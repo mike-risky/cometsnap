@@ -91,7 +91,6 @@ public sealed class ReplaceWindow : Window
 
         _startupBox = Check("Start Cometsnap with Windows", "So Print Screen always works, right after you log in.");
         _startupBox.IsChecked = true;
-        if (startsWithWindows) _startupBox.Visibility = Visibility.Collapsed;
         stack.Children.Add(_startupBox);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
@@ -112,7 +111,7 @@ public sealed class ReplaceWindow : Window
         Choice = new ReplaceChoice(
             _snippingBox?.IsChecked == true,
             _toolBoxes.Where(t => t.Box.IsChecked == true).Select(t => t.Tool).ToList(),
-            _startupBox.Visibility == Visibility.Visible && _startupBox.IsChecked == true);
+            _startupBox.IsChecked == true);
         Close();
     }
 

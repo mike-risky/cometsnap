@@ -75,6 +75,12 @@ public sealed class AppSettings
     /// </summary>
     public bool TakeOverPrintScreen { get; set; }
 
+    /// <summary>
+    /// Start Cometsnap when you log in to Windows (HKCU Run key). On by default; kept pointing
+    /// at the exe you last launched, so a new download keeps auto-starting.
+    /// </summary>
+    public bool StartWithWindows { get; set; } = true;
+
     /// <summary>The "Replace your old screen capture" offer was answered (either way).</summary>
     public bool ReplaceOfferAnswered { get; set; }
 

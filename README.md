@@ -27,7 +27,9 @@ click **More info → Run anyway**.
 - Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows).
   The moment you let go it's copied and saved: no toolbar in the way
 - First run offers to **replace your old screen capture**: Cometsnap takes over Print Screen from
-  Windows' Snipping Tool (or Greenshot, ShareX, Lightshot, Snagit...) and can start with Windows
+  Windows' Snipping Tool (or Greenshot, ShareX, Lightshot, Snagit...)
+- **Starts with Windows** by default, so Print Screen works right after you log in. Turn it off in
+  *Options > Start with Windows* (it also follows the exe if you move or re-download it)
 - Magnifier loupe with pixel grid, X/Y, selection size and hex color; it sits in a corner and dodges your cursor
 - Pixel-precise keyboard control: arrows = 1 px, Shift + arrows = 10 px, Enter to confirm, Esc to cancel
 - A small **Edit** card pops up after each capture (it never steals focus). Click it, or double-click
