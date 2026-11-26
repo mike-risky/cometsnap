@@ -1,0 +1,145 @@
+using System.Diagnostics;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
+using Cometsnap.App.Services;
+using Cometsnap.Core.Capture;
+using Cometsnap.Core.Diagnostics;
+using Cometsnap.Core.Geometry;
+using Cometsnap.Core.Native;
+using Cometsnap.Core.Storage;
+
+namespace Cometsnap.App.Capture;
+
+/// <summary>Runs every kind of capture and delivers the result (clipboard first, disk in the background).</summary>
+public sealed class CaptureController
+{
+    private readonly CometApp _app;
+    private readonly CaptureOverlay _overlay;
+    private readonly CaptureStore _store;
+    private readonly uint _pid = (uint)Environment.ProcessId;
+    private DispatcherTimer? _delayTimer;
+
+    /// <summary>Raised on the UI thread with the path of every saved capture.</summary>
+    public event Action<string>? CaptureSaved;
+
+    /// <summary>Raised on the UI thread right after a capture was taken (before saving).</summary>
+    public event Action<BitmapSource>? CaptureTaken;
+
+    public CaptureController(CometApp app)
+    {
+        _app = app;
+        _store = new CaptureStore(() => app.CapturesFolder);
+        _store.Saved += path => app.Dispatcher.BeginInvoke(() => CaptureSaved?.Invoke(path));
+
+        _overlay = new CaptureOverlay();
+        _overlay.Confirmed += (image, _) => Deliver(image);
+        _overlay.Prewarm();
+    }
+
+    public bool IsBusy => _overlay.IsCapturing;
+
+    /// <summary>Region / window capture with the frozen-screen overlay.</summary>
+    public void StartRegion()
+    {
+        if (_overlay.IsCapturing) return;
+        CancelDelay();
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var screen = FrozenScreen.CaptureVirtualScreen();
+            var grabbed = sw.ElapsedMilliseconds;
+            var windows = WindowFinder.Snapshot(_pid);
+            var monitors = Monitors.All();
+            _overlay.Begin(screen, windows, monitors, _app.Settings);
+            Log.Info($"Overlay ready in {sw.ElapsedMilliseconds} ms (grab {grabbed} ms, {windows.Count} windows, {screen.Bounds})");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Region capture failed", ex);
+            _overlay.Cancel();
+        }
+    }
+
+    /// <summary>Instant capture of the monitor under the mouse cursor.</summary>
+    public void CaptureFullscreen()
+    {
+        if (_overlay.IsCapturing) return;
+        try
+        {
+            Win32.GetCursorPos(out var p);
+            var monitor = Monitors.Containing(Monitors.All(), p.X, p.Y);
+            Deliver(FrozenScreen.Capture(monitor).CropAll());
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Fullscreen capture failed", ex);
+        }
+    }
+
+    /// <summary>Instant capture of the foreground window (true bounds, no shadow).</summary>
+    public void CaptureActiveWindow()
+    {
+        if (_overlay.IsCapturing) return;
+        try
+        {
+            var hwnd = Win32.GetForegroundWindow();
+            Win32.GetWindowThreadProcessId(hwnd, out var pid);
+            if (hwnd == IntPtr.Zero || pid == _pid)
+            {
+                CaptureFullscreen();
+                return;
+            }
+            var bounds = WindowFinder.GetBounds(hwnd).Intersect(Monitors.VirtualScreen());
+            if (bounds.IsEmpty)
+            {
+                CaptureFullscreen();
+                return;
+            }
+            Deliver(FrozenScreen.Capture(bounds).CropAll());
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Active window capture failed", ex);
+        }
+    }
+
+    /// <summary>Opens the region overlay after a delay, to capture menus and hover states.</summary>
+    public void StartDelayed(int seconds)
+    {
+        CancelDelay();
+        var remaining = seconds;
+        _app.SetTrayStatus($"Cometsnap: capture in {remaining} s");
+        _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal, (_, _) =>
+        {
+            remaining--;
+            if (remaining > 0)
+            {
+                _app.SetTrayStatus($"Cometsnap: capture in {remaining} s");
+                return;
+            }
+            CancelDelay();
+            StartRegion();
+        }, _app.Dispatcher);
+        _delayTimer.Start();
+    }
+
+    private void CancelDelay()
+    {
+        if (_delayTimer is null) return;
+        _delayTimer.Stop();
+        _delayTimer = null;
+        _app.SetTrayStatus(null);
+    }
+
+    private void Deliver(BitmapSource image)
+    {
+        var settings = _app.Settings;
+        var sw = Stopwatch.StartNew();
+        if (settings.CopyToClipboardOnCapture && !ClipboardService.SetImage(image))
+            Log.Error("Could not copy the capture to the clipboard");
+        Log.Info($"Capture {image.PixelWidth}×{image.PixelHeight} on clipboard in {sw.ElapsedMilliseconds} ms");
+
+        CaptureTaken?.Invoke(image);
+        if (settings.AutoSave) _ = _store.SaveAsync(image, DateTime.Now);
+    }
+}

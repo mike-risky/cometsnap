@@ -1,0 +1,669 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
+using Path = System.Windows.Shapes.Path;
+using Cometsnap.App.Theme;
+using Cometsnap.Core.Capture;
+using Cometsnap.Core.Geometry;
+using Cometsnap.Core.Native;
+using Cometsnap.Core.Settings;
+
+namespace Cometsnap.App.Capture;
+
+/// <summary>
+/// The heart of Cometsnap: a full virtual-screen window showing the frozen screen.
+/// Hover detects windows, click grabs one, drag draws a free region (edges snap to windows),
+/// the loupe gives pixel precision. Created once at startup and re-used, so it opens instantly.
+///
+/// Everything inside works in physical pixels: the root canvas is scaled by 1/DPI, so one
+/// unit = one screen pixel on every monitor, whatever the scaling.
+/// </summary>
+public sealed class CaptureOverlay : Window
+{
+    private enum Mode { Idle, Hover, Pressed, Dragging, Selected, Moving, Resizing }
+
+    [Flags]
+    private enum Edges { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
+
+    private const int DragThreshold = 4;
+    private const int SnapDistance = 8;
+
+    private static readonly SolidColorBrush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x8C, 0x07, 0x0A, 0x1C)));
+    private static readonly SolidColorBrush GlowBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x55, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
+    private static readonly SolidColorBrush GuideBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x70, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
+
+    private readonly Canvas _root;
+    private readonly ScaleTransform _scale = new(1, 1);
+    private readonly Image _image;
+    private readonly RectangleGeometry _outer = new();
+    private readonly RectangleGeometry _hole = new();
+    private readonly Rectangle _glow;
+    private readonly Rectangle _border;
+    private readonly Line _guideH;
+    private readonly Line _guideV;
+    private readonly Border _label;
+    private readonly TextBlock _labelText;
+    private readonly Border _hint;
+    private readonly TextBlock _hintText;
+    private readonly Loupe _loupe;
+
+    private IntPtr _hwnd;
+    private FrozenScreen? _screen;
+    private PixelRect _full;
+    private IReadOnlyList<WindowInfo> _windows = Array.Empty<WindowInfo>();
+    private IReadOnlyList<PixelRect> _monitors = Array.Empty<PixelRect>();
+    private EdgeSnapper? _snapper;
+    private AppSettings _settings = new();
+
+    private Mode _mode = Mode.Idle;
+    private bool _detectWindows = true;
+    private PixelRect? _hover;
+    private PixelRect _selection;
+    private int _cx, _cy;            // cursor pixel (local)
+    private int _ax, _ay;            // drag anchor pixel (local)
+    private int _pressX, _pressY;
+    private PixelRect _startSelection;
+    private Edges _resizeEdges;
+    private bool _spaceHeld;
+    private int _spaceX, _spaceY;
+    private bool _skipSnapOnce;
+    private LoupeCorner _loupeCorner = LoupeCorner.BottomLeft;
+    private double _dpi = 1;
+    private int _framesUntilVisible;
+
+    /// <summary>Raised with the captured image and its virtual-screen rectangle.</summary>
+    public event Action<BitmapSource, PixelRect>? Confirmed;
+    public event Action? Cancelled;
+
+    public bool IsCapturing => _mode != Mode.Idle;
+
+    public CaptureOverlay()
+    {
+        Title = "Cometsnap capture";
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.NoResize;
+        ShowInTaskbar = false;
+        Topmost = true;
+        ShowActivated = true;
+        AllowsTransparency = false;
+        Background = Brushes.Black;
+        Cursor = Cursors.Cross;
+        Focusable = true;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = -32000;
+        Top = -32000;
+        Width = 1;
+        Height = 1;
+
+        _image = new Image { Stretch = Stretch.Fill };
+        RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.NearestNeighbor);
+
+        var dimGeometry = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        dimGeometry.Children.Add(_outer);
+        dimGeometry.Children.Add(_hole);
+        var dim = new Path { Data = dimGeometry, Fill = DimBrush, IsHitTestVisible = false };
+
+        _glow = new Rectangle { Stroke = GlowBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _border = new Rectangle { Stroke = SpaceTheme.CometBlueBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _guideH = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
+        _guideV = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
+
+        _labelText = new TextBlock { Foreground = SpaceTheme.StarWhiteBrush, FontFamily = new FontFamily("Segoe UI Semibold") };
+        _label = new Border { Child = _labelText, Background = SpaceTheme.NavyBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+
+        _hintText = new TextBlock { Foreground = SpaceTheme.DustBrush, FontFamily = new FontFamily("Segoe UI") };
+        _hint = new Border { Child = _hintText, Background = SpaceTheme.NavyBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+
+        _loupe = new Loupe();
+
+        _root = new Canvas { RenderTransform = _scale, ClipToBounds = false };
+        _root.Children.Add(_image);
+        _root.Children.Add(dim);
+        _root.Children.Add(_guideH);
+        _root.Children.Add(_guideV);
+        _root.Children.Add(_glow);
+        _root.Children.Add(_border);
+        _root.Children.Add(_label);
+        _root.Children.Add(_hint);
+        _root.Children.Add(_loupe);
+        Content = _root;
+
+        MouseMove += OnMouseMove;
+        MouseLeftButtonDown += OnMouseLeftButtonDown;
+        MouseLeftButtonUp += OnMouseLeftButtonUp;
+        MouseRightButtonUp += (_, e) => { e.Handled = true; Back(); };
+        KeyDown += OnKeyDown;
+        KeyUp += OnKeyUp;
+    }
+
+    /// <summary>Creates the native window and runs WPF's first layout/render once, off-screen and cloaked.</summary>
+    public void Prewarm()
+    {
+        _hwnd = new WindowInteropHelper(this).EnsureHandle();
+        HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc);
+        SetDwm(Win32.DWMWA_TRANSITIONS_FORCEDISABLED, 1);
+        SetDwm(Win32.DWMWA_CLOAK, 1);
+        Show();
+        Hide();
+    }
+
+    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings)
+    {
+        if (_hwnd == IntPtr.Zero) Prewarm();
+
+        _screen = screen;
+        _settings = settings;
+        _full = new PixelRect(0, 0, screen.Bounds.Width, screen.Bounds.Height);
+        _windows = windows
+            .Select(w => w with { Bounds = screen.ToLocal(w.Bounds).Intersect(_full) })
+            .Where(w => !w.Bounds.IsEmpty)
+            .ToList();
+        _monitors = monitors.Select(screen.ToLocal).ToList();
+        _snapper = new EdgeSnapper(_windows.Select(w => w.Bounds).Concat(_monitors), SnapDistance);
+        _detectWindows = settings.WindowDetection;
+        _loupeCorner = settings.LoupeCorner;
+        _hover = null;
+        _selection = default;
+        _spaceHeld = false;
+
+        _image.Source = screen.Image;
+        _image.Width = _full.Width;
+        _image.Height = _full.Height;
+        _outer.Rect = new Rect(0, 0, _full.Width, _full.Height);
+        _guideH.X2 = _full.Width;
+        _guideV.Y2 = _full.Height;
+
+        // Show cloaked, place over the whole virtual screen, and uncloak once WPF has rendered
+        // the new frame: no flash of an old screenshot, no window animation.
+        SetDwm(Win32.DWMWA_CLOAK, 1);
+        Show();
+        Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, screen.Bounds.X, screen.Bounds.Y,
+            screen.Bounds.Width, screen.Bounds.Height, Win32.SWP_SHOWWINDOW);
+
+        _dpi = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        _scale.ScaleX = 1 / _dpi;
+        _scale.ScaleY = 1 / VisualTreeHelper.GetDpi(this).DpiScaleY;
+        ApplyDpiSizes();
+        _loupe.Configure(screen.Image, _dpi);
+
+        Win32.GetCursorPos(out var p);
+        _cx = p.X - screen.Bounds.X;
+        _cy = p.Y - screen.Bounds.Y;
+        _mode = Mode.Hover;
+        UpdateHover();
+        Refresh();
+
+        Activate();
+        Win32.SetForegroundWindow(_hwnd);
+        Keyboard.Focus(this);
+
+        _framesUntilVisible = 2;
+        CompositionTarget.Rendering -= OnRendering;
+        CompositionTarget.Rendering += OnRendering;
+    }
+
+    private void OnRendering(object? sender, EventArgs e)
+    {
+        if (--_framesUntilVisible > 0) return;
+        CompositionTarget.Rendering -= OnRendering;
+        if (_mode != Mode.Idle) SetDwm(Win32.DWMWA_CLOAK, 0);
+    }
+
+    private void End()
+    {
+        CompositionTarget.Rendering -= OnRendering;
+        _mode = Mode.Idle;
+        SetDwm(Win32.DWMWA_CLOAK, 1);
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        Hide();
+        _image.Source = null;
+        _loupe.Release();
+        _screen = null;
+        _windows = Array.Empty<WindowInfo>();
+    }
+
+    public void Cancel()
+    {
+        if (_mode == Mode.Idle) return;
+        End();
+        Cancelled?.Invoke();
+    }
+
+    private void Confirm()
+    {
+        if (_screen is null || _selection.IsEmpty) return;
+        var image = _screen.Crop(_selection);
+        var rect = _screen.ToVirtual(_selection);
+        End();
+        Confirmed?.Invoke(image, rect);
+    }
+
+    /// <summary>Esc / right click: drop the selection first, close on the second press.</summary>
+    private void Back()
+    {
+        if (_mode is Mode.Selected or Mode.Moving or Mode.Resizing or Mode.Dragging)
+        {
+            if (IsMouseCaptured) ReleaseMouseCapture();
+            _selection = default;
+            _mode = Mode.Hover;
+            UpdateHover();
+            Refresh();
+        }
+        else
+        {
+            Cancel();
+        }
+    }
+
+    // ------------------------------------------------------------------ mouse
+
+    private void OnMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_mode == Mode.Idle) return;
+        var pos = e.GetPosition(_root);
+        _cx = Math.Clamp((int)Math.Floor(pos.X), 0, _full.Width - 1);
+        _cy = Math.Clamp((int)Math.Floor(pos.Y), 0, _full.Height - 1);
+        var snap = !_skipSnapOnce && (Keyboard.Modifiers & ModifierKeys.Alt) == 0;
+        _skipSnapOnce = false;
+
+        switch (_mode)
+        {
+            case Mode.Hover:
+                UpdateHover();
+                break;
+
+            case Mode.Pressed:
+                if (Math.Abs(_cx - _pressX) > DragThreshold || Math.Abs(_cy - _pressY) > DragThreshold)
+                {
+                    _ax = snap ? SnapX(_pressX) : _pressX;
+                    _ay = snap ? SnapY(_pressY) : _pressY;
+                    _mode = Mode.Dragging;
+                    goto case Mode.Dragging;
+                }
+                break;
+
+            case Mode.Dragging:
+                if (_spaceHeld)
+                {
+                    // Space held: move the whole rectangle instead of resizing it.
+                    _ax += _cx - _spaceX;
+                    _ay += _cy - _spaceY;
+                }
+                _spaceX = _cx;
+                _spaceY = _cy;
+                var ex = snap && !_spaceHeld ? SnapX(_cx) : _cx;
+                var ey = snap && !_spaceHeld ? SnapY(_cy) : _cy;
+                _selection = PixelRect.FromPixels(_ax, _ay, ex, ey).Intersect(_full);
+                break;
+
+            case Mode.Moving:
+                _selection = _startSelection.Offset(_cx - _pressX, _cy - _pressY).KeepInside(_full);
+                break;
+
+            case Mode.Resizing:
+                Resize(snap);
+                break;
+
+            case Mode.Selected:
+                Cursor = CursorFor(EdgesAt(_cx, _cy), _selection.Contains(_cx, _cy));
+                break;
+        }
+
+        Refresh();
+    }
+
+    private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_mode == Mode.Idle) return;
+        e.Handled = true;
+        _pressX = _cx;
+        _pressY = _cy;
+
+        if (_mode == Mode.Selected)
+        {
+            if (e.ClickCount >= 2 && _selection.Contains(_cx, _cy))
+            {
+                Confirm();
+                return;
+            }
+
+            var edges = EdgesAt(_cx, _cy);
+            if (edges != Edges.None)
+            {
+                _resizeEdges = edges;
+                _startSelection = _selection;
+                _mode = Mode.Resizing;
+            }
+            else if (_selection.Contains(_cx, _cy))
+            {
+                _startSelection = _selection;
+                _mode = Mode.Moving;
+            }
+            else
+            {
+                _selection = default;
+                _mode = Mode.Pressed;
+                UpdateHover();
+            }
+        }
+        else
+        {
+            _mode = Mode.Pressed;
+        }
+
+        CaptureMouse();
+        Refresh();
+    }
+
+    private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_mode == Mode.Idle) return;
+        e.Handled = true;
+        if (IsMouseCaptured) ReleaseMouseCapture();
+
+        switch (_mode)
+        {
+            case Mode.Pressed:
+                // A click without dragging grabs the detected window.
+                if (_hover is { } hover)
+                {
+                    _selection = hover;
+                    _mode = Mode.Selected;
+                }
+                else
+                {
+                    _mode = Mode.Hover;
+                }
+                break;
+
+            case Mode.Dragging:
+            case Mode.Moving:
+            case Mode.Resizing:
+                _spaceHeld = false;
+                _mode = _selection.IsEmpty ? Mode.Hover : Mode.Selected;
+                break;
+        }
+
+        Cursor = _mode == Mode.Selected ? CursorFor(EdgesAt(_cx, _cy), _selection.Contains(_cx, _cy)) : Cursors.Cross;
+        Refresh();
+    }
+
+    private void Resize(bool snap)
+    {
+        var l = _startSelection.X;
+        var t = _startSelection.Y;
+        var r = _startSelection.Right - 1;
+        var b = _startSelection.Bottom - 1;
+        var dx = _cx - _pressX;
+        var dy = _cy - _pressY;
+
+        if (_resizeEdges.HasFlag(Edges.Left)) l = SnapIf(snap, l + dx, SnapX);
+        if (_resizeEdges.HasFlag(Edges.Right)) r = SnapIf(snap, r + dx, SnapX);
+        if (_resizeEdges.HasFlag(Edges.Top)) t = SnapIf(snap, t + dy, SnapY);
+        if (_resizeEdges.HasFlag(Edges.Bottom)) b = SnapIf(snap, b + dy, SnapY);
+
+        _selection = PixelRect.FromPixels(l, t, r, b).Intersect(_full);
+    }
+
+    private static int SnapIf(bool snap, int v, Func<int, int> snapper) => snap ? snapper(v) : v;
+    private int SnapX(int x) => _snapper?.SnapX(x) ?? x;
+    private int SnapY(int y) => _snapper?.SnapY(y) ?? y;
+
+    private Edges EdgesAt(int x, int y)
+    {
+        if (_selection.IsEmpty) return Edges.None;
+        var grab = Math.Max(4, (int)Math.Round(6 * _dpi));
+        var s = _selection;
+        if (x < s.X - grab || x > s.Right - 1 + grab || y < s.Y - grab || y > s.Bottom - 1 + grab) return Edges.None;
+
+        var edges = Edges.None;
+        if (Math.Abs(x - s.X) <= grab) edges |= Edges.Left;
+        else if (Math.Abs(x - (s.Right - 1)) <= grab) edges |= Edges.Right;
+        if (Math.Abs(y - s.Y) <= grab) edges |= Edges.Top;
+        else if (Math.Abs(y - (s.Bottom - 1)) <= grab) edges |= Edges.Bottom;
+        return edges;
+    }
+
+    private static Cursor CursorFor(Edges edges, bool inside) => edges switch
+    {
+        Edges.Left or Edges.Right => Cursors.SizeWE,
+        Edges.Top or Edges.Bottom => Cursors.SizeNS,
+        Edges.Left | Edges.Top or Edges.Right | Edges.Bottom => Cursors.SizeNWSE,
+        Edges.Right | Edges.Top or Edges.Left | Edges.Bottom => Cursors.SizeNESW,
+        _ => inside ? Cursors.SizeAll : Cursors.Cross,
+    };
+
+    private void UpdateHover()
+    {
+        if (!_detectWindows)
+        {
+            _hover = null;
+            return;
+        }
+        _hover = WindowFinder.HitTest(_windows, _cx, _cy)?.Bounds
+                 ?? Monitors.Containing(_monitors, _cx, _cy).Intersect(_full);
+    }
+
+    // ------------------------------------------------------------------ keyboard
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (_mode == Mode.Idle) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+        var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        var step = shift ? 10 : 1;
+        e.Handled = true;
+
+        switch (key)
+        {
+            case Key.Escape:
+                Back();
+                return;
+
+            case Key.Enter:
+                if (_mode == Mode.Hover && _hover is { } hover) _selection = hover;
+                Confirm();
+                return;
+
+            case Key.C when ctrl && _mode == Mode.Selected:
+                Confirm();
+                return;
+
+            case Key.C:
+                if (_screen is not null)
+                {
+                    var hex = Loupe.HexOf(_screen.ColorAt(_cx, _cy));
+                    if (Services.ClipboardService.SetText(hex)) _loupe.FlashHint("Copied!");
+                }
+                return;
+
+            case Key.F:
+                _selection = Monitors.Containing(_monitors, _cx, _cy).Intersect(_full);
+                _mode = Mode.Selected;
+                Refresh();
+                return;
+
+            case Key.W:
+                _detectWindows = !_detectWindows;
+                if (_mode == Mode.Hover) UpdateHover();
+                Refresh();
+                return;
+
+            case Key.Space:
+                if (_mode == Mode.Dragging && !e.IsRepeat)
+                {
+                    _spaceHeld = true;
+                    _spaceX = _cx;
+                    _spaceY = _cy;
+                }
+                return;
+
+            case Key.Left: Arrow(-step, 0, ctrl); return;
+            case Key.Right: Arrow(step, 0, ctrl); return;
+            case Key.Up: Arrow(0, -step, ctrl); return;
+            case Key.Down: Arrow(0, step, ctrl); return;
+        }
+
+        e.Handled = false;
+    }
+
+    private void OnKeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Space) _spaceHeld = false;
+    }
+
+    private void Arrow(int dx, int dy, bool resize)
+    {
+        if (_mode == Mode.Selected)
+        {
+            // Arrows move the selection; Ctrl + arrows grow/shrink it from the bottom-right.
+            _selection = resize
+                ? new PixelRect(_selection.X, _selection.Y, Math.Max(1, _selection.Width + dx), Math.Max(1, _selection.Height + dy)).Intersect(_full)
+                : _selection.Offset(dx, dy).KeepInside(_full);
+            Refresh();
+            return;
+        }
+
+        // Otherwise the arrows move the mouse cursor itself, pixel by pixel.
+        if (_screen is null) return;
+        var x = Math.Clamp(_cx + dx, 0, _full.Width - 1);
+        var y = Math.Clamp(_cy + dy, 0, _full.Height - 1);
+        _skipSnapOnce = true;
+        Win32.SetCursorPos(x + _screen.Bounds.X, y + _screen.Bounds.Y);
+    }
+
+    // ------------------------------------------------------------------ drawing
+
+    private void ApplyDpiSizes()
+    {
+        var bt = Math.Max(1, Math.Round(_dpi));
+        _border.StrokeThickness = bt;
+        _glow.StrokeThickness = bt * 4;
+        _labelText.FontSize = 12 * _dpi;
+        _label.Padding = new Thickness(6 * _dpi, 2 * _dpi, 6 * _dpi, 2 * _dpi);
+        _label.CornerRadius = new CornerRadius(4 * _dpi);
+        _hintText.FontSize = 12 * _dpi;
+        _hint.Padding = new Thickness(8 * _dpi, 4 * _dpi, 8 * _dpi, 4 * _dpi);
+        _hint.CornerRadius = new CornerRadius(6 * _dpi);
+        _hintText.Text = "Enter copy  ·  Esc back  ·  drag to adjust  ·  arrows move  ·  Ctrl+arrows resize";
+    }
+
+    private void Refresh()
+    {
+        if (_screen is null) return;
+
+        PixelRect? target = _mode is Mode.Hover or Mode.Pressed ? _hover : _selection.IsEmpty ? null : _selection;
+
+        if (target is { } r)
+        {
+            _hole.Rect = new Rect(r.X, r.Y, r.Width, r.Height);
+            PlaceFrame(_border, r, _border.StrokeThickness);
+            PlaceFrame(_glow, r, _border.StrokeThickness + _glow.StrokeThickness / 2);
+            _border.Visibility = _glow.Visibility = Visibility.Visible;
+
+            _labelText.Text = $"{r.Width} × {r.Height}";
+            _label.Visibility = Visibility.Visible;
+            _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var lh = _label.DesiredSize.Height;
+            var ly = r.Y - lh - 4 * _dpi;
+            if (ly < 0) ly = r.Y + 4 * _dpi;
+            Canvas.SetLeft(_label, Math.Max(0, r.X));
+            Canvas.SetTop(_label, ly);
+        }
+        else
+        {
+            _hole.Rect = Rect.Empty;
+            _border.Visibility = _glow.Visibility = _label.Visibility = Visibility.Collapsed;
+        }
+
+        var showGuides = _mode is Mode.Hover or Mode.Pressed or Mode.Dragging;
+        _guideH.Visibility = _guideV.Visibility = showGuides ? Visibility.Visible : Visibility.Collapsed;
+        if (showGuides)
+        {
+            _guideH.Y1 = _guideH.Y2 = _cy + 0.5;
+            _guideV.X1 = _guideV.X2 = _cx + 0.5;
+        }
+
+        if (_mode == Mode.Selected && target is { } sel)
+        {
+            _hint.Visibility = Visibility.Visible;
+            _hint.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var hw = _hint.DesiredSize.Width;
+            var hh = _hint.DesiredSize.Height;
+            var hy = sel.Bottom + 8 * _dpi;
+            if (hy + hh > _full.Height) hy = Math.Max(0, sel.Bottom - hh - 8 * _dpi);
+            Canvas.SetLeft(_hint, Math.Clamp(sel.CenterX - hw / 2, 0, Math.Max(0, _full.Width - hw)));
+            Canvas.SetTop(_hint, hy);
+        }
+        else
+        {
+            _hint.Visibility = Visibility.Collapsed;
+        }
+
+        UpdateLoupe(target);
+    }
+
+    private static void PlaceFrame(Rectangle frame, PixelRect r, double outset)
+    {
+        // The frame sits just outside the selection so it never ends up in the capture.
+        Canvas.SetLeft(frame, r.X - outset);
+        Canvas.SetTop(frame, r.Y - outset);
+        frame.Width = r.Width + 2 * outset;
+        frame.Height = r.Height + 2 * outset;
+    }
+
+    private void UpdateLoupe(PixelRect? target)
+    {
+        if (_screen is null) return;
+        var w = _loupe.PixelWidth;
+        var h = _loupe.PixelHeight;
+        var monitor = Monitors.Containing(_monitors, _cx, _cy);
+
+        PixelRect place;
+        if (_settings.LoupeCorner == LoupeCorner.FollowCursor)
+        {
+            place = LoupePlacement.FollowRect(monitor, w, h, _cx, _cy);
+        }
+        else
+        {
+            _loupeCorner = LoupePlacement.ResolveCorner(_settings.LoupeCorner, _loupeCorner, monitor, w, h, _cx, _cy);
+            place = LoupePlacement.RectFor(_loupeCorner, monitor, w, h);
+        }
+        Canvas.SetLeft(_loupe, place.X);
+        Canvas.SetTop(_loupe, place.Y);
+
+        var size = target is { } t ? $"{t.Width} × {t.Height}" : null;
+        _loupe.Update(_cx, _cy, _cx + _screen.Bounds.X, _cy + _screen.Bounds.Y, _screen.ColorAt(_cx, _cy), size);
+    }
+
+    // ------------------------------------------------------------------ native
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == Win32.WM_DPICHANGED)
+        {
+            // We span every monitor and draw in physical pixels ourselves: ignore DPI-driven
+            // resizing, otherwise Windows would shrink/grow the overlay between monitors.
+            handled = true;
+            if (_screen is { } s)
+                Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, s.Bounds.X, s.Bounds.Y, s.Bounds.Width, s.Bounds.Height, Win32.SWP_NOACTIVATE);
+        }
+        return IntPtr.Zero;
+    }
+
+    private void SetDwm(int attribute, int value)
+    {
+        if (_hwnd != IntPtr.Zero) Win32.DwmSetWindowAttribute(_hwnd, attribute, ref value, sizeof(int));
+    }
+
+    private static T Freeze<T>(T freezable) where T : Freezable
+    {
+        freezable.Freeze();
+        return freezable;
+    }
+}
