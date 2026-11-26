@@ -295,6 +295,13 @@ final class CanvasView: NSView, NSTextFieldDelegate {
 
     private func pushUndo() { undoStack.push(doc) }
 
+    /// Constellation mode on or off (a look, not an edit: no undo step).
+    func setConnectSteps(_ on: Bool) {
+        guard doc.connectSteps != on else { return }
+        doc.connectSteps = on
+        changed()
+    }
+
     private func changed() { onChange?(); needsDisplay = true }
 
     func undo() {

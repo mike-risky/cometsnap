@@ -57,7 +57,9 @@ enum Theme {
     }
 
     /// Menu bar icon, 18 pt, from the hand-tuned 20/40 px PNGs.
-    static var menuBarIcon: NSImage {
+    static var menuBarIcon: NSImage { SeasonalArt.decorate(plainMenuBarIcon) }
+
+    private static var plainMenuBarIcon: NSImage {
         let img = NSImage(size: NSSize(width: 18, height: 18))
         for name in ["cometsnap-20", "cometsnap-40"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "png"), let rep = NSImageRep(contentsOf: url) {

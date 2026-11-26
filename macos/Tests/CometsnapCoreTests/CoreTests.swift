@@ -123,3 +123,84 @@ final class AnnotationTests: XCTestCase {
         XCTAssertEqual(u.redo(current: 1), 2)
     }
 }
+
+final class FunTests: XCTestCase {
+    private var utc: Calendar {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = TimeZone(identifier: "UTC")!
+        return c
+    }
+
+    private func day(_ y: Int, _ m: Int, _ d: Int) -> Date {
+        utc.date(from: DateComponents(year: y, month: m, day: d, hour: 12))!
+    }
+
+    func testKonami() {
+        var k = KonamiCode()
+        let seq: [KonamiKey] = [.up, .up, .up, .down, .down, .left, .right, .left, .right, .b]
+        for key in seq { XCTAssertFalse(k.feed(key)) }
+        XCTAssertTrue(k.feed(.a))
+        XCTAssertFalse(k.feed(.a))
+        XCTAssertFalse(k.feed(.other))
+        XCTAssertEqual(k.matched, 0)
+    }
+
+    func testSeasons() {
+        XCTAssertEqual(Season.at(day(2026, 10, 17), calendar: utc), .none)
+        XCTAssertEqual(Season.at(day(2026, 10, 18), calendar: utc), .halloween)
+        XCTAssertEqual(Season.at(day(2026, 10, 31), calendar: utc), .halloween)
+        XCTAssertEqual(Season.at(day(2026, 12, 1), calendar: utc), .winter)
+        XCTAssertEqual(Season.at(day(2027, 1, 1), calendar: utc), .none)
+    }
+
+    func testMilestones() {
+        XCTAssertTrue(SnapMilestones.isMilestone(10))
+        XCTAssertTrue(SnapMilestones.isMilestone(1000))
+        XCTAssertTrue(SnapMilestones.isMilestone(30000))
+        XCTAssertFalse(SnapMilestones.isMilestone(11))
+        XCTAssertFalse(SnapMilestones.isMilestone(15000))
+        XCTAssertEqual(SnapMilestones.title(1000), "1,000th snap!")
+        XCTAssertEqual(SnapMilestones.suffix(21), "st")
+        XCTAssertEqual(SnapMilestones.suffix(112), "th")
+        XCTAssertEqual(SnapMilestones.suffix(23), "rd")
+    }
+
+    func testRecordAndMonthSummary() {
+        var s = AppSettings()
+        s.snapCount = 9
+        let e = SnapMilestones.record(&s, now: day(2026, 10, 5), calendar: utc)
+        XCTAssertEqual(e.milestone, 10)
+        XCTAssertNil(e.finishedMonth)
+        _ = SnapMilestones.record(&s, now: day(2026, 10, 6), calendar: utc)
+        let next = SnapMilestones.record(&s, now: day(2026, 11, 1), calendar: utc)
+        XCTAssertEqual(next.finishedMonth, MonthSummary(month: "2026-10", count: 2))
+        XCTAssertEqual(next.finishedMonth?.title, "October 2026")
+        XCTAssertEqual(s.snapMonthCount, 1)
+        XCTAssertEqual(s.snapCount, 12)
+    }
+
+    func testSeedOnce() {
+        var s = AppSettings()
+        SnapMilestones.seed(&s, existing: [day(2026, 9, 1), day(2026, 11, 2), day(2026, 11, 3)], now: day(2026, 11, 20), calendar: utc)
+        XCTAssertEqual(s.snapCount, 3)
+        XCTAssertEqual(s.snapMonthCount, 2)
+        XCTAssertTrue(s.snapCountSeeded)
+        SnapMilestones.seed(&s, existing: Array(repeating: day(2026, 11, 2), count: 50), now: day(2026, 11, 20), calendar: utc)
+        XCTAssertEqual(s.snapCount, 3)
+    }
+
+    func testDocumentKeepsConstellation() {
+        var doc = AnnotationDocument()
+        doc.connectSteps = true
+        XCTAssertEqual(AnnotationDocument.decode(doc.encoded()!)?.connectSteps, true)
+        let old = AnnotationDocument.decode(Data("{\"version\":1,\"annotations\":[]}".utf8))
+        XCTAssertEqual(old?.connectSteps, false)
+    }
+
+    func testSettingsNewFieldsDefault() throws {
+        let s = try JSONDecoder().decode(AppSettings.self, from: Data("{}".utf8))
+        XCTAssertTrue(s.celebrations)
+        XCTAssertTrue(s.seasonalLooks)
+        XCTAssertFalse(s.snapCountSeeded)
+    }
+}
