@@ -27,6 +27,12 @@ public sealed class AppSettings
 
     public string FullscreenHotkey { get; set; } = "Ctrl+PrintScreen";
 
+    /// <summary>Scrolling capture (X11): Cometsnap scrolls the picked window and glues one tall image.</summary>
+    public string ScrollingHotkey { get; set; } = "Ctrl+Alt+PrintScreen";
+
+    /// <summary>Copy text (OCR with Tesseract).</summary>
+    public string TextHotkey { get; set; } = "Ctrl+Alt+T";
+
     /// <summary>Start recording a region (pick it like a capture). Pressed again while recording: stop.</summary>
     public string RecordHotkey { get; set; } = "Shift+PrintScreen";
 

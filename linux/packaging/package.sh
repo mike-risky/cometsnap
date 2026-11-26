@@ -89,7 +89,7 @@ Installed-Size: $SIZE
 Maintainer: Michael Solioz <260403229+mike-risky@users.noreply.github.com>
 Homepage: https://github.com/mike-risky/cometsnap
 Depends: libx11-6, libice6, libsm6, libfontconfig1, libc6, ffmpeg
-Recommends: xdg-desktop-portal, gstreamer1.0-pipewire, wl-clipboard, pulseaudio-utils | pipewire-bin
+Recommends: libxtst6, tesseract-ocr, xdg-desktop-portal, gstreamer1.0-pipewire, wl-clipboard, pulseaudio-utils | pipewire-bin
 Description: Snappy screenshots, annotations and screen recordings
  Cometsnap lives in the tray. Press Print Screen, pick a window or drag an
  area, and the picture is copied and saved at once. Edit it later with arrows,

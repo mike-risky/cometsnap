@@ -63,6 +63,8 @@ public sealed class TrayController : IDisposable
         _captureItem = Item(T("Capture window / region"), () => Later(_app.Capture.StartRegion));
         menu.Add(_captureItem);
         menu.Add(Item(T("Capture full screen"), () => Later(_app.Capture.CaptureFullscreen)));
+        menu.Add(Item(T("Scrolling capture"), () => Later(_app.Scrolling.Start)));
+        menu.Add(Item(T("Copy text from the screen"), () => Later(_app.CopyText.Start)));
         var delayed = new NativeMenuItem(T("Delayed capture")) { Menu = new NativeMenu() };
         foreach (var s in new[] { 3, 5, 10 }) delayed.Menu.Add(Item($"{s} seconds", () => _app.Capture.StartDelayed(s)));
         menu.Add(delayed);

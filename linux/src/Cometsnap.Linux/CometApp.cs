@@ -28,6 +28,8 @@ public sealed class CometApp : Application
     public ThumbnailCache Thumbs { get; private set; } = null!;
     public CaptureStore Store { get; private set; } = null!;
     public ClipboardService Clipboard { get; private set; } = null!;
+    public TextCapture CopyText { get; private set; } = null!;
+    public ScrollingCapture Scrolling { get; private set; } = null!;
     public SoundService Sound { get; private set; } = null!;
     public CaptureController Capture { get; private set; } = null!;
     public RecordingController Recorder { get; private set; } = null!;
@@ -92,6 +94,8 @@ public sealed class CometApp : Application
         Recorder = new RecordingController(this);
         Flyout = new FlyoutWindow(this);
         Clipboard = new ClipboardService(() => Flyout);
+        CopyText = new TextCapture(this);
+        Scrolling = new ScrollingCapture(this);
         Task.Run(() => Recent.Load(CapturesFolder));
 
         try { _tray = new TrayController(this); }
@@ -147,6 +151,8 @@ public sealed class CometApp : Application
                 else Capture.StartRegion();
                 break;
             case "fullscreen": Capture.CaptureFullscreen(); break;
+            case "scroll": Scrolling.Start(); break;
+            case "text": CopyText.Start(); break;
             case "delayed": Capture.StartDelayed(parts.Length > 1 && int.TryParse(parts[1], out var s) ? s : 3); break;
             case "record": Recorder.ToggleRegion(RecordingFormat.Mp4); break;
             case "record-gif": Recorder.ToggleRegion(RecordingFormat.Gif); break;
