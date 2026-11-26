@@ -210,8 +210,12 @@ final class LocalizationTests: XCTestCase {
 
     func testPicksSystemLanguage() {
         XCTAssertEqual(L.fromPreferred(["de-CH", "en-US"]), "de")
-        XCTAssertEqual(L.fromPreferred(["es-ES", "it-IT"]), "it")
+        XCTAssertEqual(L.fromPreferred(["ja-JP", "it-IT"]), "it")
         XCTAssertEqual(L.fromPreferred(["ja-JP"]), "en")
+        XCTAssertEqual(L.fromPreferred(["es-MX"]), "es")
+        XCTAssertEqual(L.fromPreferred(["pt-BR"]), "pt")
+        XCTAssertEqual(L.fromPreferred(["zh-Hans-CN"]), "zh")
+        XCTAssertEqual(L.fromPreferred(["hi-IN"]), "hi")
         L.use("", preferred: ["fr-CH"])
         XCTAssertEqual(L.language, "fr")
         L.use("xx")
@@ -230,13 +234,27 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(SnapMilestones.title(1000), "1.000. Screenshot!")
         L.use("it")
         XCTAssertEqual(L.t("Delayed"), "Autoscatto")
+        L.use("es")
+        XCTAssertEqual(L.t("COPIED!"), "¡COPIADO!")
+        L.use("pt")
+        XCTAssertEqual(L.t("Delayed"), "Com atraso")
+        L.use("zh")
+        XCTAssertEqual(SnapMilestones.title(1000), "第 1,000 张截图！")
+        XCTAssertEqual(MonthSummary(month: "2026-10", count: 3).title, "2026年10月")
+        L.use("hi")
+        XCTAssertEqual(L.t("COPIED!"), "कॉपी हो गया!")
     }
 
     func testEveryLanguageHasEveryText() {
-        let fr = Set(Strings.french.keys), de = Set(Strings.german.keys), it = Set(Strings.italian.keys)
-        XCTAssertEqual(fr, de)
-        XCTAssertEqual(fr, it)
-        for (k, v) in Strings.french where k.contains("{0}") { XCTAssertTrue(v.contains("{0}"), k) }
+        XCTAssertEqual(L.languages.count, 8)
+        let fr = Set(Strings.french.keys)
+        for (code, _) in L.languages where code != "en" {
+            let table = Strings.table(code) ?? [:]
+            XCTAssertEqual(Set(table.keys), fr, code)
+            for (k, v) in table {
+                for p in ["{0}", "{1}"] where k.contains(p) { XCTAssertTrue(v.contains(p), "\(code): \(k)") }
+            }
+        }
     }
 }
 

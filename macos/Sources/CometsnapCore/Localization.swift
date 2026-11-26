@@ -1,17 +1,19 @@
 import Foundation
 
-/// The app's texts in English, French, German and Italian. The English text is the key, so the
+/// The app's texts in English, French, German, Italian, Spanish, Brazilian Portuguese,
+/// Simplified Chinese and Hindi. The English text is the key, so the
 /// code stays readable and a missing translation simply shows English. Same scheme and wording
 /// as the Windows app.
 public enum L {
     /// Languages Cometsnap speaks: code and native name.
     public static let languages: [(code: String, name: String)] = [
         ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
+        ("es", "Español"), ("pt", "Português"), ("zh", "简体中文"), ("hi", "हिन्दी"),
     ]
 
     private static var table: [String: String]?
 
-    /// The language in use: "en", "fr", "de" or "it".
+    /// The language in use: "en", "fr", "de", "it", "es", "pt", "zh" or "hi".
     public private(set) static var language = "en"
 
     /// Picks the language: the saved choice, or else the Mac's preferred languages, or else English.
@@ -38,7 +40,13 @@ public enum L {
     }
 
     /// Month names and numbers in the language in use.
-    public static var locale: Locale { Locale(identifier: language) }
+    public static var locale: Locale {
+        switch language {
+        case "pt": return Locale(identifier: "pt_BR")
+        case "zh": return Locale(identifier: "zh_Hans")
+        default: return Locale(identifier: language)
+        }
+    }
 
     /// Translates a text.
     public static func t(_ english: String) -> String {

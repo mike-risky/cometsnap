@@ -53,6 +53,7 @@ public struct MonthSummary: Equatable {
     public var title: String {
         let parts = month.split(separator: "-")
         guard parts.count == 2, let y = Int(parts[0]), let m = Int(parts[1]), (1...12).contains(m) else { return month }
+        if L.language == "zh" { return "\(y)年\(m)月" }
         let f = DateFormatter()
         f.locale = L.language == "en" ? Locale(identifier: "en_US_POSIX") : L.locale
         // Mid-sentence: "in October 2026", "en octobre 2026", "im Oktober 2026".
