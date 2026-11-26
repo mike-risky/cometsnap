@@ -215,8 +215,25 @@ public struct AnnotationDocument: Codable, Equatable {
     public var annotations: [Annotation] = []
     /// Crop in image pixels (top-left origin), nil = whole image.
     public var crop: CGRect?
+    /// Constellation mode: numbered steps are joined, in order, by faint star lines.
+    public var connectSteps = false
 
     public init() {}
+
+    enum CodingKeys: String, CodingKey { case version, annotations, crop, connectSteps }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1
+        annotations = try c.decodeIfPresent([Annotation].self, forKey: .annotations) ?? []
+        crop = try? c.decodeIfPresent(CGRect.self, forKey: .crop)
+        connectSteps = (try? c.decodeIfPresent(Bool.self, forKey: .connectSteps)) ?? false
+    }
+
+    /// Steps in number order: the path the constellation follows.
+    public var orderedSteps: [Annotation] {
+        annotations.filter { $0.kind == .step }.sorted { $0.number < $1.number }
+    }
 
     public var nextStepNumber: Int {
         (annotations.filter { $0.kind == .step }.map(\.number).max() ?? 0) + 1

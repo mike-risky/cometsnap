@@ -60,6 +60,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         ScreenGrabber.shared.prewarm()
         Log.info("Cometsnap \(Bundle.main.shortVersion) started")
 
+        if !settings.snapCountSeeded { seedSnapCount() }
+        // A new season can start while Cometsnap runs.
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.statusItem.refreshIcon() }
+
         if !settings.firstRunDone { showWelcome() }
     }
 
@@ -82,6 +86,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             SystemShortcuts.setBuiltInRegionShortcut(enabled: !settings.takeOverSystemShortcut)
             registerHotkeys()
         }
+        if old.seasonalLooks != settings.seasonalLooks { statusItem.refreshIcon() }
         if old.capturesFolder != settings.capturesFolder {
             try? FileManager.default.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
             capturesChanged()
@@ -125,6 +130,65 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     func capturesChanged() { refreshRecent() }
+
+    // MARK: playful touches
+
+    /// Counts a snap; round numbers and the first snap of a month get a tiny celebration.
+    func countSnap() {
+        var event: SnapEvent?
+        update { event = SnapMilestones.record(&$0, now: Date()) }
+        guard settings.celebrations, let event else { return }
+        var delay: TimeInterval = 0.9 // after the comet has landed
+        if let month = event.finishedMonth {
+            let n = SnapMilestones.formatted(month.count)
+            celebrate(after: delay, meteors: 14, title: "You captured \(n) snap\(month.count == 1 ? "" : "s")",
+                      subtitle: "in \(month.title). New month, new snaps!")
+            delay += 3.4
+        }
+        if let n = event.milestone {
+            celebrate(after: delay, meteors: 22, title: "✦ " + SnapMilestones.title(n), subtitle: "Thanks for snapping with Cometsnap.")
+        }
+    }
+
+    /// A small meteor shower above the corner where the Copied card sits. Never during a capture.
+    private func celebrate(after delay: TimeInterval, meteors: Int, title: String, subtitle: String, tries: Int = 0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            if self.capture.isBusy || self.recorder.isRecording {
+                if tries < 20 { self.celebrate(after: 1, meteors: meteors, title: title, subtitle: subtitle, tries: tries + 1) }
+                return
+            }
+            let vf = NSScreen.underMouse.visibleFrame
+            let area = CGRect(x: vf.maxX - 392, y: vf.minY + 112, width: 380, height: 250)
+            MeteorShower.play(over: area, meteors: meteors, duration: 3, title: title, subtitle: subtitle)
+        }
+    }
+
+    /// ↑ ↑ ↓ ↓ ← → ← → B A in the menu bar panel.
+    func meteorShowerEasterEgg() {
+        guard !capture.isBusy else { return }
+        Log.info("Konami code: meteor shower")
+        let vf = NSScreen.underMouse.visibleFrame
+        MeteorShower.play(over: vf, meteors: 70, duration: 3.6, title: "☄ METEOR SHOWER ☄",
+                          subtitle: "You found the secret. Make a wish!", captionAtBottom: false)
+    }
+
+    /// First run with milestones: start from the snaps already in the captures folder, silently.
+    private func seedSnapCount() {
+        let root = capturesDirectory
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            var dates: [Date] = []
+            let fm = FileManager.default
+            if let e = fm.enumerator(at: root, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]) {
+                for case let u as URL in e where MediaKind.of(u) == .image && u.lastPathComponent.hasPrefix(SnapNaming.snapPrefix) {
+                    dates.append((try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? Date())
+                }
+            }
+            DispatchQueue.main.async {
+                self?.update { SnapMilestones.seed(&$0, existing: dates, now: Date()) }
+            }
+        }
+    }
 
     func open(_ url: URL) {
         if MediaKind.of(url) == .image { openEditor(url: url) } else { NSWorkspace.shared.open(url) }
