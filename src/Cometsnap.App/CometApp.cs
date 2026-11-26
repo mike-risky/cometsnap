@@ -97,10 +97,22 @@ public sealed class CometApp : Application
         var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
         ListenForOtherLaunches();
+        ApplyStartWithWindows(userAsked: false);
         Log.Info($"Started in {sw.ElapsedMilliseconds} ms");
 
         if (!Settings.ReplaceOfferAnswered)
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk));
+    }
+
+    /// <summary>
+    /// Makes the Windows Run entry match the setting, pointing at this exe. At launch it is a quiet
+    /// sync that keeps a Task Manager "Disabled" choice; from the menu or the offer it is the user's call.
+    /// </summary>
+    public void ApplyStartWithWindows(bool userAsked)
+    {
+        var exe = Environment.ProcessPath ?? "";
+        if (exe.Length == 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return;
+        CaptureTools.SetCometsnapStartsWithWindows(exe, Settings.StartWithWindows, overrideTaskManager: userAsked);
     }
 
     /// <summary>
@@ -194,7 +206,8 @@ public sealed class CometApp : Application
                 if (tool.IsRunning) CaptureTools.Close(tool.Tool);
                 CaptureTools.DisableStartup(tool);
             }
-            if (choice.StartWithWindows && exe.Length > 0) CaptureTools.SetCometsnapStartsWithWindows(exe, true);
+            Settings.StartWithWindows = choice.StartWithWindows;
+            ApplyStartWithWindows(userAsked: true);
             Settings.TakeOverPrintScreen = true;
             TrySaveSettings();
             var ok = RegisterHotkeys(announce: false);

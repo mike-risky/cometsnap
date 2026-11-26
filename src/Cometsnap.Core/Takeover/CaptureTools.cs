@@ -168,14 +168,20 @@ public static class CaptureTools
         catch { return false; }
     }
 
-    public static void SetCometsnapStartsWithWindows(string exePath, bool enabled)
+    /// <param name="overrideTaskManager">
+    /// True when the user just asked for it: also clears a "Disabled" set in Task Manager's Startup apps.
+    /// False for the silent sync at launch, which must respect that choice.
+    /// </param>
+    public static void SetCometsnapStartsWithWindows(string exePath, bool enabled, bool overrideTaskManager = true)
     {
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKey);
             if (enabled)
             {
-                key.SetValue(CometsnapRunName, $"\"{exePath}\"");
+                var value = $"\"{exePath}\"";
+                if (!Equals(key.GetValue(CometsnapRunName), value)) key.SetValue(CometsnapRunName, value);
+                if (!overrideTaskManager) return;
                 using var approved = Registry.CurrentUser.OpenSubKey(StartupApprovedKey, writable: true);
                 approved?.DeleteValue(CometsnapRunName, throwOnMissingValue: false);
             }

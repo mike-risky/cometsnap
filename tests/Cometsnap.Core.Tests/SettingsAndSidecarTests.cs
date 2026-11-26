@@ -47,6 +47,7 @@ public class SettingsAndSidecarTests
         var s = new AppSettings();
         Assert.False(s.PlaySounds);
         Assert.True(s.InstantCapture);
+        Assert.True(s.StartWithWindows);
         Assert.True(s.ShowEditCard);
         Assert.False(s.TakeOverPrintScreen);
         Assert.False(s.ReplaceOfferAnswered);

@@ -47,6 +47,12 @@ public sealed class TrayMenu
     {
         var s = _app.Settings;
         var options = new MenuItem { Header = "Options" };
+        options.Items.Add(Toggle("Start with Windows", s.StartWithWindows, v =>
+        {
+            s.StartWithWindows = v;
+            _app.ApplyStartWithWindows(userAsked: true);
+        }));
+        options.Items.Add(new Separator());
         options.Items.Add(Toggle("Instant capture (no toolbar)", s.InstantCapture, v => s.InstantCapture = v));
         options.Items.Add(Toggle("Show the Edit card after a capture", s.ShowEditCard, v => s.ShowEditCard = v));
         options.Items.Add(Toggle("Comet animation", s.ShowCometAnimation, v => s.ShowCometAnimation = v));
