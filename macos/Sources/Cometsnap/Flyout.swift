@@ -18,6 +18,8 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
     private let status = NSTextField(labelWithString: "")
     private var tiles: [TileView] = []
     private var clickMonitor: Any?
+    private var keyMonitor: Any?
+    private var konami = KonamiCode()
     private(set) var dirty = true
 
     init(app: AppController) {
@@ -132,6 +134,10 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
 
     private func delayMenu() -> NSMenu {
         let m = NSMenu()
+        let explain = NSMenuItem(title: "Wait a few seconds before capturing, so you can open a menu or a tooltip first.", action: nil, keyEquivalent: "")
+        explain.isEnabled = false
+        m.addItem(explain)
+        m.addItem(.separator())
         for s in [3, 5, 10] {
             let i = ClosureMenuItem(title: "In \(s) seconds") { [weak self] in self?.app.capture.captureDelayed(s) }
             m.addItem(i)
@@ -180,11 +186,37 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.hide()
         }
+        // ↑ ↑ ↓ ↓ ← → ← → B A while the panel is open.
+        konami.reset()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window === self else { return event }
+            if self.konami.feed(FlyoutPanel.konamiKey(event)) {
+                self.hide()
+                self.app.meteorShowerEasterEgg()
+            }
+            return event
+        }
+    }
+
+    private static func konamiKey(_ e: NSEvent) -> KonamiKey {
+        switch e.keyCode {
+        case 126: return .up
+        case 125: return .down
+        case 123: return .left
+        case 124: return .right
+        default:
+            switch e.charactersIgnoringModifiers?.lowercased() {
+            case "b": return .b
+            case "a": return .a
+            default: return .other
+            }
+        }
     }
 
     func hide() {
         guard isVisible else { return }
         if let m = clickMonitor { NSEvent.removeMonitor(m); clickMonitor = nil }
+        if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
         header.stop()
         orderOut(nil)
     }
@@ -358,18 +390,12 @@ final class TileView: NSView, NSDraggingSource {
         let p = event.locationInWindow
         guard hypot(p.x - d.x, p.y - d.y) > 4 else { return }
         downPoint = nil
-        let di = NSDraggingItem(pasteboardWriter: item.url as NSURL)
-        let img = NSImage(size: bounds.size)
-        if let c = imageLayer.contents {
-            img.lockFocus()
-            if let ctx = NSGraphicsContext.current?.cgContext {
-                // swiftlint:disable:next force_cast
-                ctx.draw(c as! CGImage, in: CGRect(origin: .zero, size: bounds.size))
-            }
-            img.unlockFocus()
+        // The file and, for pictures, the PNG itself: drops into Finder, Mail, Slack, Pages, browsers…
+        let preview = imageLayer.contents.map { NSImage(cgImage: $0 as! CGImage, size: bounds.size) }
+        alphaValue = 0.55
+        DragOut.start(from: self, event: event, url: item.url, image: nil, preview: preview, frame: bounds) { [weak self] _ in
+            self?.alphaValue = 1
         }
-        di.setDraggingFrame(bounds, contents: img)
-        beginDraggingSession(with: [di], event: event, source: self)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -465,6 +491,8 @@ final class StarHeaderView: NSView {
     private let wordmark = CATextLayer()
     private let tagline = CATextLayer()
     private let shooting = CAGradientLayer()
+    private var snow: SnowLayer?
+    private var season: Season?
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -516,7 +544,25 @@ final class StarHeaderView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Pumpkin comet in late October, snow in December (when Seasonal looks is on).
+    private func applySeason() {
+        let now = SeasonalArt.current
+        guard now != season else { return }
+        season = now
+        comet.contents = SeasonalArt.decorate(Theme.logo, season: now).cgImage(forProposedRect: nil, context: nil, hints: nil)
+        snow?.removeFromSuperlayer()
+        snow = nil
+        if now == .winter, let root = layer {
+            let s = SnowLayer()
+            s.fit(bounds)
+            root.insertSublayer(s, above: gradient)
+            snow = s
+        }
+    }
+
     func start() {
+        applySeason()
+        snow?.birthRate = 1
         for s in stars {
             let a = CABasicAnimation(keyPath: "opacity")
             a.fromValue = 0.15
@@ -555,6 +601,7 @@ final class StarHeaderView: NSView {
     }
 
     func stop() {
+        snow?.birthRate = 0
         stars.forEach { $0.removeAllAnimations() }
         comet.removeAllAnimations()
         shooting.removeAllAnimations()

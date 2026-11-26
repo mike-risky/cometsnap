@@ -153,13 +153,15 @@ final class SettingsWindow: NSWindow {
     private let comet = NSButton(checkboxWithTitle: "Comet animation into the menu bar", target: nil, action: nil)
     private let sound = NSButton(checkboxWithTitle: "Play a sound", target: nil, action: nil)
     private let audio = NSButton(checkboxWithTitle: "Record the Mac's sound in videos", target: nil, action: nil)
+    private let celebrations = NSButton(checkboxWithTitle: "Little celebrations (a tiny meteor shower at 100, 1,000… snaps, and a monthly recap)", target: nil, action: nil)
+    private let seasonal = NSButton(checkboxWithTitle: "Seasonal looks (a pumpkin comet for Halloween, a snowy one in December)", target: nil, action: nil)
     private let loupe = NSPopUpButton()
     private let gifFps = NSPopUpButton()
     private let folder = NSTextField(labelWithString: "")
 
     init(app: AppController) {
         self.app = app
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 520, height: 470), styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 560, height: 530), styleMask: [.titled, .closable], backing: .buffered, defer: false)
         title = "Cometsnap Settings"
         appearance = NSAppearance(named: .darkAqua)
         backgroundColor = Theme.night
@@ -169,7 +171,7 @@ final class SettingsWindow: NSWindow {
     }
 
     private func build() {
-        for b in [login, takeOver, copyBox, card, comet, sound, audio] {
+        for b in [login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal] {
             b.target = self
             b.action = #selector(changed)
         }
@@ -203,13 +205,13 @@ final class SettingsWindow: NSWindow {
         keys.textColor = Theme.muted
         keys.preferredMaxLayoutWidth = 460
 
-        let stack = NSStackView(views: [title, login, takeOver, copyBox, card, comet, sound, audio,
+        let stack = NSStackView(views: [title, login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal,
                                         row("Loupe corner", loupe), row("GIF smoothness", gifFps), row("Captures folder", folderRow), keys])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 9
         stack.setCustomSpacing(16, after: title)
-        stack.setCustomSpacing(16, after: audio)
+        stack.setCustomSpacing(16, after: seasonal)
         stack.translatesAutoresizingMaskIntoConstraints = false
         let root = NSView()
         root.addSubview(stack)
@@ -231,6 +233,8 @@ final class SettingsWindow: NSWindow {
         comet.state = s.cometAnimation ? .on : .off
         sound.state = s.playSound ? .on : .off
         audio.state = s.recordSystemAudio ? .on : .off
+        celebrations.state = s.celebrations ? .on : .off
+        seasonal.state = s.seasonalLooks ? .on : .off
         loupe.selectItem(at: LoupeCorner.allCases.firstIndex(of: s.loupeCorner) ?? 2)
         let fpsValues = [8, 10, 12, 15, 20, 25]
         gifFps.selectItem(at: fpsValues.firstIndex(of: s.gifFramesPerSecond) ?? 3)
@@ -247,6 +251,8 @@ final class SettingsWindow: NSWindow {
             s.cometAnimation = comet.state == .on
             s.playSound = sound.state == .on
             s.recordSystemAudio = audio.state == .on
+            s.celebrations = celebrations.state == .on
+            s.seasonalLooks = seasonal.state == .on
             s.loupeCorner = LoupeCorner.allCases[max(0, loupe.indexOfSelectedItem)]
             s.gifFramesPerSecond = fpsValues[max(0, gifFps.indexOfSelectedItem)]
         }

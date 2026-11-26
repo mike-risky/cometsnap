@@ -16,6 +16,7 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
     private let widthSlider = NSSlider(value: 4, minValue: 1, maxValue: 12, target: nil, action: nil)
     private let zoomLabel = NSTextField(labelWithString: "100%")
     private var savedDoc: AnnotationDocument
+    private let constellation = SpaceButton(title: "Constellation", symbol: "sparkles", tip: "Join the numbered steps with faint star lines")
 
     init(app: AppController, url: URL?, image: CGImage?, scale: CGFloat?) {
         self.app = app
@@ -33,6 +34,7 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
                 baseImage = PNG.load(url)
             }
         }
+        if doc.annotations.isEmpty { doc.connectSteps = app.settings.constellationSteps }
         base = baseImage ?? CGImage.placeholder
         imageScale = scale ?? (NSScreen.main?.backingScaleFactor ?? 2)
         savedDoc = doc
@@ -56,6 +58,7 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         canvas.onSelection = { [weak self] a in self?.selectionChanged(a) }
         select(.arrow)
         setColor(RGBA.palette[0])
+        updateConstellation()
     }
 
     private func build() {
@@ -83,7 +86,10 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         let copy = SpaceButton(title: "Copy", symbol: "doc.on.doc", fill: Theme.terracotta, tip: "Copy, save and close (⌘C or ⌘↩)")
         copy.onClick = { [weak self] in self?.performCopyAndClose() }
 
-        let left = NSStackView(views: [undo, redo, fit, actual, zoomLabel])
+        constellation.onClick = { [weak self] in self?.toggleConstellation() }
+        constellation.widthAnchor.constraint(equalToConstant: 128).isActive = true
+        constellation.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        let left = NSStackView(views: [undo, redo, fit, actual, zoomLabel, constellation])
         left.spacing = 6
         let right = NSStackView(views: [saveAs, save, copy])
         right.spacing = 8
@@ -338,6 +344,20 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
 
     private func documentChanged() {
         isDocumentEdited = canvas.doc != savedDoc
+        updateConstellation()
+    }
+
+    /// Constellation mode: shown once there are two steps to connect.
+    private func updateConstellation() {
+        constellation.isHidden = canvas.doc.orderedSteps.count < 2
+        constellation.active = canvas.doc.connectSteps
+    }
+
+    private func toggleConstellation() {
+        let on = !canvas.doc.connectSteps
+        canvas.setConnectSteps(on)
+        app.update { $0.constellationSteps = on }
+        updateConstellation()
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

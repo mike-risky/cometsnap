@@ -143,6 +143,12 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
     }
 
+    /// Picks up a new season (or the Seasonal looks switch).
+    func refreshIcon() {
+        guard pulseTimer == nil else { return }
+        item.button?.image = Theme.menuBarIcon
+    }
+
     /// Shows 3, 2, 1 next to the icon, then runs `done`.
     func countdown(_ seconds: Int, done: @escaping () -> Void) {
         countdownTimer?.invalidate()

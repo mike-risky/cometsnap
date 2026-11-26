@@ -15,12 +15,23 @@ public struct AppSettings: Codable, Equatable {
     public var recordSystemAudio = true
     public var gifFramesPerSecond = 15
     public var videoFramesPerSecond = 30
+    /// Milestone meteor showers and the monthly recap.
+    public var celebrations = true
+    /// Pumpkin comet in late October, snowy comet in December.
+    public var seasonalLooks = true
+    /// Editor: join numbered steps with star lines (remembered from the last toggle).
+    public var constellationSteps = false
+    public var snapCount = 0
+    public var snapMonth: String?
+    public var snapMonthCount = 0
+    public var snapCountSeeded = false
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
-             takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond
+             takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
+             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded
     }
 
     public init(from decoder: Decoder) throws {
@@ -36,6 +47,13 @@ public struct AppSettings: Codable, Equatable {
         firstRunDone = (try? c.decodeIfPresent(Bool.self, forKey: .firstRunDone)) ?? d.firstRunDone
         recordSystemAudio = (try? c.decodeIfPresent(Bool.self, forKey: .recordSystemAudio)) ?? d.recordSystemAudio
         gifFramesPerSecond = min(30, max(5, (try? c.decodeIfPresent(Int.self, forKey: .gifFramesPerSecond)) ?? d.gifFramesPerSecond))
+        celebrations = (try? c.decodeIfPresent(Bool.self, forKey: .celebrations)) ?? d.celebrations
+        seasonalLooks = (try? c.decodeIfPresent(Bool.self, forKey: .seasonalLooks)) ?? d.seasonalLooks
+        constellationSteps = (try? c.decodeIfPresent(Bool.self, forKey: .constellationSteps)) ?? d.constellationSteps
+        snapCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .snapCount)) ?? 0)
+        snapMonth = try? c.decodeIfPresent(String.self, forKey: .snapMonth)
+        snapMonthCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .snapMonthCount)) ?? 0)
+        snapCountSeeded = (try? c.decodeIfPresent(Bool.self, forKey: .snapCountSeeded)) ?? false
         videoFramesPerSecond = min(60, max(10, (try? c.decodeIfPresent(Int.self, forKey: .videoFramesPerSecond)) ?? d.videoFramesPerSecond))
     }
 

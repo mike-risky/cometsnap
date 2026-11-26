@@ -93,7 +93,7 @@ final class CaptureController {
         let settings = app.settings
         if settings.copyToClipboard { Clipboard.copy(image, scale: scale) }
         if settings.playSound { Sound.snap() }
-        if settings.cometAnimation { CometFlight.fly(from: rect, to: app.statusItem.buttonFrame) }
+        if settings.cometAnimation { CometFlight.fly(from: rect, to: app.statusItem.buttonFrame, image: image) }
         let card = settings.showEditCard ? app.editCard : nil
         card?.show(image: image, scale: scale, copied: settings.copyToClipboard)
         let url = SnapNaming.nextFreeURL(root: app.capturesDirectory, date: Date())
@@ -103,6 +103,7 @@ final class CaptureController {
                 DispatchQueue.main.async {
                     card?.setSaved(url, for: image)
                     self?.app.capturesChanged()
+                    self?.app.countSnap()
                     Log.info("saved \(url.lastPathComponent) \(image.width)x\(image.height)")
                 }
             } catch {
@@ -155,6 +156,8 @@ final class EditCard: NSPanel {
         // The whole card opens the editor: faster to hit than the button alone.
         root.onClick = { [weak self] in self?.edit() }
         root.toolTip = "Click to edit"
+        // …or drag it straight into any app.
+        root.onDrag = { [weak self] event in self?.drag(event) }
         self.root = root
 
         thumb.imageScaling = .scaleProportionallyUpOrDown
@@ -274,6 +277,16 @@ final class EditCard: NSPanel {
         if let image { onEdit?(url, image, scale) }
     }
 
+    private func drag(_ event: NSEvent) {
+        guard let root, image != nil || url != nil else { return }
+        hideTimer?.invalidate()
+        let started = DragOut.start(from: root, event: event, url: url, image: fileOnly ? nil : image, preview: thumb.image,
+                                    frame: root.convert(thumb.bounds, from: thumb)) { [weak self] op in
+            if op.isEmpty { self?.restartTimer() } else { self?.fadeOut() }
+        }
+        if !started { restartTimer() }
+    }
+
     func fadeOut() {
         hideTimer?.invalidate()
         NSAnimationContext.runAnimationGroup({ ctx in
@@ -289,6 +302,10 @@ final class EditCard: NSPanel {
 final class HoverView: NSView {
     var onHover: ((Bool) -> Void)?
     var onClick: (() -> Void)?
+    /// Called once the mouse has moved a few points with the button down.
+    var onDrag: ((NSEvent) -> Void)?
+    private var downAt: CGPoint?
+    private var dragged = false
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     /// Labels and the thumbnail count as the card; only real buttons keep their own clicks.
@@ -302,9 +319,21 @@ final class HoverView: NSView {
         return hit == nil ? nil : self
     }
     override func resetCursorRects() { if onClick != nil { addCursorRect(bounds, cursor: .pointingHand) } }
-    override func mouseDown(with event: NSEvent) {}
+    override func mouseDown(with event: NSEvent) {
+        downAt = event.locationInWindow
+        dragged = false
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard let d = downAt, let onDrag else { return }
+        let p = event.locationInWindow
+        guard hypot(p.x - d.x, p.y - d.y) > 4 else { return }
+        downAt = nil
+        dragged = true
+        onDrag(event)
+    }
     override func mouseUp(with event: NSEvent) {
-        if bounds.contains(convert(event.locationInWindow, from: nil)) { onClick?() }
+        defer { downAt = nil; dragged = false }
+        if !dragged, bounds.contains(convert(event.locationInWindow, from: nil)) { onClick?() }
     }
 
     override func updateTrackingAreas() {
@@ -315,37 +344,4 @@ final class HoverView: NSView {
 
     override func mouseEntered(with event: NSEvent) { onHover?(true) }
     override func mouseExited(with event: NSEvent) { onHover?(false) }
-}
-
-// MARK: - Comet flight
-
-/// A little comet streaks from the capture into the menu bar icon.
-enum CometFlight {
-    static func fly(from rect: CGRect, to target: CGRect?) {
-        guard let target, let screen = NSScreen.containing(CGPoint(x: rect.midX, y: rect.midY)) else { return }
-        _ = screen
-        let size: CGFloat = 44
-        let start = CGRect(x: rect.midX - size / 2, y: rect.midY - size / 2, width: size, height: size)
-        let end = CGRect(x: target.midX - 9, y: target.midY - 9, width: 18, height: 18)
-        let panel = NSPanel(contentRect: start, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = .screenSaver
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = false
-        panel.ignoresMouseEvents = true
-        panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let iv = NSImageView(image: Theme.logo)
-        iv.imageScaling = .scaleProportionallyUpOrDown
-        panel.contentView = iv
-        panel.orderFrontRegardless()
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.45
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.5, 0, 0.8, 0.6)
-            panel.animator().setFrame(end, display: true)
-            panel.animator().alphaValue = 0.35
-        }, completionHandler: {
-            panel.orderOut(nil)
-        })
-    }
 }
