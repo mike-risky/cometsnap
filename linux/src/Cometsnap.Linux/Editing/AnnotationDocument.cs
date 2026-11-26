@@ -30,6 +30,9 @@ public sealed class AnnotationDocument
 
     public event Action? Changed;
 
+    /// <summary>Constellation mode: numbered steps are joined, in order, by faint star lines.</summary>
+    public bool ConnectSteps { get; set; }
+
     /// <summary>The image under the annotations, in annotation coordinates (0,0 = its top-left pixel).</summary>
     public Bitmap? Source
     {
@@ -124,6 +127,8 @@ public sealed class AnnotationDocument
             dc.DrawGeometry(new ImmutableSolidColorBrush(Color.FromArgb((byte)(255 * spots[^1].Dim), 0, 0, 0)), null, dim);
         }
 
+        if (ConnectSteps) RenderConstellation(dc, all.OfType<StepAnnotation>());
+
         foreach (var a in all)
             if (a is not (BlurAnnotation or SpotlightAnnotation or CropAnnotation)) a.Render(dc);
 
@@ -133,6 +138,52 @@ public sealed class AnnotationDocument
             dc.DrawGeometry(new ImmutableSolidColorBrush(Color.FromArgb(0xB0, 0x07, 0x11, 0x3A)), null, outside);
             dc.DrawRectangle(null, new ImmutablePen(Brushes.White.ToImmutable(), Math.Max(1, crop.Thickness / 2), new ImmutableDashStyle(new double[] { 4, 3 }, 0)), crop.Box);
         }
+    }
+
+    /// <summary>Faint lines from step 1 to 2 to 3…, with a little four-pointed star halfway along each.</summary>
+    private static void RenderConstellation(DrawingContext dc, IEnumerable<StepAnnotation> steps)
+    {
+        var ordered = steps.OrderBy(s => s.Number).ToList();
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            var a = ordered[i - 1];
+            var b = ordered[i];
+            var from = new Point(a.X, a.Y);
+            var to = new Point(b.X, b.Y);
+            var v = to - from;
+            var length = Math.Sqrt(v.X * v.X + v.Y * v.Y);
+            if (length <= a.Radius + b.Radius + 4) continue;
+            v /= length;
+            var start = from + v * (a.Radius + 3);
+            var end = to - v * (b.Radius + 3);
+            var width = Math.Max(1.2, (a.Radius + b.Radius) / 16);
+            var glow = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0x38, 0xA9, 0xC8, 0xFF)), width * 4, lineCap: PenLineCap.Round);
+            var line = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF)), width,
+                new ImmutableDashStyle(new[] { 0.0, 3.2 }, 0), PenLineCap.Round);
+            dc.DrawLine(glow, start, end);
+            dc.DrawLine(line, start, end);
+            DrawSparkle(dc, start + (end - start) / 2, Math.Max(4, width * 3.2));
+        }
+    }
+
+    private static void DrawSparkle(DrawingContext dc, Point c, double r)
+    {
+        var k = r * 0.22;
+        var star = new StreamGeometry();
+        using (var g = star.Open())
+        {
+            g.BeginFigure(new Point(c.X, c.Y - r), true);
+            g.LineTo(new Point(c.X + k, c.Y - k));
+            g.LineTo(new Point(c.X + r, c.Y));
+            g.LineTo(new Point(c.X + k, c.Y + k));
+            g.LineTo(new Point(c.X, c.Y + r));
+            g.LineTo(new Point(c.X - k, c.Y + k));
+            g.LineTo(new Point(c.X - r, c.Y));
+            g.LineTo(new Point(c.X - k, c.Y - k));
+            g.EndFigure(true);
+        }
+        dc.DrawEllipse(new ImmutableSolidColorBrush(Color.FromArgb(0x50, 0xFF, 0xE8, 0x80)), null, c, r * 0.8, r * 0.8);
+        dc.DrawGeometry(new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0xF4, 0xC2)), null, star);
     }
 
     private Rect ImageArea(IEnumerable<Annotation> all)

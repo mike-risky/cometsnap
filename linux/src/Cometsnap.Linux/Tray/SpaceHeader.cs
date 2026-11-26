@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Cometsnap.Linux.Core;
 using Cometsnap.Linux.Theme;
 
 namespace Cometsnap.Linux.Tray;
@@ -24,6 +25,9 @@ public sealed class SpaceHeader : Control
     private readonly IBrush _sky;
     private readonly FormattedText _comet;
     private readonly FormattedText _snap;
+    private readonly record struct Flake(double X, double Size, double Opacity, double Seconds, double Delay, double Drift);
+    private readonly List<Flake> _snow = new();
+    private Season _season;
 
     public SpaceHeader(double width, double height)
     {
@@ -65,6 +69,21 @@ public sealed class SpaceHeader : Control
         _timer = new DispatcherTimer(TimeSpan.FromMilliseconds(1000.0 / 30), DispatcherPriority.Render, (_, _) => InvalidateVisual());
     }
 
+    /// <summary>Snow cap and falling snow in December, a pumpkin comet at Halloween.</summary>
+    public void SetSeason(Season season)
+    {
+        if (season == _season) return;
+        _season = season;
+        if (season == Season.Winter && _snow.Count == 0)
+        {
+            var rng = new Random(12);
+            for (var i = 0; i < 18; i++)
+                _snow.Add(new Flake(rng.NextDouble() * (Width - 4), 1.6 + rng.NextDouble() * 1.8, 0.45 + rng.NextDouble() * 0.4,
+                    3.2 + rng.NextDouble() * 3, rng.NextDouble() * 4, -6 + rng.NextDouble() * 12));
+        }
+        InvalidateVisual();
+    }
+
     /// <summary>Starts the sky. Call when the flyout appears.</summary>
     public void Start()
     {
@@ -103,6 +122,16 @@ public sealed class SpaceHeader : Control
             var brush = new ImmutableSolidColorBrush(s.Tint, o);
             dc.DrawEllipse(brush, null, new Point(s.X + s.Size / 2, s.Y + s.Size / 2), s.Size / 2, s.Size / 2);
         }
+
+        if (_season == Season.Winter)
+            foreach (var f in _snow)
+            {
+                if (t < f.Delay) continue;
+                var k = (t - f.Delay) / f.Seconds % 1;
+                var y = -6 + (h + 12) * k;
+                var x = f.X + Swing(t - f.Delay, -f.Drift / 2, f.Drift / 2, f.Seconds / 2);
+                dc.DrawEllipse(new ImmutableSolidColorBrush(Colors.White, f.Opacity), null, new Point(x, y), f.Size / 2, f.Size / 2);
+            }
 
         // One shooting star crosses the top right, shortly after opening.
         const double begin = 0.28, fly = 0.75;
@@ -143,7 +172,11 @@ public sealed class SpaceHeader : Control
                 * Matrix.CreateTranslation(center.X + floatX, center.Y + floatY);
         using (dc.PushTransform(m))
         using (dc.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = BitmapInterpolationMode.HighQuality }))
-            dc.DrawImage(SpaceTheme.Logo, new Rect(left, cy - logo / 2, logo, logo));
+        {
+            var box = new Rect(left, cy - logo / 2, logo, logo);
+            dc.DrawImage(SpaceTheme.Logo, box);
+            SeasonalArt.DrawOverlay(dc, _season, box);
+        }
 
         var textY = cy - _comet.Height / 2;
         dc.DrawText(_comet, new Point(left + logo + 10, textY));

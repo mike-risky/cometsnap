@@ -35,6 +35,9 @@ public sealed class FlyoutWindow : Window
     private bool _dirty = true;
     private DateTime _hiddenAt;
     private DateTime _shownAt;
+    private readonly KonamiCode _konami = new();
+    private string? _dragArmed;
+    private Point _dragFrom;
 
     public FlyoutWindow(CometApp app)
     {
@@ -65,7 +68,7 @@ public sealed class FlyoutWindow : Window
             ("3 seconds", (Action)(() => { HideFlyout(); _app.Capture.StartDelayed(3); })),
             ("5 seconds", () => { HideFlyout(); _app.Capture.StartDelayed(5); }),
             ("10 seconds", () => { HideFlyout(); _app.Capture.StartDelayed(10); }),
-        });
+        }, note: "Wait a few seconds before capturing, so you can open a menu or a tooltip first.");
         buttons.Children.Add(delayed);
         var record = BigButton("Record", "M8,3 A5,5 0 1 1 7.99,3 Z M8,6 A2,2 0 1 1 7.99,6 Z", false,
             "Record a video (Shift+Print Screen). Right-click for full screen or GIF",
@@ -151,6 +154,18 @@ public sealed class FlyoutWindow : Window
             if ((DateTime.UtcNow - _shownAt).TotalMilliseconds > 300) HideFlyout();
         };
         KeyDown += (_, e) => { if (e.Key == Key.Escape) HideFlyout(); };
+        // ↑ ↑ ↓ ↓ ← → ← → B A: a meteor shower. Watched, never swallowed, so typing in search still works.
+        AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (!_konami.Push(e.Key.ToString())) return;
+            if (_search.IsFocused && _search.Text is { } text && text.EndsWith("b", StringComparison.OrdinalIgnoreCase))
+            {
+                // The B already went into the search box and the A is about to: keep the search clean.
+                _search.Text = text[..^1];
+                e.Handled = true;
+            }
+            _app.MeteorShowerEasterEgg();
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _app.Recent.Changed += () => Dispatcher.UIThread.Post(() =>
         {
             _dirty = true;
@@ -198,9 +213,13 @@ public sealed class FlyoutWindow : Window
     {
         if (!IsVisible) return;
         _hiddenAt = DateTime.UtcNow;
+        _konami.Reset();
         _sky.Stop();
         Hide();
     }
+
+    /// <summary>Applies the seasonal skin to the header (snowy or pumpkin comet).</summary>
+    public void SetSeason(Season season) => _sky.SetSeason(season);
 
     private void HideThen(Action action)
     {
@@ -236,9 +255,18 @@ public sealed class FlyoutWindow : Window
         return b;
     }
 
-    private static void AttachMenu(Border button, IEnumerable<(string Text, Action Action)> items, bool rightClickOnly = false)
+    private static void AttachMenu(Border button, IEnumerable<(string Text, Action Action)> items, bool rightClickOnly = false, string? note = null)
     {
         var menu = new ContextMenu();
+        if (note is not null)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = new TextBlock { Text = note, TextWrapping = TextWrapping.Wrap, MaxWidth = 240, FontSize = 12, Foreground = SpaceTheme.DustBrush },
+                IsHitTestVisible = false, Focusable = false,
+            });
+            menu.Items.Add(new Separator());
+        }
         foreach (var (text, action) in items)
         {
             var item = new MenuItem { Header = text };
@@ -246,11 +274,12 @@ public sealed class FlyoutWindow : Window
             menu.Items.Add(item);
         }
         button.ContextMenu = menu;
+        // The button marks its own release as handled, so listen to handled events too.
         if (!rightClickOnly)
-            button.PointerReleased += (_, e) =>
+            button.AddHandler(PointerReleasedEvent, (_, e) =>
             {
-                if (e.InitialPressMouseButton == MouseButton.Left) menu.Open(button);
-            };
+                if (e.InitialPressMouseButton == MouseButton.Left && button.IsPointerOver) menu.Open(button);
+            }, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     private static Control Link(string text, Action click)
@@ -311,8 +340,8 @@ public sealed class FlyoutWindow : Window
             RenderTransform = scale, RenderTransformOrigin = RelativePoint.Center,
         };
         ToolTip.SetTip(frame, isRecording
-            ? $"{Path.GetFileName(path)}\nClick: copy · Double-click: play"
-            : $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit");
+            ? $"{Path.GetFileName(path)}\nClick: copy · Double-click: play · Drag into any app"
+            : $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag into any app");
         frame.PointerEntered += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.IsVisible = true; scale.ScaleX = scale.ScaleY = 1.04; };
         frame.PointerExited += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.IsVisible = false; scale.ScaleX = scale.ScaleY = 1; };
 
@@ -320,6 +349,9 @@ public sealed class FlyoutWindow : Window
         frame.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed) return;
+            // Only a press that started on this tile can drag it (not one on a mini button or elsewhere).
+            _dragArmed = path;
+            _dragFrom = e.GetPosition(this);
             if (e.ClickCount >= 2)
             {
                 pendingClick?.Dispose();
@@ -327,8 +359,25 @@ public sealed class FlyoutWindow : Window
                 Open(path);
             }
         };
+        frame.PointerMoved += async (_, e) =>
+        {
+            if (_dragArmed != path || DragOut.Active) return;
+            if (!e.GetCurrentPoint(frame).Properties.IsLeftButtonPressed) { _dragArmed = null; return; }
+            var d = e.GetPosition(this) - _dragFrom;
+            if (Math.Abs(d.X) < 5 && Math.Abs(d.Y) < 5) return;
+            _dragArmed = null;
+            pendingClick?.Dispose();
+            pendingClick = null;
+            scale.ScaleX = scale.ScaleY = 1;
+            frame.Opacity = 0.55;
+            try { await DragOut.StartAsync(path, null, image.Source as Bitmap); }
+            finally { frame.Opacity = 1; }
+        };
         frame.PointerReleased += (_, e) =>
         {
+            var armed = _dragArmed == path;
+            _dragArmed = null;
+            if (!armed || DragOut.Active) return; // the end of a drag, or a press that began elsewhere
             if (e.InitialPressMouseButton != MouseButton.Left || !frame.IsPointerOver) return;
             // Wait a moment: a double-click opens instead of copying.
             pendingClick?.Dispose();

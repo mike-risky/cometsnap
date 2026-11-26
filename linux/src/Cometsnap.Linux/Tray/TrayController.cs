@@ -16,7 +16,9 @@ public sealed class TrayController : IDisposable
 {
     private readonly CometApp _app;
     private readonly TrayIcon _icon;
-    private readonly WindowIcon _normal;
+    private readonly WindowIcon _everyday;
+    private WindowIcon _normal;
+    private bool _isRecording;
     private readonly WindowIcon _recording;
     private readonly NativeMenuItem _recent;
     private readonly NativeMenuItem _stop;
@@ -25,7 +27,7 @@ public sealed class TrayController : IDisposable
     public TrayController(CometApp app)
     {
         _app = app;
-        _normal = new WindowIcon(SpaceTheme.LoadAsset("cometsnap-256.png"));
+        _everyday = _normal = new WindowIcon(SpaceTheme.LoadAsset("cometsnap-256.png"));
         _recording = new WindowIcon(WithRedDot(SpaceTheme.LoadAsset("cometsnap-256.png")));
 
         var menu = new NativeMenu();
@@ -108,8 +110,16 @@ public sealed class TrayController : IDisposable
         }
     }
 
+    /// <summary>Snowy comet in December, pumpkin comet at Halloween; the everyday comet otherwise.</summary>
+    public void SetSeason(Season season)
+    {
+        _normal = SeasonalArt.CreateIcon(season) is { } art ? new WindowIcon(art) : _everyday;
+        if (!_isRecording) _icon.Icon = _normal;
+    }
+
     private void SetRecording(bool on)
     {
+        _isRecording = on;
         _icon.Icon = on ? _recording : _normal;
         _stop.IsVisible = on;
         _icon.ToolTipText = on ? "Cometsnap · recording (click the pill or press the shortcut to stop)" : "Cometsnap";
