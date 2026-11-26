@@ -292,7 +292,7 @@ final class TileView: NSView, NSDraggingSource {
 
         let specs: [(String, String, () -> Void)] = [
             ("pencil", item.kind == .image ? "Edit" : "Play", { [weak self] in self?.primary() }),
-            ("doc.on.doc", "Copy", { [weak self] in self?.copy() }),
+            ("doc.on.doc", "Copy", { [weak self] in self?.copyItem() }),
             ("folder", "Show in Finder", { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }),
             ("trash", "Move to Trash", { [weak self] in self?.trash() }),
         ]
@@ -373,7 +373,7 @@ final class TileView: NSView, NSDraggingSource {
     }
 
     override func mouseUp(with event: NSEvent) {
-        if downPoint != nil && event.clickCount == 1 { copy() }
+        if downPoint != nil && event.clickCount == 1 { copyItem() }
         downPoint = nil
     }
 
@@ -386,7 +386,7 @@ final class TileView: NSView, NSDraggingSource {
         app.flyout.hide()
     }
 
-    private func copy() {
+    private func copyItem() {
         if item.kind == .image, let img = PNG.load(item.url) {
             Clipboard.copy(img, scale: NSScreen.underMouse.backingScaleFactor)
         } else {

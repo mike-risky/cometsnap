@@ -270,7 +270,7 @@ final class OverlayView: NSView {
     private let imageLayer = CALayer()
     private let dimLayer = CAShapeLayer()
     private let borderLayer = CAShapeLayer()
-    private let tag = TagView()
+    private let sizeTag = TagView()
     private let hint = TagView()
     private let loupe: LoupeView
     private var loupeCornerNow: LoupeCorner
@@ -306,7 +306,7 @@ final class OverlayView: NSView {
         borderLayer.frame = bounds
         layer?.addSublayer(borderLayer)
 
-        addSubview(tag)
+        addSubview(sizeTag)
         addSubview(loupe)
         hint.style = .hint
         hint.text = overlay.purpose == .recording
@@ -417,17 +417,17 @@ final class OverlayView: NSView {
             borderLayer.path = CGPath(rect: r.insetBy(dx: 1, dy: 1), transform: nil)
             borderLayer.isHidden = false
             let s = frozen.scale
-            tag.text = "\(Int((h.width * s).rounded())) × \(Int((h.height * s).rounded()))"
-            tag.sizeToFitText()
+            sizeTag.text = "\(Int((h.width * s).rounded())) × \(Int((h.height * s).rounded()))"
+            sizeTag.sizeToFitText()
             var o = CGPoint(x: r.minX, y: r.maxY + 6)
-            if o.y + tag.frame.height > bounds.height - 4 { o.y = r.maxY - tag.frame.height - 6; o.x = r.minX + 6 }
-            o.x = min(max(4, o.x), bounds.width - tag.frame.width - 4)
-            tag.setFrameOrigin(o)
-            tag.isHidden = false
+            if o.y + sizeTag.frame.height > bounds.height - 4 { o.y = r.maxY - sizeTag.frame.height - 6; o.x = r.minX + 6 }
+            o.x = min(max(4, o.x), bounds.width - sizeTag.frame.width - 4)
+            sizeTag.setFrameOrigin(o)
+            sizeTag.isHidden = false
         } else {
             dimLayer.path = full
             borderLayer.isHidden = true
-            tag.isHidden = true
+            sizeTag.isHidden = true
         }
         CATransaction.commit()
         updateLoupe()
