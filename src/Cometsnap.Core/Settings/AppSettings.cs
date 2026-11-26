@@ -30,6 +30,12 @@ public sealed class AppSettings
     public string FullscreenHotkey { get; set; } = "Ctrl+PrintScreen";
     public string ActiveWindowHotkey { get; set; } = "Alt+PrintScreen";
 
+    /// <summary>Scrolling capture: pick a window, Cometsnap scrolls it and glues one tall image.</summary>
+    public string ScrollingHotkey { get; set; } = "Ctrl+Alt+PrintScreen";
+
+    /// <summary>Copy text (OCR): drag over text on the screen and the text goes on the clipboard.</summary>
+    public string TextHotkey { get; set; } = "Ctrl+Alt+T";
+
     /// <summary>Folder for captures. Empty = default (Pictures\Cometsnap or beside the exe in portable mode).</summary>
     public string CapturesFolder { get; set; } = "";
 

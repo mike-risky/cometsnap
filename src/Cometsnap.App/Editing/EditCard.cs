@@ -30,7 +30,9 @@ public sealed class EditCard : Window
     private readonly TextBlock _editLabel;
     private readonly Border _editButton;
     private readonly Border _cardBorder;
+    private readonly Border _textButton;
     private string? _recording;           // set while the card shows a recording
+    private string? _text;                // set while the card shows recognized text
     private readonly DispatcherTimer _timer;
     private BitmapSource? _image;
     private string? _path;
@@ -43,7 +45,15 @@ public sealed class EditCard : Window
     /// <summary>Raised with the recording's path when the card of a recording is clicked (opens the trimmer).</summary>
     public event Action<string>? TrimRequested;
 
+    /// <summary>Raised with the capture when its Text button is clicked (read the text in it).</summary>
+    public event Action<BitmapSource>? TextRequested;
+
+    /// <summary>Raised with the recognized text when the card of a text capture is clicked.</summary>
+    public event Action<string>? ShowTextRequested;
+
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
+    private const string TextIcon = "M3,3.5 H13 M8,3.5 V13.5 M6,13.5 H10";
+    private const string EyeIcon = "M1.5,8 C4,3.5 12,3.5 14.5,8 C12,12.5 4,12.5 1.5,8 Z M8,8 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0";
     private const string ScissorsIcon = "M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4";
 
     public EditCard()
@@ -87,6 +97,29 @@ public sealed class EditCard : Window
         _editButton = edit;
         edit.MouseLeftButtonUp += (_, e) => { e.Handled = true; _pressAt = null; if (!_dragged) OnEdit(); };
 
+        // Copy text (OCR): reads the text in the capture and puts it on the clipboard.
+        _textButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7, 9, 7),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            ToolTip = L.T("Copy the text in this capture"),
+            Child = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(TextIcon), Stroke = SpaceTheme.StarWhiteBrush, StrokeThickness = 1.8,
+                StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Width = 16, Height = 16,
+            },
+        };
+        _textButton.MouseEnter += (_, _) => _textButton.Background = SpaceTheme.CometBlueBrush;
+        _textButton.MouseLeave += (_, _) => _textButton.Background = SpaceTheme.NavyBrush;
+        _textButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _image is not { } image) return;
+            _timer.Stop();
+            TextRequested?.Invoke(image);
+        };
+
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -97,6 +130,7 @@ public sealed class EditCard : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
+        row.Children.Add(_textButton);
         row.Children.Add(edit);
         row.Children.Add(close);
 
@@ -123,7 +157,7 @@ public sealed class EditCard : Window
         card.PreviewMouseLeftButtonDown += (_, e) => { _pressAt = e.GetPosition(this); _dragged = false; };
         card.PreviewMouseMove += (_, e) =>
         {
-            if (e.LeftButton != MouseButtonState.Pressed || _pressAt is not { } start || (_image is null && _recording is null)) return;
+            if (e.LeftButton != MouseButtonState.Pressed || _pressAt is not { } start || (_image is null && _recording is null) || _text is not null) return;
             var d = e.GetPosition(this) - start;
             if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _pressAt = null;
@@ -157,7 +191,7 @@ public sealed class EditCard : Window
     /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area.</summary>
     public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied)
     {
-        SetMode(recording: null);
+        SetMode(recording: null, text: null);
         _image = image;
         _path = null;
         _thumb.Source = image;
@@ -181,7 +215,7 @@ public sealed class EditCard : Window
     /// </summary>
     public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied, Rect workAreaDip)
     {
-        SetMode(path);
+        SetMode(path, text: null);
         _image = poster;
         _path = path;
         _thumb.Source = poster;
@@ -198,20 +232,68 @@ public sealed class EditCard : Window
         _timer.Start();
     }
 
-    private void SetMode(string? recording)
+    private void SetMode(string? recording, string? text)
     {
         _recording = recording;
+        _text = text;
         var video = recording is not null;
-        _editIcon.Data = Geometry.Parse(video ? ScissorsIcon : PenIcon);
-        _editLabel.Text = video ? L.T("Trim") : L.T("Edit");
-        _editButton.ToolTip = video ? L.T("Trim the start and end, or cut parts out") : L.T("Open in the editor");
-        _cardBorder.ToolTip = video ? L.T("Click to trim · Drag into any app") : L.T("Click to edit · Drag into any app");
+        var reading = text is not null;
+        _textButton.Visibility = video || reading ? Visibility.Collapsed : Visibility.Visible;
+        _editButton.Visibility = reading && text!.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+        _editIcon.Data = Geometry.Parse(video ? ScissorsIcon : reading ? EyeIcon : PenIcon);
+        _editLabel.Text = video ? L.T("Trim") : reading ? L.T("Show") : L.T("Edit");
+        _editButton.ToolTip = video ? L.T("Trim the start and end, or cut parts out")
+            : reading ? L.T("See the text and copy just a part") : L.T("Open in the editor");
+        _cardBorder.ToolTip = video ? L.T("Click to trim · Drag into any app")
+            : reading ? L.T("Click to see the text") : L.T("Click to edit · Drag into any app");
+    }
+
+    /// <summary>The text of a capture is being read: shows the card with a "Reading" title until it is done.</summary>
+    public void ShowReading(BitmapSource image, Rect workAreaDip)
+    {
+        SetMode(recording: null, text: "");
+        _image = image;
+        _path = null;
+        _thumb.Source = image;
+        _title.Text = L.T("READING…");
+        _detail.Text = L.T("Looking for text");
+        Present(workAreaDip, fadeLater: false);
+    }
+
+    /// <summary>Shows what text recognition found (already on the clipboard).</summary>
+    public void ShowText(BitmapSource image, string text, int lines, Rect workAreaDip)
+    {
+        SetMode(recording: null, text: text);
+        _image = image;
+        _path = null;
+        _thumb.Source = image;
+        _title.Text = text.Length > 0 ? L.T("TEXT COPIED!") : L.T("NO TEXT FOUND");
+        _detail.Text = text.Length == 0 ? L.T("Try a bigger area")
+            : lines == 1 ? FirstLine(text) : L.F("{0} lines · {1}", lines, FirstLine(text));
+        Present(workAreaDip, fadeLater: true);
+    }
+
+    private static string FirstLine(string text) =>
+        text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
+
+    private void Present(Rect workAreaDip, bool fadeLater)
+    {
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 1;
+        var wasVisible = IsVisible;
+        if (!wasVisible) Show();
+        if (!wasVisible && Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
+        UpdateLayout();
+        Left = workAreaDip.Right - ActualWidth - 4;
+        Top = workAreaDip.Bottom - ActualHeight - 4;
+        _timer.Stop();
+        if (fadeLater) _timer.Start();
     }
 
     /// <summary>The capture reached the disk: Edit will now open the file.</summary>
     public void SetSaved(string path, BitmapSource image)
     {
-        if (_recording is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
+        if (_recording is not null || _text is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
         _path = path;
         _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · {Path.GetFileName(path)}";
     }
@@ -221,6 +303,8 @@ public sealed class EditCard : Window
         _timer.Stop();
         Hide();
         if (_recording is { } recording) TrimRequested?.Invoke(recording);
+        else if (_text is { Length: > 0 } text) ShowTextRequested?.Invoke(text);
+        else if (_text is not null) return;
         else if (_image is { } image) EditRequested?.Invoke(_path, image);
     }
 

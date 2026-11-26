@@ -102,6 +102,12 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
   panel for anyone who knows ↑ ↑ ↓ ↓ ← → ← → B A
 - Fullscreen, active window and delayed captures (3, 5 or 10 s), multi-monitor and mixed DPI
 - **Screen recording**: MP4 with PC sound and microphone, or an animated GIF, of any area or the whole screen
+- **Scrolling capture** (Ctrl+Alt+Print Screen): click a window (or drag over the part that scrolls) and Cometsnap
+  scrolls it for you, gluing one tall image. Sticky headers and footers appear once. It stops at the end of the
+  page; press Esc or move the mouse to stop earlier
+- **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
+  button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
+  Click the card to see the text and copy just a part
 
 ## Keys
 
@@ -112,6 +118,8 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Anywhere | **Alt+Print Screen** | Active window |
 | Anywhere | **Shift+Print Screen** | Record a region / window to MP4 (press again, click the tray icon or ■ to stop) |
 | Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
+| Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (Esc or move the mouse to stop) |
+| Anywhere | **Ctrl+Alt+T** | Copy the text in an area (OCR) |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
 | Overlay | arrows / **Shift**+arrows | Move the cursor 1 px / 10 px |
@@ -128,6 +136,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Editor | **1**–**8**, **[** / **]** | Color, size |
 | Editor | **Ctrl+Z** / **Ctrl+Y** | Undo / redo (moves, colors and deletes too) |
 | Editor | **Ctrl+C** or **Ctrl+Enter** | Copy, save and close |
+| Editor | **Ctrl+Shift+C** | Copy the text in the image (OCR) |
 | Editor | **Ctrl+S** / **Ctrl+Shift+S** | Save and close / save a copy as… |
 | Editor | **Ctrl+wheel**, **Ctrl+0**, **Ctrl+1** | Zoom, fit, 100% |
 | Trimmer | drag the yellow handles, or **I** / **O** | Trim the start / end of a recording |

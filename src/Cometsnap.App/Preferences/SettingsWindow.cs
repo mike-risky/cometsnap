@@ -119,6 +119,8 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(HotkeyRow(L.T("Backup shortcut for capture"), () => S.CaptureHotkeyFallback, v => S.CaptureHotkeyFallback = v, new AppSettings().CaptureHotkeyFallback));
         stack.Children.Add(HotkeyRow(L.T("Fullscreen (monitor under the mouse)"), () => S.FullscreenHotkey, v => S.FullscreenHotkey = v, new AppSettings().FullscreenHotkey));
         stack.Children.Add(HotkeyRow(L.T("Active window"), () => S.ActiveWindowHotkey, v => S.ActiveWindowHotkey = v, new AppSettings().ActiveWindowHotkey));
+        stack.Children.Add(HotkeyRow(L.T("Scrolling capture"), () => S.ScrollingHotkey, v => S.ScrollingHotkey = v, new AppSettings().ScrollingHotkey));
+        stack.Children.Add(HotkeyRow(L.T("Copy text from the screen"), () => S.TextHotkey, v => S.TextHotkey = v, new AppSettings().TextHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a video (MP4)"), () => S.RecordHotkey, v => S.RecordHotkey = v, new AppSettings().RecordHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a GIF"), () => S.RecordGifHotkey, v => S.RecordGifHotkey = v, new AppSettings().RecordGifHotkey));
 

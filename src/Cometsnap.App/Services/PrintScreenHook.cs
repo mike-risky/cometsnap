@@ -36,6 +36,9 @@ public sealed class PrintScreenHook : IDisposable
     /// <summary>Optional: Ctrl+Shift+Print Screen (start / stop a GIF recording).</summary>
     public Action? CtrlShift { get; set; }
 
+    /// <summary>Optional: Ctrl+Alt+Print Screen (scrolling capture).</summary>
+    public Action? CtrlAlt { get; set; }
+
     public bool IsInstalled => _hook != IntPtr.Zero;
 
     public bool Install()
@@ -76,7 +79,9 @@ public sealed class PrintScreenHook : IDisposable
                     _down = true;
                     var shift = Win32.IsKeyDown(Win32.VK_SHIFT);
                     var ctrl = Win32.IsKeyDown(Win32.VK_CONTROL);
-                    var action = shift && ctrl && CtrlShift is not null ? CtrlShift
+                    var alt = Win32.IsKeyDown(Win32.VK_MENU);
+                    var action = ctrl && alt && !shift && CtrlAlt is not null ? CtrlAlt
+                        : shift && ctrl && CtrlShift is not null ? CtrlShift
                         : shift && !ctrl && Shift is not null ? Shift
                         : ctrl ? _ctrl
                         : Win32.IsKeyDown(Win32.VK_MENU) ? _alt
