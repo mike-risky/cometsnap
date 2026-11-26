@@ -11,10 +11,15 @@ No paywall, no branding, no forced updates.
 
 ## Download
 
-Cometsnap is a single portable `.exe`, nothing to install.
+Get the installer from the [Latest build](https://github.com/mike-risky/cometsnap/releases/tag/nightly) pre-release:
+**`Cometsnap-Setup-x64.exe`** (most PCs) or `Cometsnap-Setup-arm64.exe` (Snapdragon / Surface Pro X).
 
-- **Latest build:** grab `Cometsnap-x64.exe` (most PCs) or `Cometsnap-arm64.exe`
-  (Snapdragon / Surface Pro X) from the [Latest build](https://github.com/mike-risky/cometsnap/releases/tag/nightly) pre-release.
+- Installs just for you, no admin rights. It says clearly whether it is a new install, an update
+  (`0.1.41 → 0.1.42`) or a reinstall, closes any running Cometsnap first, and keeps your settings and captures.
+- When it finishes, Cometsnap starts and offers to replace your old screen capture tool.
+- Uninstall from *Settings > Apps*: startup entry removed, Print Screen goes back to Windows, captures kept.
+
+Prefer no install? `Cometsnap-x64.exe` / `Cometsnap-arm64.exe` are portable single files.
 - Put a file named `portable.txt` next to the exe to keep settings and captures beside it (USB-friendly).
 
 Windows may show a SmartScreen warning the first time because the exe is not code-signed yet:
@@ -89,7 +94,8 @@ Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download) on Windows.
 ```powershell
 dotnet build Cometsnap.sln
 dotnet test Cometsnap.sln
-dotnet publish src/Cometsnap.App -c Release -r win-x64 -o out   # portable out/Cometsnap.exe
+dotnet publish src/Cometsnap.App -c Release -r win-x64 -o out/x64   # portable out/x64/Cometsnap.exe
+# Setup (Inno Setup 6.3+): ISCC /DArch=x64 installer\Cometsnap.iss   -> out/Cometsnap-Setup-x64.exe
 ```
 
 Every push builds `Cometsnap.exe` for x64 and ARM64 with GitHub Actions.

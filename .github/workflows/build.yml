@@ -42,18 +42,36 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+      - name: Pick the version
+        shell: pwsh
+        run: |
+          # Every build gets its own number, so Setup can say "Update 0.1.41 to 0.1.42".
+          $version = "0.1.${{ github.run_number }}"
+          if ("${{ github.ref_type }}" -eq "tag") { $version = "${{ github.ref_name }}".TrimStart("v") }
+          "VERSION=$version" >> $env:GITHUB_ENV
       - name: Publish portable Cometsnap.exe (${{ matrix.arch }})
         shell: pwsh
         run: |
-          $version = "0.1.0"
-          if ("${{ github.ref_type }}" -eq "tag") { $version = "${{ github.ref_name }}".TrimStart("v") }
           dotnet publish src/Cometsnap.App/Cometsnap.App.csproj -c Release -r win-${{ matrix.arch }} `
-            -p:Version=$version -o out/${{ matrix.arch }}
+            -p:Version=$env:VERSION -o out/${{ matrix.arch }}
+          Get-ChildItem out/${{ matrix.arch }}
+      - name: Build Cometsnap-Setup-${{ matrix.arch }}.exe
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc "/DAppVersion=$env:VERSION" "/DArch=${{ matrix.arch }}" `
+            "/DSourceExe=$PWD\out\${{ matrix.arch }}\Cometsnap.exe" "/O$PWD\out\${{ matrix.arch }}" installer\Cometsnap.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem out/${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
           name: Cometsnap-${{ matrix.arch }}
-          path: out/${{ matrix.arch }}/Cometsnap.exe
+          path: |
+            out/${{ matrix.arch }}/Cometsnap.exe
+            out/${{ matrix.arch }}/Cometsnap-Setup-${{ matrix.arch }}.exe
           if-no-files-found: error
 
   release:
@@ -71,6 +89,8 @@ jobs:
           mkdir -p rel
           cp dl/Cometsnap-x64/Cometsnap.exe rel/Cometsnap-x64.exe
           cp dl/Cometsnap-arm64/Cometsnap.exe rel/Cometsnap-arm64.exe
+          cp dl/Cometsnap-x64/Cometsnap-Setup-x64.exe rel/
+          cp dl/Cometsnap-arm64/Cometsnap-Setup-arm64.exe rel/
           ls -la rel
       - name: Update the "latest build" pre-release (main)
         if: github.ref == 'refs/heads/main'
@@ -81,7 +101,7 @@ jobs:
           gh release delete nightly --yes --cleanup-tag || true
           gh release create nightly rel/*.exe --prerelease --target "${{ github.sha }}" \
             --title "Latest build (main)" \
-            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Portable: download the exe for your PC (x64 for most PCs, arm64 for Snapdragon / Surface Pro X) and run it."
+            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe."
       - name: Update the test pre-release of this pull request
         if: github.event_name == 'pull_request'
         env:
@@ -94,7 +114,7 @@ jobs:
           gh release delete "test-pr$PR" --yes --cleanup-tag || true
           gh release create "test-pr$PR" rel/*.exe --prerelease --latest=false --target "$HEAD_SHA" \
             --title "Test build: PR #$PR" \
-            --notes "Test build of pull request #$PR ($PR_TITLE), commit ${HEAD_SHA::7}. Portable: download Cometsnap-x64.exe (most PCs) or Cometsnap-arm64.exe (Snapdragon / Surface Pro X) and run it."
+            --notes "Test build of pull request #$PR ($PR_TITLE), commit ${HEAD_SHA::7}. Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe."
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
