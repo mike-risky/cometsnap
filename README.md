@@ -109,6 +109,14 @@ On Wayland, captures and recordings go through the desktop portal, so the first 
 | Editor | **Ctrl+C** or **Ctrl+Enter** | Copy, save and close |
 | Editor | **Ctrl+S** / **Ctrl+Shift+S** | Save and close / save a copy as… |
 | Editor | **Ctrl+wheel**, **Ctrl+0**, **Ctrl+1** | Zoom, fit, 100% |
+| Trimmer | drag the yellow handles, or **I** / **O** | Trim the start / end of a recording |
+| Trimmer | drag across the timeline, then **Del** | Cut that part out (click a cut to put it back) |
+| Trimmer | **Space**, **←** / **→**, **Home** / **End** | Play / pause, step a frame (Shift = 1 s), jump to start / end |
+| Trimmer | **Ctrl+C** / **Ctrl+S** / **Ctrl+Shift+S** | Copy and close / save and close / save a copy as… |
+
+Recordings open in the trimmer from the card that appears after recording, or with a double-click
+in the tray panel. Saving keeps the untouched original hidden next to it, so you can re-open and
+change the cuts later.
 
 With *Instant capture* off, the same tool keys work on the frozen screen once a region is selected,
 and **Ctrl+E** opens the selection in the editor.
@@ -118,7 +126,7 @@ and **Ctrl+E** opens the selection in the editor.
 1. **Snappy core**: tray, hotkeys, capture overlay, loupe, quick annotations
 2. **Full editor + docs mode**: all tools, re-editable captures, effects, doc sessions with PDF/DOCX/Markdown export
 3. **Smart tools**: OCR, color picker, QR reader, scrolling capture
-4. **Video**: MP4/GIF recording with sound
+4. **Video**: MP4/GIF recording with sound, trim and cut
 5. **Share**: Imgur, SFTP, S3, OneDrive, Google Drive
 6. **Extras**: auto-blur of sensitive data, subtitles, Android capture
 

@@ -19,6 +19,14 @@ public static class EditSidecar
     public static string AnnotationsFor(string imagePath) =>
         Path.Combine(FolderFor(imagePath), Path.GetFileNameWithoutExtension(imagePath) + ".annotations.json");
 
+    /// <summary>The untouched recording, kept when a video or GIF is trimmed (same extension).</summary>
+    public static string OriginalRecordingFor(string recordingPath) =>
+        Path.Combine(FolderFor(recordingPath), Path.GetFileNameWithoutExtension(recordingPath) + ".original" + Path.GetExtension(recordingPath));
+
+    /// <summary>What was trimmed and cut from a recording, so the trimmer re-opens where you left it.</summary>
+    public static string CutsFor(string recordingPath) =>
+        Path.Combine(FolderFor(recordingPath), Path.GetFileNameWithoutExtension(recordingPath) + ".cuts.json");
+
     public static void EnsureFolder(string imagePath)
     {
         var folder = Directory.CreateDirectory(FolderFor(imagePath));
@@ -29,7 +37,7 @@ public static class EditSidecar
     /// <summary>Removes the sidecar files of a deleted capture.</summary>
     public static void DeleteFor(string imagePath)
     {
-        foreach (var f in new[] { OriginalFor(imagePath), AnnotationsFor(imagePath) })
+        foreach (var f in new[] { OriginalFor(imagePath), AnnotationsFor(imagePath), OriginalRecordingFor(imagePath), CutsFor(imagePath) })
         {
             try { if (File.Exists(f)) File.Delete(f); }
             catch { /* best effort */ }
