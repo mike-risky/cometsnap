@@ -96,10 +96,42 @@ public sealed class CometApp : Application
         _printScreen = new PrintScreenHook(Dispatcher, Capture.StartRegion, Capture.CaptureFullscreen, Capture.CaptureActiveWindow);
         var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
+        ListenForOtherLaunches();
         Log.Info($"Started in {sw.ElapsedMilliseconds} ms");
 
         if (!Settings.ReplaceOfferAnswered)
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk));
+    }
+
+    /// <summary>
+    /// Launching Cometsnap again opens the tray panel of the running one; launching a different
+    /// or newer exe makes this one quit so the new one takes over (see Program).
+    /// </summary>
+    private void ListenForOtherLaunches()
+    {
+        void Listen(string name, Action action)
+        {
+            var handle = new EventWaitHandle(false, EventResetMode.AutoReset, name);
+            var thread = new Thread(() =>
+            {
+                while (handle.WaitOne())
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        try { action(); }
+                        catch (Exception ex) { Log.Error($"{name} failed", ex); }
+                    });
+            }) { IsBackground = true, Name = name };
+            thread.Start();
+        }
+        Listen(Program.ActivateEventName, () =>
+        {
+            if (_flyout is { IsVisible: false }) _flyout.Toggle(_tray?.GetIconRect());
+        });
+        Listen(Program.QuitEventName, () =>
+        {
+            Log.Info("A newer Cometsnap was started: handing over");
+            Shutdown();
+        });
     }
 
     private static bool UsesPrintScreen(string gesture) =>
