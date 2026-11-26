@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace Cometsnap.Core.Storage;
 
 /// <summary>
