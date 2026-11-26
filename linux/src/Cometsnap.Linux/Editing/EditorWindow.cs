@@ -108,7 +108,7 @@ public sealed class EditorWindow : Window
                 rail.Children.Add(Ui.Divider(vertical: false));
             var tool = t.Tool;
             Control icon = t.Glyph == "1" ? Ui.StepGlyph() : t.Glyph is not null ? Ui.Glyph(t.Glyph) : Ui.Icon(t.Icon!);
-            var b = Ui.LabeledButton(icon, t.Label, t.Tip, () => SetTool(tool), height: 46);
+            var b = Ui.LabeledButton(icon, T(t.Label), T(t.Tip), () => SetTool(tool), height: 46);
             b.Margin = new Thickness(0, 1);
             _toolButtons[tool] = b;
             rail.Children.Add(b);
@@ -128,33 +128,33 @@ public sealed class EditorWindow : Window
             Text = "COMETSNAP", FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush,
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 14, 0),
         });
-        for (var i = 0; i < EditorTools.Palette.Length; i++) left.Children.Add(Swatch(EditorTools.Palette[i], $"{EditorTools.PaletteNames[i]} ({i + 1})"));
+        for (var i = 0; i < EditorTools.Palette.Length; i++) left.Children.Add(Swatch(EditorTools.Palette[i], $"{T(EditorTools.PaletteNames[i])} ({i + 1})"));
         left.Children.Add(Ui.Divider(vertical: true));
         for (var i = 0; i < 3; i++)
         {
             var s = i;
             var b = Ui.Button(new TextBlock { Text = SizeNames[i], FontWeight = FontWeight.Bold, FontSize = 13, Width = 16, TextAlignment = TextAlignment.Center },
-                $"Size {SizeNames[i]} ([ and ] change it)", () => SetSize(s), padding: new Thickness(7, 5));
+                F("Size {0} ([ and ] change it)", SizeNames[i]), () => SetSize(s), padding: new Thickness(7, 5));
             b.Margin = new Thickness(1, 0);
             _sizeButtons[i] = b;
             left.Children.Add(b);
         }
         left.Children.Add(Ui.Divider(vertical: true));
-        left.Children.Add(IconButton("M5,6 H10.5 A3,3 0 0 1 10.5,12 H6 M5,6 L7.5,3.5 M5,6 L7.5,8.5", "Undo (Ctrl+Z)", Undo));
-        left.Children.Add(IconButton("M11,6 H5.5 A3,3 0 0 0 5.5,12 H10 M11,6 L8.5,3.5 M11,6 L8.5,8.5", "Redo (Ctrl+Y)", () => { CommitText(); Select(null); _doc.Redo(); }));
-        left.Children.Add(IconButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete the selected shape (Del)", DeleteSelected));
+        left.Children.Add(IconButton("M5,6 H10.5 A3,3 0 0 1 10.5,12 H6 M5,6 L7.5,3.5 M5,6 L7.5,8.5", T("Undo (Ctrl+Z)"), Undo));
+        left.Children.Add(IconButton("M11,6 H5.5 A3,3 0 0 0 5.5,12 H10 M11,6 L8.5,3.5 M11,6 L8.5,8.5", T("Redo (Ctrl+Y)"), () => { CommitText(); Select(null); _doc.Redo(); }));
+        left.Children.Add(IconButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", T("Delete the selected shape (Del)"), DeleteSelected));
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
         // Constellation mode: shown once there are two steps to connect.
-        _constellationButton = Ui.ActionButton("Constellation",
+        _constellationButton = Ui.ActionButton(T("Constellation"),
             "M3,12 L7,6 L12,9 L14,3 M3,12 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M7,6 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M12,9 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0",
-            "Join the numbered steps with faint star lines", ToggleConstellation);
+            T("Join the numbered steps with faint star lines"), ToggleConstellation);
         _constellationButton.IsVisible = false;
         if (_doc.ConnectSteps) Ui.SetActive(_constellationButton, true);
         right.Children.Add(_constellationButton);
-        right.Children.Add(Ui.ActionButton("Save as…", null, "Save a copy as PNG or JPEG (Ctrl+Shift+S)", () => _ = SaveAsAndCloseAsync()));
-        right.Children.Add(Ui.ActionButton("Save", "M3,2.5 H11 L13.5,5 V13.5 H3 Z M5.5,2.5 V6 H10 V2.5 M5.5,13.5 V9.5 H10.5 V13.5", "Save and close (Ctrl+S)", SaveAndClose));
-        right.Children.Add(Ui.ActionButton("Copy", "M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy, save and close (Ctrl+C / Ctrl+Enter)", () => _ = CopyAndCloseAsync(), primary: true));
+        right.Children.Add(Ui.ActionButton(T("Save as…"), null, T("Save a copy as PNG or JPEG (Ctrl+Shift+S)"), () => _ = SaveAsAndCloseAsync()));
+        right.Children.Add(Ui.ActionButton(T("Save"), "M3,2.5 H11 L13.5,5 V13.5 H3 Z M5.5,2.5 V6 H10 V2.5 M5.5,13.5 V9.5 H10.5 V13.5", T("Save and close (Ctrl+S)"), SaveAndClose));
+        right.Children.Add(Ui.ActionButton(T("Copy"), "M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", T("Copy, save and close (Ctrl+C / Ctrl+Enter)"), () => _ = CopyAndCloseAsync(), primary: true));
 
         var top = new DockPanel { Margin = new Thickness(12, 8, 12, 8) };
         DockPanel.SetDock(right, Dock.Right);
@@ -211,7 +211,7 @@ public sealed class EditorWindow : Window
     public Annotation? Selected => _selected;
     public bool IsCropTool => _tool == EditorTool.Crop;
 
-    private string TitleText() => _path is null ? "Cometsnap editor" : $"{System.IO.Path.GetFileName(_path)} · Cometsnap";
+    private string TitleText() => _path is null ? T("Cometsnap editor") : $"{System.IO.Path.GetFileName(_path)} · Cometsnap";
 
     // ------------------------------------------------------------------ layout
 
@@ -274,7 +274,7 @@ public sealed class EditorWindow : Window
         _app.SaveSettings();
         _dirty = true;
         _doc.Touch();
-        Flash(_doc.ConnectSteps ? "Constellation on: steps are joined by star lines" : "Constellation off");
+        Flash(_doc.ConnectSteps ? T("Constellation on: steps are joined by star lines") : T("Constellation off"));
     }
 
     private void Flash(string text)
@@ -283,7 +283,7 @@ public sealed class EditorWindow : Window
         DispatcherTimer.RunOnce(() => _hint.Text = ToolHint(), TimeSpan.FromSeconds(3));
     }
 
-    private string ToolHint() => EditorTools.All.First(t => t.Tool == _tool).Tip + "   ·   Ctrl+C copy · Ctrl+S save";
+    private string ToolHint() => T(EditorTools.All.First(t => t.Tool == _tool).Tip) + "   ·   " + T("Ctrl+C copy · Ctrl+S save");
 
     private Border Swatch(string color, string tip)
     {
@@ -309,10 +309,10 @@ public sealed class EditorWindow : Window
     private Border BuildConfirm()
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        row.Children.Add(new TextBlock { Text = "Save your changes?", FontSize = 14, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
-        row.Children.Add(Ui.ActionButton("Save", null, "Save and close", () => { HideConfirm(); SaveAndClose(); }, primary: true));
-        row.Children.Add(Ui.ActionButton("Don't save", null, "Close without saving", () => { _closingAfterSave = true; Close(); }));
-        row.Children.Add(Ui.ActionButton("Cancel", null, "Keep editing", HideConfirm));
+        row.Children.Add(new TextBlock { Text = T("Save your changes?"), FontSize = 14, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+        row.Children.Add(Ui.ActionButton(T("Save"), null, T("Save and close"), () => { HideConfirm(); SaveAndClose(); }, primary: true));
+        row.Children.Add(Ui.ActionButton(T("Don't save"), null, T("Close without saving"), () => { _closingAfterSave = true; Close(); }));
+        row.Children.Add(Ui.ActionButton(T("Cancel"), null, T("Keep editing"), HideConfirm));
         return new Border
         {
             Child = row,
@@ -524,7 +524,7 @@ public sealed class EditorWindow : Window
         }
         _doc.Add(a);
         _dirty = true;
-        if (a is CropAnnotation) Flash("Cropped. Ctrl+Z to undo, or drag again to change it.");
+        if (a is CropAnnotation) Flash(T("Cropped. Ctrl+Z to undo, or drag again to change it."));
     }
 
     // ------------------------------------------------------------------ text
@@ -546,7 +546,7 @@ public sealed class EditorWindow : Window
             FontWeight = FontWeight.SemiBold,
             FontSize = TextSizes[_size] * (Stroke(_size) / Sizes[_size]) * _zoom,
             Padding = new Thickness(2),
-            Watermark = callout ? "Bubble text" : "Type…",
+            Watermark = callout ? T("Bubble text") : T("Type…"),
         };
         _textBox.AddHandler(KeyDownEvent, (_, e) =>
         {
@@ -652,11 +652,11 @@ public sealed class EditorWindow : Window
         var png = CaptureStore.EncodePng(image);
         if (!await _app.Clipboard.SetPngAsync(png))
         {
-            Flash("Could not copy, try again");
+            Flash(T("Could not copy, try again"));
             return;
         }
         if (_dirty && !Save(image, png)) return;
-        _app.Toast("Copied to clipboard ✓", 1500);
+        _app.Toast(T("Copied to clipboard ✓"), 1500);
         CloseNow();
     }
 
@@ -664,7 +664,7 @@ public sealed class EditorWindow : Window
     {
         var image = Flattened();
         if (!Save(image, CaptureStore.EncodePng(image))) return;
-        _app.Toast("Saved ✓", 1500);
+        _app.Toast(T("Saved ✓"), 1500);
         CloseNow();
     }
 
@@ -673,10 +673,10 @@ public sealed class EditorWindow : Window
         var image = Flattened();
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save a copy",
+            Title = T("Save a copy"),
             SuggestedFileName = (_path is null ? SnapNaming.BaseName(DateTime.Now) : System.IO.Path.GetFileNameWithoutExtension(_path) + "-edited") + ".png",
             DefaultExtension = "png",
-            FileTypeChoices = new[] { new FilePickerFileType("PNG image") { Patterns = new[] { "*.png" } } },
+            FileTypeChoices = new[] { new FilePickerFileType(T("PNG image")) { Patterns = new[] { "*.png" } } },
         });
         if (file is null) return;
         try
@@ -690,7 +690,7 @@ public sealed class EditorWindow : Window
         catch (Exception ex)
         {
             Log.Error("Editor save as failed", ex);
-            Flash($"Could not save: {ex.Message}");
+            Flash($"{T("Could not save:")} {ex.Message}");
         }
     }
 
@@ -729,7 +729,7 @@ public sealed class EditorWindow : Window
         catch (Exception ex)
         {
             Log.Error("Editor save failed", ex);
-            Flash($"Could not save: {ex.Message}");
+            Flash($"{T("Could not save:")} {ex.Message}");
             return false;
         }
     }

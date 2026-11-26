@@ -48,7 +48,7 @@ public sealed class EditCard : Window
             CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = _thumb,
             BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
         };
-        _title = new TextBlock { Text = "COPIED!", FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush };
+        _title = new TextBlock { Text = T("COPIED!"), FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush };
         _detail = new TextBlock
         {
             Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(0, 2, 0, 0), MaxWidth = 170,
@@ -58,14 +58,14 @@ public sealed class EditCard : Window
         text.Children.Add(_title);
         text.Children.Add(_detail);
 
-        var edit = Ui.ActionButton("Edit", "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Open in the editor", OnEdit, primary: true);
+        var edit = Ui.ActionButton(T("Edit"), "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", T("Open in the editor"), OnEdit, primary: true);
         edit.VerticalAlignment = VerticalAlignment.Center;
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
             VerticalAlignment = VerticalAlignment.Top, Cursor = new Cursor(StandardCursorType.Hand),
         };
-        ToolTip.SetTip(close, "Dismiss");
+        ToolTip.SetTip(close, T("Dismiss"));
         close.PointerReleased += (_, e) => { e.Handled = true; FadeOut(); };
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
@@ -84,7 +84,7 @@ public sealed class EditCard : Window
 
         // The whole card opens the editor (faster than aiming for the button); Edit and ✕ still work.
         _card.Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(_card, "Click to edit · Drag into any app");
+        ToolTip.SetTip(_card, T("Click to edit · Drag into any app"));
         _card.PointerEntered += (_, _) => _card.BorderBrush = SpaceTheme.CometBlueBrush;
         _card.PointerExited += (_, _) => _card.BorderBrush = SpaceTheme.NavyLightBrush;
         // Click = edit; drag = drop the capture into any app (file manager, chat, mail, a browser…).
@@ -137,8 +137,8 @@ public sealed class EditCard : Window
         _image = image;
         _path = null;
         _thumb.Source = image;
-        _title.Text = title ?? (copied ? "COPIED!" : "SNAPPED!");
-        _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · saving…";
+        _title.Text = title ?? (copied ? T("COPIED!") : T("SNAPPED!"));
+        _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · {T("saving…")}";
         Opacity = 1;
         if (!IsVisible) Show();
         Ui.Entrance(_card, lift: 14, ms: 180);

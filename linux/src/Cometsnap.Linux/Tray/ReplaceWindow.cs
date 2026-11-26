@@ -37,7 +37,7 @@ public sealed class ReplaceWindow : Window
 
         panel.Children.Add(new TextBlock
         {
-            Text = "Replace your old screenshot tool?", FontFamily = SpaceTheme.HeadingFont, FontSize = 18, Foreground = SpaceTheme.StarWhiteBrush,
+            Text = T("Replace your old screenshot tool?"), FontFamily = SpaceTheme.HeadingFont, FontSize = 18, Foreground = SpaceTheme.StarWhiteBrush,
         });
 
         var auto = DesktopIntegration.CanTakeOverPrintScreen;
@@ -45,10 +45,10 @@ public sealed class ReplaceWindow : Window
         {
             TextWrapping = TextWrapping.Wrap, FontSize = 14, Foreground = SpaceTheme.DustBrush,
             Text = auto
-                ? "Print Screen will open Cometsnap instead of the desktop's screenshot tool. Ctrl+Print Screen grabs the whole screen, Shift+Print Screen records a video and Ctrl+Shift+Print Screen a GIF. You can give the keys back anytime in Settings."
+                ? T("Print Screen will open Cometsnap instead of the desktop's screenshot tool. Ctrl+Print Screen grabs the whole screen, Shift+Print Screen records a video and Ctrl+Shift+Print Screen a GIF. You can give the keys back anytime in Settings.")
                 : DesktopSession.IsWayland
-                    ? "Your desktop decides which app gets Print Screen. Open its keyboard shortcut settings and add these commands (Cometsnap also asked the desktop for its shortcuts, so a confirmation window may have appeared):"
-                    : "Another program already uses Print Screen. Open your desktop's keyboard shortcut settings and point these keys at Cometsnap:",
+                    ? T("Your desktop decides which app gets Print Screen. Open its keyboard shortcut settings and add these commands (Cometsnap also asked the desktop for its shortcuts, so a confirmation window may have appeared):")
+                    : T("Another program already uses Print Screen. Open your desktop's keyboard shortcut settings and point these keys at Cometsnap:"),
         });
 
         if (!auto)
@@ -66,14 +66,14 @@ public sealed class ReplaceWindow : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
         if (auto)
         {
-            buttons.Children.Add(Ui.ActionButton("Not now", null, "Keep the desktop's tool", () => { app.AnswerReplaceOffer(false); Close(); }));
-            buttons.Children.Add(Ui.ActionButton("Yes, use Cometsnap", null, "Hand Print Screen over to Cometsnap", () => { app.AnswerReplaceOffer(true); Close(); }, primary: true));
+            buttons.Children.Add(Ui.ActionButton(T("Not now"), null, T("Keep the desktop's tool"), () => { app.AnswerReplaceOffer(false); Close(); }));
+            buttons.Children.Add(Ui.ActionButton(T("Yes, use Cometsnap"), null, T("Hand Print Screen over to Cometsnap"), () => { app.AnswerReplaceOffer(true); Close(); }, primary: true));
         }
         else
         {
             if (DesktopSession.IsKde && DesktopSession.Which("systemsettings") is not null)
-                buttons.Children.Add(Ui.ActionButton("Open shortcut settings", null, "", () => Tools.Launch("systemsettings", "kcm_keys")));
-            buttons.Children.Add(Ui.ActionButton("Done", null, "", () => { app.AnswerReplaceOffer(false); Close(); }, primary: true));
+                buttons.Children.Add(Ui.ActionButton(T("Open shortcut settings"), null, "", () => Tools.Launch("systemsettings", "kcm_keys")));
+            buttons.Children.Add(Ui.ActionButton(T("Done"), null, "", () => { app.AnswerReplaceOffer(false); Close(); }, primary: true));
         }
         panel.Children.Add(buttons);
         Content = panel;

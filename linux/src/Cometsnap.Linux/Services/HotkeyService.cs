@@ -52,10 +52,10 @@ public sealed class HotkeyService : IDisposable
             {
                 if (HotkeyGesture.TryParse(hotkey, out var g)) shortcuts.Add(new Portal.Shortcut(id, description, g.ToPortalTrigger()));
             }
-            Add("capture", "Capture a window or an area", _settings.CaptureHotkey);
-            Add("fullscreen", "Capture the whole screen", _settings.FullscreenHotkey);
-            Add("record", "Record a video (press again to stop)", _settings.RecordHotkey);
-            Add("record-gif", "Record a GIF (press again to stop)", _settings.RecordGifHotkey);
+            Add("capture", T("Capture a window or an area"), _settings.CaptureHotkey);
+            Add("fullscreen", T("Capture the whole screen"), _settings.FullscreenHotkey);
+            Add("record", T("Record a video (press again to stop)"), _settings.RecordHotkey);
+            Add("record-gif", T("Record a GIF (press again to stop)"), _settings.RecordGifHotkey);
             var ok = await portal.BindGlobalShortcutsAsync(shortcuts, id => Avalonia.Threading.Dispatcher.UIThread.Post(() => _onCommand(id)));
             Log.Info($"Hotkeys: GlobalShortcuts portal {(ok ? "bound" : "not available")}");
             PrintScreenTaken = !ok;

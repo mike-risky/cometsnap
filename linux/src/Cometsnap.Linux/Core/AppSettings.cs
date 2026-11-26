@@ -75,6 +75,9 @@ public sealed class AppSettings
     /// <summary>The desktop's own screenshot shortcuts before Cometsnap took Print Screen (to give them back).</summary>
     public string DesktopShortcutsBackup { get; set; } = "";
 
+    /// <summary>"en", "fr", "de" or "it"; empty follows the desktop's language.</summary>
+    public string Language { get; set; } = "";
+
     // ---- Playful touches
     /// <summary>Tiny meteor showers for snap milestones and the monthly recap.</summary>
     public bool Celebrations { get; set; } = true;

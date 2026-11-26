@@ -129,14 +129,14 @@ public sealed class RecordingController
         _tick?.Stop();
         _pill?.HideNow();
         StateChanged?.Invoke(false);
-        if (_format == RecordingFormat.Gif) _app.Toast("Making the GIF…", 2500);
+        if (_format == RecordingFormat.Gif) _app.Toast(T("Making the GIF…"), 2500);
         try
         {
             var result = await recorder.StopAsync();
             var copied = _app.Settings.RecordCopyToClipboard && await _app.Clipboard.SetFilesAsync(new[] { result.Path });
             _app.Recent.Add(result.Path);
             var mb = result.Bytes / 1024.0 / 1024.0;
-            _app.Toast((copied ? "Copied: paste it anywhere. " : "Saved: ") + $"{Path.GetFileName(result.Path)} · {result.Duration:m\\:ss} · {mb:0.#} MB", 5000);
+            _app.Toast((copied ? T("Copied: paste it anywhere.") + " " : T("Saved:") + " ") + $"{Path.GetFileName(result.Path)} · {result.Duration:m\\:ss} · {mb:0.#} MB", 5000);
         }
         catch (Exception ex)
         {

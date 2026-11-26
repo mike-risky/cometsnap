@@ -80,6 +80,8 @@ public sealed class CometApp : Application
         Log.Initialize(Paths.LogFile);
         Log.Info($"Cometsnap {typeof(CometApp).Assembly.GetName().Version} starting · {DesktopSession.Describe()}");
         Settings = AppSettings.Load(Paths.SettingsFile);
+        Loc.Use(Settings.Language);
+        Log.Info($"Language: {Loc.Language}");
         if (!File.Exists(Paths.SettingsFile)) SaveSettings();
 
         Recent = new RecentCaptures(Settings.RecentCount);
@@ -113,7 +115,7 @@ public sealed class CometApp : Application
         {
             if (command is null)
             {
-                Toast($"Cometsnap is ready ☄️ Press {Hotkeys.CaptureLabel} or click the comet in the tray.", 4500);
+                Toast(F("Cometsnap is ready ☄️ Press {0} or click the comet in the tray.", Hotkeys.CaptureLabel), 4500);
                 if (!Settings.ReplaceOfferAnswered) DispatcherTimer.RunOnce(() => ShowReplaceOffer(false), TimeSpan.FromSeconds(1.5));
             }
             else if (command != "background")
@@ -238,12 +240,13 @@ public sealed class CometApp : Application
         var delay = TimeSpan.FromMilliseconds(900); // after the comet has landed
         if (happened.FinishedMonth is { } month)
         {
-            var count = month.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-            Celebrate(delay, 14, $"You captured {count} snap{(month.Count == 1 ? "" : "s")}", $"in {month.MonthName} {month.Year}. New month, new snaps!");
+            var name = new DateTime(month.Year, month.Month, 1).ToString("MMMM yyyy", Loc.Culture);
+            Celebrate(delay, 14, month.Count == 1 ? T("You captured 1 snap") : F("You captured {0:N0} snaps", month.Count),
+                F("in {0}. New month, new snaps!", name));
             delay += TimeSpan.FromSeconds(3.4);
         }
         if (happened.Milestone is { } n)
-            Celebrate(delay, 22, "✦ " + SnapMilestones.Title(n), "Thanks for snapping with Cometsnap.");
+            Celebrate(delay, 22, "✦ " + F("{0:N0}th snap!", n), T("Thanks for snapping with Cometsnap."));
     }
 
     /// <summary>A small meteor shower above the corner where the Copied card sits. Never during a capture.</summary>
@@ -272,8 +275,10 @@ public sealed class CometApp : Application
         Log.Info("Konami code: meteor shower");
         var p = X11.PointerPosition() ?? (0, 0);
         var (work, scale) = WorkAreaAt(p.X, p.Y);
-        MeteorShower.Play(work, scale, 70, TimeSpan.FromSeconds(3.6), "☄ METEOR SHOWER ☄", "You found the secret. Make a wish!",
-            captionAtBottom: false, fallback: () => Toast("☄ METEOR SHOWER ☄ You found the secret. Make a wish!", 4000));
+        var title = "☄ " + T("METEOR SHOWER") + " ☄";
+        var subtitle = T("You found the secret. Make a wish!");
+        MeteorShower.Play(work, scale, 70, TimeSpan.FromSeconds(3.6), title, subtitle,
+            captionAtBottom: false, fallback: () => Toast($"{title} {subtitle}", 4000));
     }
 
     /// <summary>First run with milestones: start from the snaps already in the captures folder, silently.</summary>
@@ -340,7 +345,7 @@ public sealed class CometApp : Application
         catch (Exception ex)
         {
             Log.Error($"Could not open {path}", ex);
-            Toast("Could not open this capture", 3000);
+            Toast(T("Could not open this capture"), 3000);
         }
     }
 
@@ -379,6 +384,30 @@ public sealed class CometApp : Application
         Tools.Open(CapturesFolder);
     }
 
+    /// <summary>Switches the app language now: the tray menu, the tray panel and the Copied card are rebuilt.</summary>
+    public void SetLanguage(string code)
+    {
+        Settings.Language = code;
+        SaveSettings();
+        Loc.Use(code);
+        Log.Info($"Language switched to {Loc.Language}");
+        var old = Flyout;
+        Flyout = new FlyoutWindow(this);
+        Flyout.SetSeason(_season);
+        old.Close();
+        if (_card is not null)
+        {
+            _card.Close();
+            _card = null;
+        }
+        if (_toast is not null)
+        {
+            _toast.Close();
+            _toast = null;
+        }
+        _tray?.Rebuild();
+    }
+
     public void OpenSettings()
     {
         if (_settingsWindow is { IsVisible: true })
@@ -412,10 +441,10 @@ public sealed class CometApp : Application
             Settings.DesktopShortcutsBackup = backup;
             SaveSettings();
             _ = StartHotkeysAsync();
-            Toast("Print Screen now opens Cometsnap ☄️", 4000);
+            Toast(T("Print Screen now opens Cometsnap ☄️"), 4000);
             return;
         }
-        if (yes) Toast("Could not change the desktop's shortcuts. See Settings.", 5000);
+        if (yes) Toast(T("Could not change the desktop's shortcuts. See Settings."), 5000);
         SaveSettings();
     }
 
@@ -426,7 +455,7 @@ public sealed class CometApp : Application
         Settings.DesktopShortcutsBackup = "";
         SaveSettings();
         _ = StartHotkeysAsync();
-        Toast("Print Screen is back with your desktop's screenshot tool.", 4000);
+        Toast(T("Print Screen is back with your desktop's screenshot tool."), 4000);
     }
 
     public void Quit()

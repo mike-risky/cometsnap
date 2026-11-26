@@ -42,7 +42,7 @@ internal sealed class RecordingPill : Window
         _time = new TextBlock { Text = "0:00", Foreground = SpaceTheme.StarWhiteBrush, FontSize = 13, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center, MinWidth = 36 };
         _kind = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 1, 6, 0) };
         var stop = Ui.Button(new Border { Width = 10, Height = 10, CornerRadius = new CornerRadius(2), Background = SpaceTheme.StarWhiteBrush },
-            "Stop recording (same shortcut again)", () => StopClicked?.Invoke(), SpaceTheme.RecordRedBrush,
+            T("Stop recording (same shortcut again)"), () => StopClicked?.Invoke(), SpaceTheme.RecordRedBrush,
             new ImmutableSolidColorBrush(Color.FromRgb(0xFF, 0x60, 0x66)), new Thickness(9), 14);
         stop.Margin = new Thickness(0, 0, 4, 0);
 

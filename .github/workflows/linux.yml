@@ -3,9 +3,9 @@ name: linux
 on:
   push:
     branches: [main]
-    paths: ['linux/**', 'assets/**', '.github/workflows/linux.yml']
+    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', '.github/workflows/linux.yml']
   pull_request:
-    paths: ['linux/**', 'assets/**', '.github/workflows/linux.yml']
+    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', '.github/workflows/linux.yml']
   workflow_dispatch:
 
 permissions:

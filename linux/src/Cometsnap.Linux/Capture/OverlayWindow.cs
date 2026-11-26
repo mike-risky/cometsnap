@@ -198,7 +198,7 @@ internal sealed class OverlaySurface : Control
                 if (s.ColorUnderCursor() is { } hex)
                 {
                     _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(hex);
-                    s.ShowFlash($"Copied {hex}");
+                    s.ShowFlash(F("Copied {0}", hex));
                 }
                 break;
             case Key.Left: X11.MovePointer(-step, 0); break;
@@ -289,10 +289,10 @@ internal sealed class OverlaySurface : Control
     private static void DrawHint(DrawingContext dc, OverlaySession s, Rect bounds, Point cursor)
     {
         var text = s.Flash ?? (s.Purpose == OverlayPurpose.Record
-            ? "RECORD: click a window or drag an area · F full screen · Esc cancel"
+            ? T("RECORD: click a window or drag an area · F full screen · Esc cancel")
             : s.WindowDetection
-                ? "Click a window or drag an area · F full screen · C copy color · Esc cancel"
-                : "Drag an area or click for the whole screen · C copy color · Esc cancel");
+                ? T("Click a window or drag an area · F full screen · C copy color · Esc cancel")
+                : T("Drag an area or click for the whole screen · C copy color · Esc cancel"));
         var t = Text(text, 13, SpaceTheme.StarWhiteBrush);
         var w = t.Width + 28;
         var h = t.Height + 14;
