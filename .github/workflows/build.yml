@@ -280,7 +280,15 @@ jobs:
 
             **Code signing policy:** free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
             Details: [CODE_SIGNING.md](https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md).
-        run: gh release create "${{ github.ref_name }}" rel/* --title "Cometsnap ${{ github.ref_name }}" --notes "$NOTES" --generate-notes
+        run: |
+          # The tag may come from a release published on github.com (Releases > Draft a new release):
+          # then the release already exists and only gets the files and notes.
+          if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" rel/* --clobber
+            gh release edit "${{ github.ref_name }}" --title "Cometsnap ${{ github.ref_name }}" --notes "$NOTES" --draft=false
+          else
+            gh release create "${{ github.ref_name }}" rel/* --title "Cometsnap ${{ github.ref_name }}" --notes "$NOTES" --generate-notes
+          fi
 
   winget:
     needs: release
