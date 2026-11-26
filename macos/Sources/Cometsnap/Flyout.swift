@@ -309,7 +309,7 @@ final class TileView: NSView, NSDraggingSource {
         imageLayer.contentsGravity = .resizeAspectFill
         imageLayer.masksToBounds = true
         layer?.addSublayer(imageLayer)
-        toolTip = item.name + "\n" + (item.kind == .image ? L.t("Click: copy · Double-click: edit · Drag: drop into any app") : L.t("Click: copy · Double-click: play · Drag: drop into any app"))
+        toolTip = item.name + "\n" + (item.kind == .image ? L.t("Click: copy · Double-click: edit · Drag: drop into any app") : L.t("Click: copy · Double-click: trim · Drag: drop into any app"))
 
         if item.kind != .image {
             badge.stringValue = item.kind == .gif ? " GIF " : " ▶ MP4 "
@@ -322,12 +322,21 @@ final class TileView: NSView, NSDraggingSource {
             addSubview(badge)
         }
 
-        let specs: [(String, String, () -> Void)] = [
-            ("pencil", item.kind == .image ? L.t("Edit") : L.t("Play"), { [weak self] in self?.primary() }),
-            ("doc.on.doc", L.t("Copy"), { [weak self] in self?.copyItem() }),
-            ("folder", L.t("Show in Finder"), { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }),
-            ("trash", L.t("Move to Trash"), { [weak self] in self?.trash() }),
-        ]
+        typealias Spec = (String, String, () -> Void)
+        var specs: [Spec] = []
+        if item.kind == .image {
+            specs.append(("pencil", L.t("Edit"), { [weak self] in self?.primary() }))
+        } else {
+            specs.append(("scissors", L.t("Trim or cut"), { [weak self] in self?.primary() }))
+            specs.append(("play.fill", L.t("Play"), { [weak self] in
+                guard let self else { return }
+                NSWorkspace.shared.open(self.item.url)
+                self.app.flyout.hide()
+            }))
+        }
+        specs.append(("doc.on.doc", L.t("Copy"), { [weak self] in self?.copyItem() }))
+        specs.append(("folder", L.t("Show in Finder"), { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }))
+        specs.append(("trash", L.t("Move to Trash"), { [weak self] in self?.trash() }))
         for (sym, tip, act) in specs {
             let b = SpaceButton(title: "", symbol: sym, fill: Theme.night.withAlphaComponent(0.85), tip: tip)
             b.layer?.cornerRadius = 6
@@ -408,7 +417,7 @@ final class TileView: NSView, NSDraggingSource {
     }
 
     private func primary() {
-        if item.kind == .image { app.openEditor(url: item.url) } else { NSWorkspace.shared.open(item.url) }
+        if item.kind == .image { app.openEditor(url: item.url) } else { app.openTrimmer(item.url) }
         app.flyout.hide()
     }
 
