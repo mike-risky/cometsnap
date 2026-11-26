@@ -9,7 +9,7 @@ namespace Cometsnap.Linux.Core;
 /// </summary>
 public static class Loc
 {
-    /// <summary>The language in use: "en", "fr", "de" or "it".</summary>
+    /// <summary>The language in use: "en", "fr", "de", "it", "es", "pt", "zh" or "hi".</summary>
     public static string Language => L.Language;
 
     /// <summary>The culture of the language in use (month names and the like).</summary>
