@@ -20,6 +20,20 @@ Cometsnap is a single portable `.exe`, nothing to install.
 Windows may show a SmartScreen warning the first time because the exe is not code-signed yet:
 click **More info → Run anyway**.
 
+### Linux
+
+Works on X11 and Wayland (GNOME, KDE Plasma, Cinnamon, Xfce and others), on x86_64 and ARM64.
+Get it from the [Latest Linux build](https://github.com/mike-risky/cometsnap/releases/tag/linux-nightly) pre-release:
+
+- **Any distro:** `Cometsnap-x86_64.AppImage` (or `Cometsnap-aarch64.AppImage` on ARM).
+  Make it executable and run it: `chmod +x Cometsnap-x86_64.AppImage && ./Cometsnap-x86_64.AppImage`.
+  It adds itself to your app menu on first start, and comes with its own ffmpeg for recordings.
+- **Ubuntu, Debian, Mint, Pop!_OS:** `sudo apt install ./cometsnap_amd64.deb` (or `cometsnap_arm64.deb`).
+
+On first start Cometsnap offers to take over Print Screen from your desktop's screenshot tool
+(automatic on GNOME, Cinnamon and Xfce; other desktops get the commands to bind).
+On Wayland, captures and recordings go through the desktop portal, so the first one asks for permission.
+
 ## Features (Phase 1)
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
@@ -77,6 +91,15 @@ dotnet publish src/Cometsnap.App -c Release -r win-x64 -o out   # portable out/C
 
 Every push builds `Cometsnap.exe` for x64 and ARM64 with GitHub Actions.
 
+The Linux app lives in `linux/` (Avalonia on .NET 8) and builds on any Linux machine:
+
+```bash
+cd linux
+dotnet test tests/Cometsnap.Linux.Tests
+dotnet run --project src/Cometsnap.Linux
+packaging/package.sh x86_64        # build/Cometsnap-x86_64.AppImage and build/cometsnap_amd64.deb
+```
+
 ## Project layout
 
 ```
@@ -85,6 +108,7 @@ src/Cometsnap.Core     capture engine, window detection, hotkeys, storage, setti
 src/Cometsnap.Editor   vector annotation model + rendering
 tests/                 unit tests
 assets/                icon, sounds
+linux/                 Linux app (Avalonia): X11 + Wayland portal capture, editor, recorder, packaging
 ```
 
 ## Brand

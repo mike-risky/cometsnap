@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Cometsnap.Linux</RootNamespace>
+    <AssemblyName>cometsnap</AssemblyName>
+    <ApplicationIcon />
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishSingleFile>false</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="..\..\..\assets\fonts\Bungee-Regular.ttf" Link="Assets\Fonts\Bungee-Regular.ttf" />
+    <AvaloniaResource Include="..\..\..\assets\fonts\BungeeShade-Regular.ttf" Link="Assets\Fonts\BungeeShade-Regular.ttf" />
+    <AvaloniaResource Include="..\..\..\assets\png\cometsnap-256.png" Link="Assets\cometsnap-256.png" />
+    <AvaloniaResource Include="..\..\..\assets\png\cometsnap-512.png" Link="Assets\cometsnap-512.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cometsnap.Linux.Tests" />
+  </ItemGroup>
+
+</Project>

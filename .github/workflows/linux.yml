@@ -1,0 +1,108 @@
+name: linux
+
+on:
+  push:
+    branches: [main]
+    paths: ['linux/**', 'assets/**', '.github/workflows/linux.yml']
+  pull_request:
+    paths: ['linux/**', 'assets/**', '.github/workflows/linux.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test
+        run: dotnet test tests/Cometsnap.Linux.Tests -c Release --logger "console;verbosity=normal"
+
+  package:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build AppImage and .deb (${{ matrix.arch }})
+        run: packaging/package.sh ${{ matrix.arch }} 0.1.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}
+          path: |
+            linux/build/*.AppImage
+            linux/build/*.deb
+          if-no-files-found: error
+
+  release:
+    needs: package
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+      - name: Collect files
+        run: |
+          mkdir -p rel
+          find dl -type f \( -name '*.AppImage' -o -name '*.deb' \) -exec cp {} rel/ \;
+          ls -la rel
+          cat > notes.txt <<'NOTES'
+          **AppImage (any distro):** download the file for your PC (x86_64 for most PCs, aarch64 for ARM), then
+          `chmod +x Cometsnap-x86_64.AppImage && ./Cometsnap-x86_64.AppImage` (or right-click > Properties > Allow executing as program).
+          It adds itself to your app menu on first start.
+
+          **Ubuntu / Debian / Mint / Pop!_OS:** download the .deb and run `sudo apt install ./cometsnap_amd64.deb`.
+
+          Works on X11 and Wayland (GNOME, KDE Plasma, Cinnamon, Xfce...). Recording on Wayland uses the desktop portal and needs the GStreamer PipeWire plugin, which most desktops already have.
+          NOTES
+          sed -i 's/^          //' notes.txt
+      - name: Update the Linux "latest build" pre-release (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete linux-nightly --yes --cleanup-tag || true
+          { echo "Automatic Linux build of the latest commit on main (${GITHUB_SHA::7})."; echo; cat notes.txt; } > body.txt
+          gh release create linux-nightly rel/* --prerelease --latest=false --target "${{ github.sha }}" \
+            --title "Latest Linux build (main)" --notes-file body.txt
+      - name: Update the Linux test pre-release of this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh release delete "linux-test-pr$PR" --yes --cleanup-tag || true
+          { echo "Linux test build of pull request #$PR (commit ${HEAD_SHA::7})."; echo; cat notes.txt; } > body.txt
+          gh release create "linux-test-pr$PR" rel/* --prerelease --latest=false --target "$HEAD_SHA" \
+            --title "Linux test build: PR #$PR" --notes-file body.txt
