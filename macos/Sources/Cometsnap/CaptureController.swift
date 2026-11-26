@@ -129,6 +129,7 @@ final class EditCard: NSPanel {
     private var url: URL?
     private var fileOnly = false
     private var hideTimer: Timer?
+    private weak var root: HoverView?
 
     init() {
         editButton = SpaceButton(title: "Edit", symbol: "pencil", fill: Theme.terracotta, tip: "Open in the editor")
@@ -151,6 +152,10 @@ final class EditCard: NSPanel {
         root.layer?.borderWidth = 1
         root.layer?.borderColor = Theme.line.cgColor
         root.onHover = { [weak self] inside in self?.hover(inside) }
+        // The whole card opens the editor: faster to hit than the button alone.
+        root.onClick = { [weak self] in self?.edit() }
+        root.toolTip = "Click to edit"
+        self.root = root
 
         thumb.imageScaling = .scaleProportionallyUpOrDown
         thumb.wantsLayer = true
@@ -207,6 +212,7 @@ final class EditCard: NSPanel {
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = copied ? "COPIED!" : "SNAPPED!"
         detail.stringValue = "\(image.width) × \(image.height) · saving…"
+        root?.toolTip = "Click to edit"
         present()
     }
 
@@ -219,6 +225,7 @@ final class EditCard: NSPanel {
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
         titleLabel.stringValue = url.pathExtension.lowercased() == "gif" ? "GIF SAVED!" : "VIDEO SAVED!"
         detail.stringValue = url.lastPathComponent + " · copied"
+        root?.toolTip = "Click to play"
         present()
     }
 
@@ -250,6 +257,8 @@ final class EditCard: NSPanel {
     }
 
     private func hover(_ inside: Bool) {
+        root?.layer?.borderColor = (inside ? Theme.blue : Theme.line).cgColor
+        root?.layer?.borderWidth = inside ? 2 : 1
         if inside {
             hideTimer?.invalidate()
             animator().alphaValue = 1
@@ -279,6 +288,24 @@ final class EditCard: NSPanel {
 /// Reports mouse enter / exit (keeps the card on screen while hovered).
 final class HoverView: NSView {
     var onHover: ((Bool) -> Void)?
+    var onClick: (() -> Void)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    /// Labels and the thumbnail count as the card; only real buttons keep their own clicks.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let hit = super.hitTest(point)
+        var v = hit
+        while let cur = v, cur !== self {
+            if cur is SpaceButton { return hit }
+            v = cur.superview
+        }
+        return hit == nil ? nil : self
+    }
+    override func resetCursorRects() { if onClick != nil { addCursorRect(bounds, cursor: .pointingHand) } }
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) {
+        if bounds.contains(convert(event.locationInWindow, from: nil)) { onClick?() }
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
