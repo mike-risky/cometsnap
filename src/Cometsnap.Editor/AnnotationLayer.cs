@@ -34,5 +34,31 @@ public sealed class AnnotationLayer : FrameworkElement
         set { _inProgress = value; InvalidateVisual(); }
     }
 
-    protected override void OnRender(DrawingContext dc) => _document?.Render(dc, _inProgress);
+    /// <summary>Editor mode: show the crop frame instead of applying it.</summary>
+    public bool Editing { get; set; }
+
+    private Annotation? _selected;
+
+    /// <summary>The shape picked with the select tool, drawn with a dashed frame.</summary>
+    public Annotation? Selected
+    {
+        get => _selected;
+        set { _selected = value; InvalidateVisual(); }
+    }
+
+    /// <summary>Screen-to-image scale, so the selection frame stays one screen pixel thin.</summary>
+    public double PixelSize { get; set; } = 1;
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        _document?.Render(dc, _inProgress, Editing);
+        if (_selected is null) return;
+        var b = _selected.Bounds;
+        var pad = 4 * PixelSize;
+        b.Inflate(pad, pad);
+        var dark = new Pen(new SolidColorBrush(Color.FromArgb(0xCC, 0x07, 0x11, 0x3A)), 3 * PixelSize);
+        var blue = new Pen(new SolidColorBrush(Color.FromRgb(0x3D, 0x6B, 0xFF)), 1.5 * PixelSize) { DashStyle = DashStyles.Dash };
+        dc.DrawRoundedRectangle(null, dark, b, 3 * PixelSize, 3 * PixelSize);
+        dc.DrawRoundedRectangle(null, blue, b, 3 * PixelSize, 3 * PixelSize);
+    }
 }

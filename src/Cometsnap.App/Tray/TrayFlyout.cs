@@ -23,10 +23,13 @@ namespace Cometsnap.App.Tray;
 /// </summary>
 public sealed class TrayFlyout : Window
 {
-    private const double PanelWidth = 392;
-    private const double PanelHeight = 560;
-    private const double TileWidth = 112;
-    private const double TileHeight = 78;
+    private FrameworkElement? _content;
+    private SpaceHeader? _sky;
+    // Wide enough for 3 thumbnails per row and 3+ rows, and for every button label in full.
+    private const double PanelWidth = 560;
+    private const double PanelHeight = 660;
+    private const double TileWidth = 160;
+    private const double TileHeight = 104;
 
     private readonly CometApp _app;
     private readonly RecentCaptures _recent;
@@ -62,19 +65,9 @@ public sealed class TrayFlyout : Window
         Foreground = SpaceTheme.StarWhiteBrush;
         UseLayoutRounding = true;
 
-        // ---- header: wordmark
-        var word = new TextBlock { FontFamily = SpaceTheme.DisplayFont, FontSize = 28, Margin = new Thickness(0, 0, 0, 2) };
-        word.Inlines.Add(new System.Windows.Documents.Run("COMET") { Foreground = SpaceTheme.StarWhiteBrush });
-        word.Inlines.Add(new System.Windows.Documents.Run("SNAP") { Foreground = SpaceTheme.SunBrush });
-        var logo = new Image
-        {
-            Source = new BitmapImage(new Uri("pack://application:,,,/Assets/cometsnap-256.png")),
-            Width = 36, Height = 36, Margin = new Thickness(0, 0, 10, 0),
-        };
-        RenderOptions.SetBitmapScalingMode(logo, BitmapScalingMode.HighQuality);
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 14, 16, 10) };
-        header.Children.Add(logo);
-        header.Children.Add(word);
+        // ---- header: night sky, twinkling stars, floating comet
+        var header = new SpaceHeader(PanelWidth - 2, 66) { Margin = new Thickness(0, 0, 0, 6) };
+        _sky = header;
 
         // ---- big capture buttons
         var buttons = new UniformGrid { Columns = 3, Margin = new Thickness(12, 0, 12, 10) };
@@ -162,6 +155,7 @@ public sealed class TrayFlyout : Window
         root.Children.Add(footer);
         root.Children.Add(footerLine);
         root.Children.Add(gridHost);
+        _content = root;
         Content = root;
 
         Deactivated += (_, _) => HideFlyout();
@@ -214,8 +208,9 @@ public sealed class TrayFlyout : Window
         Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, work.Left, work.Top, 0, 0, Win32.SWP_NOACTIVATE | 0x0001 /* NOSIZE */);
         var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
         var w = (int)Math.Round(PanelWidth * scale);
-        var h = (int)Math.Round(PanelHeight * scale);
         var m = (int)Math.Round(12 * scale);
+        var h = Math.Min((int)Math.Round(PanelHeight * scale), work.Bottom - work.Top - 2 * m);
+        w = Math.Min(w, work.Right - work.Left - 2 * m);
 
         int x, y;
         if (anchor.Y >= work.Bottom) y = work.Bottom - h - m;            // taskbar at the bottom
@@ -231,6 +226,9 @@ public sealed class TrayFlyout : Window
         Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, x, y, w, h, Win32.SWP_SHOWWINDOW);
         Activate();
         Win32.SetForegroundWindow(_hwnd);
+        // Discreet entrance: a short fade and lift, the window itself is already there.
+        if (_content is not null) Editing.EditorUi.Entrance(_content, lift: 6, ms: 140);
+        _sky?.Start();
         _ = monitor;
     }
 
@@ -238,6 +236,7 @@ public sealed class TrayFlyout : Window
     {
         if (!IsVisible) return;
         _hiddenAt = DateTime.UtcNow;
+        _sky?.Stop();
         Hide();
     }
 
@@ -293,6 +292,7 @@ public sealed class TrayFlyout : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), Visibility = Visibility.Collapsed,
         };
+        actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Edit (circle, arrow, text…)", () => Open(path)));
         actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy", () => CopyFile(path)));
         actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", "Show in folder", () => ShowInFolder(path)));
         actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete (to Recycle Bin)", () => Delete(path)));
@@ -302,15 +302,24 @@ public sealed class TrayFlyout : Window
             Width = TileWidth, Height = TileHeight, Margin = new Thickness(0, 0, 8, 8), CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
             ClipToBounds = true, Cursor = Cursors.Hand,
-            ToolTip = $"{Path.GetFileName(path)}\nClick: copy · Double-click: open · Drag: drop into any app",
+            ToolTip = $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag: drop into any app",
         };
         var inner = new Grid { ClipToBounds = true };
         inner.Children.Add(image);
         inner.Children.Add(actions);
         frame.Child = new Border { CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = inner };
 
-        frame.MouseEnter += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.Visibility = Visibility.Visible; };
-        frame.MouseLeave += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.Visibility = Visibility.Collapsed; };
+        var lift = new ScaleTransform(1, 1);
+        frame.RenderTransformOrigin = new Point(0.5, 0.5);
+        frame.RenderTransform = lift;
+        void Zoom(double to)
+        {
+            var a = new System.Windows.Media.Animation.DoubleAnimation(to, TimeSpan.FromMilliseconds(110));
+            lift.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+            lift.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+        }
+        frame.MouseEnter += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.Visibility = Visibility.Visible; Zoom(1.04); };
+        frame.MouseLeave += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.Visibility = Visibility.Collapsed; Zoom(1); };
         frame.MouseLeftButtonDown += (_, e) =>
         {
             _dragStart = e.GetPosition(this);
@@ -376,11 +385,11 @@ public sealed class TrayFlyout : Window
         }
     }
 
+    /// <summary>Opens the capture in Cometsnap's editor.</summary>
     private void Open(string path)
     {
         HideFlyout();
-        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch (Exception ex) { Log.Error("Open failed", ex); }
+        _app.OpenInEditor(path);
     }
 
     private void ShowInFolder(string path)
@@ -398,6 +407,7 @@ public sealed class TrayFlyout : Window
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path,
                     Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
                     Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            Cometsnap.Core.Storage.EditSidecar.DeleteFor(path);
             _thumbs.Forget(path);
             _recent.Remove(path);
             Flash("Moved to the Recycle Bin");
@@ -431,10 +441,15 @@ public sealed class TrayFlyout : Window
             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
             Margin = new Thickness(0, 0, 0, 6),
         });
-        stack.Children.Add(new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center });
+        // Labels wrap onto a second line instead of being cut, whatever the language.
+        stack.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.None, Margin = new Thickness(4, 0, 4, 0),
+        });
         var b = new Border
         {
-            Height = 68, Margin = new Thickness(4), CornerRadius = new CornerRadius(10), Background = normal,
+            MinHeight = 68, Padding = new Thickness(0, 8, 0, 8), Margin = new Thickness(4), CornerRadius = new CornerRadius(10), Background = normal,
             BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(primary ? 0 : 1),
             Cursor = Cursors.Hand, Child = stack,
         };
