@@ -69,9 +69,21 @@ public enum EditSidecar {
         folder(for: image).appendingPathComponent(image.deletingPathExtension().lastPathComponent + ".annotations.json")
     }
 
+    /// The untouched recording, kept once it has been trimmed: name.original.mp4 / .gif.
+    public static func originalRecording(for recording: URL) -> URL {
+        folder(for: recording).appendingPathComponent(recording.deletingPathExtension().lastPathComponent + ".original." + recording.pathExtension)
+    }
+
+    /// The trim and cuts of a recording, so they stay adjustable: name.cuts.json.
+    public static func cuts(for recording: URL) -> URL {
+        folder(for: recording).appendingPathComponent(recording.deletingPathExtension().lastPathComponent + ".cuts.json")
+    }
+
     public static func delete(for image: URL) {
         try? FileManager.default.removeItem(at: original(for: image))
         try? FileManager.default.removeItem(at: annotations(for: image))
+        try? FileManager.default.removeItem(at: originalRecording(for: image))
+        try? FileManager.default.removeItem(at: cuts(for: image))
     }
 }
 

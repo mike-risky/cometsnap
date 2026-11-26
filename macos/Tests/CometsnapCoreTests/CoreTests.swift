@@ -239,3 +239,62 @@ final class LocalizationTests: XCTestCase {
         for (k, v) in Strings.french where k.contains("{0}") { XCTAssertTrue(v.contains("{0}"), k) }
     }
 }
+
+final class CutListTests: XCTestCase {
+    func testTrimAndCuts() {
+        var c = CutList(duration: 10)
+        XCTAssertTrue(c.isUntouched)
+        c.trimStart = 1
+        c.trimEnd = 9
+        XCTAssertTrue(c.addCut(3, 4))
+        XCTAssertTrue(c.addCut(5, 6))
+        XCTAssertEqual(c.kept.count, 3)
+        XCTAssertEqual(c.keptLength, 6, accuracy: 1e-9)
+        XCTAssertEqual(c.toOutput(4.5), 2.0, accuracy: 1e-9)
+        XCTAssertEqual(c.nextKept(3.5)!, 4, accuracy: 1e-9)
+        XCTAssertNil(c.nextKept(9.5))
+        XCTAssertTrue(c.addCut(3.5, 5.5)) // merges both
+        XCTAssertEqual(c.cuts, [TimeRange(3, 6)])
+        XCTAssertFalse(c.addCut(1, 9))    // would cut everything
+        XCTAssertFalse(c.addCut(2, 2.05)) // too short
+        XCTAssertTrue(c.restoreCut(at: 4))
+        XCTAssertTrue(c.cuts.isEmpty)
+    }
+
+    func testTrimLimits() {
+        var c = CutList(duration: 5)
+        c.trimEnd = 2
+        c.trimStart = 3
+        XCTAssertEqual(c.trimStart, 1.9, accuracy: 1e-9)
+        c.trimEnd = -1
+        XCTAssertEqual(c.trimEnd, 2.0, accuracy: 1e-9)
+    }
+
+    func testFrameTimes() {
+        var c = CutList(duration: 4)
+        c.addCut(1, 2)
+        XCTAssertEqual(c.frameOutputTimes(from: 0.5, to: 0.75), [0.5])
+        XCTAssertEqual(c.frameOutputTimes(from: 1.2, to: 1.4), [])
+        XCTAssertEqual(c.frameOutputTimes(from: 1.9, to: 2.1), [1.0])
+    }
+
+    func testJsonRoundTripAndWindowsFormat() {
+        var c = CutList(duration: 8)
+        c.trimStart = 0.5
+        c.addCut(2, 3)
+        let back = CutList.from(json: c.json(), duration: 8)
+        XCTAssertEqual(back, c)
+        let win = CutList.from(json: Data(#"{"Start":1,"End":7,"Cuts":[[2,3]]}"#.utf8), duration: 8)
+        XCTAssertEqual(win.trimStart, 1)
+        XCTAssertEqual(win.cuts, [TimeRange(2, 3)])
+        XCTAssertTrue(CutList.from(json: Data("nope".utf8), duration: 8).isUntouched)
+        XCTAssertEqual(CutList.label(65.37), "1:05.3")
+        XCTAssertEqual(CutList.label(65.37, tenths: false), "1:05")
+    }
+
+    func testSidecarPaths() {
+        let u = URL(fileURLWithPath: "/x/2026-11/rec_1.mp4")
+        XCTAssertEqual(EditSidecar.originalRecording(for: u).path, "/x/2026-11/.cometsnap/rec_1.original.mp4")
+        XCTAssertEqual(EditSidecar.cuts(for: u).path, "/x/2026-11/.cometsnap/rec_1.cuts.json")
+    }
+}

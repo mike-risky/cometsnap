@@ -104,11 +104,15 @@ final class SpaceButton: NSView {
     var onRightClick: ((NSEvent) -> Void)?
     private let fill: NSColor?
     private let stack = NSStackView()
+    private var iconView: NSImageView?
+    private var titleField: NSTextField?
+    private let vertical: Bool
     private var hovering = false { didSet { updateColors() } }
     var active = false { didSet { updateColors() } }
 
     init(title: String, symbol: String?, fill: NSColor? = nil, vertical: Bool = false, fontSize: CGFloat = 13, tip: String? = nil) {
         self.fill = fill
+        self.vertical = vertical
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 10
@@ -124,6 +128,7 @@ final class SpaceButton: NSView {
             let iv = NSImageView(image: img.withSymbolConfiguration(conf) ?? img)
             iv.contentTintColor = .white
             stack.addArrangedSubview(iv)
+            iconView = iv
         }
         if !title.isEmpty {
             let label = NSTextField(labelWithString: title)
@@ -131,6 +136,7 @@ final class SpaceButton: NSView {
             label.textColor = .white
             label.alignment = .center
             stack.addArrangedSubview(label)
+            titleField = label
         }
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
@@ -144,6 +150,15 @@ final class SpaceButton: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// Changes the label and icon in place (Play ↔ Pause, Edit ↔ Trim).
+    func update(title: String, symbol: String) {
+        titleField?.stringValue = title
+        if let img = NSImage(systemSymbolName: symbol, accessibilityDescription: title) {
+            let conf = NSImage.SymbolConfiguration(pointSize: vertical ? 20 : 14, weight: .semibold)
+            iconView?.image = img.withSymbolConfiguration(conf) ?? img
+        }
+    }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()

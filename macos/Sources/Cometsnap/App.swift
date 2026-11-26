@@ -30,6 +30,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     private(set) var recorder: Recorder!
     private(set) var editCard: EditCard!
     private var editors: [EditorWindow] = []
+    private var trimmers: [TrimWindow] = []
     private var settingsWindow: SettingsWindow?
     private var welcome: WelcomeWindow?
 
@@ -96,7 +97,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     private func makeEditCard() -> EditCard {
         let card = EditCard()
         card.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
-        card.onOpen = { url in NSWorkspace.shared.open(url) }
+        card.onOpen = { [weak self] url in self?.openTrimmer(url) }
         return card
     }
 
@@ -240,6 +241,25 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     func editorClosed(_ e: EditorWindow) {
         editors.removeAll { $0 === e }
+    }
+
+    /// Opens a recording (MP4 or GIF) in the trimmer.
+    func openTrimmer(_ url: URL) {
+        hidePanels()
+        if let existing = trimmers.first(where: { $0.url == url }) {
+            NSApp.activate()
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+        Task { @MainActor in
+            guard let t = await TrimWindow.open(app: self, url: url) else { return }
+            self.trimmers.append(t)
+            t.present()
+        }
+    }
+
+    func trimmerClosed(_ t: TrimWindow) {
+        trimmers.removeAll { $0 === t }
     }
 
     // MARK: panels

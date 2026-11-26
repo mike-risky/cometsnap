@@ -216,6 +216,8 @@ final class EditCard: NSPanel {
         titleLabel.stringValue = copied ? L.t("COPIED!") : L.t("SNAPPED!")
         detail.stringValue = "\(image.width) × \(image.height) · " + L.t("saving…")
         root?.toolTip = L.t("Click to edit · Drag into any app")
+        editButton.update(title: L.t("Edit"), symbol: "pencil")
+        editButton.toolTip = L.t("Open in the editor")
         present()
     }
 
@@ -228,7 +230,9 @@ final class EditCard: NSPanel {
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
         titleLabel.stringValue = url.pathExtension.lowercased() == "gif" ? L.t("GIF SAVED!") : L.t("VIDEO SAVED!")
         detail.stringValue = url.lastPathComponent + " · " + L.t("copied")
-        root?.toolTip = L.t("Click to play")
+        root?.toolTip = L.t("Click to trim · Drag into any app")
+        editButton.update(title: L.t("Trim"), symbol: "scissors")
+        editButton.toolTip = L.t("Trim the start and end, or cut parts out")
         present()
     }
 
