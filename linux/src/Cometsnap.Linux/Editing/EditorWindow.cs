@@ -35,6 +35,7 @@ public sealed class EditorWindow : Window
     private readonly Dictionary<EditorTool, Border> _toolButtons = new();
     private readonly Dictionary<string, Border> _swatches = new();
     private readonly Border[] _sizeButtons = new Border[3];
+    private readonly Border _constellationButton;
 
     private string? _path;
     private bool _dirty;
@@ -60,6 +61,7 @@ public sealed class EditorWindow : Window
         _base = image;
         _doc = doc;
         _doc.Source = image;
+        _doc.ConnectSteps = app.Settings.ConstellationSteps;
         _path = path;
         _dirty = path is null;
 
@@ -143,6 +145,13 @@ public sealed class EditorWindow : Window
         left.Children.Add(IconButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete the selected shape (Del)", DeleteSelected));
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
+        // Constellation mode: shown once there are two steps to connect.
+        _constellationButton = Ui.ActionButton("Constellation",
+            "M3,12 L7,6 L12,9 L14,3 M3,12 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M7,6 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M12,9 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0",
+            "Join the numbered steps with faint star lines", ToggleConstellation);
+        _constellationButton.IsVisible = false;
+        if (_doc.ConnectSteps) Ui.SetActive(_constellationButton, true);
+        right.Children.Add(_constellationButton);
         right.Children.Add(Ui.ActionButton("Save as…", null, "Save a copy as PNG or JPEG (Ctrl+Shift+S)", () => _ = SaveAsAndCloseAsync()));
         right.Children.Add(Ui.ActionButton("Save", "M3,2.5 H11 L13.5,5 V13.5 H3 Z M5.5,2.5 V6 H10 V2.5 M5.5,13.5 V9.5 H10.5 V13.5", "Save and close (Ctrl+S)", SaveAndClose));
         right.Children.Add(Ui.ActionButton("Copy", "M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy, save and close (Ctrl+C / Ctrl+Enter)", () => _ = CopyAndCloseAsync(), primary: true));
@@ -178,7 +187,8 @@ public sealed class EditorWindow : Window
         root.Children.Add(centerGrid);
         Content = root;
 
-        _doc.Changed += () => { _surface.InvalidateVisual(); UpdateStatus(); };
+        _doc.Changed += () => { _surface.InvalidateVisual(); UpdateStatus(); UpdateConstellationButton(); };
+        UpdateConstellationButton();
         KeyDown += OnKeyDown;
         Closing += OnClosing;
 
@@ -246,6 +256,25 @@ public sealed class EditorWindow : Window
     {
         var size = _doc.CropRect is { } c ? $"{(int)c.Width} × {(int)c.Height} (cropped)" : $"{_base.PixelSize.Width} × {_base.PixelSize.Height}";
         _status.Text = $"{size} · {Math.Round(_zoom * 100)}% · {_doc.Items.Count} shape{(_doc.Items.Count == 1 ? "" : "s")}";
+    }
+
+    private void UpdateConstellationButton()
+    {
+        var show = _doc.Items.OfType<StepAnnotation>().Skip(1).Any();
+        var was = _constellationButton.IsVisible;
+        _constellationButton.IsVisible = show;
+        if (show && !was) Ui.Entrance(_constellationButton, lift: 0, ms: 140);
+    }
+
+    private void ToggleConstellation()
+    {
+        _doc.ConnectSteps = !_doc.ConnectSteps;
+        Ui.SetActive(_constellationButton, _doc.ConnectSteps);
+        _app.Settings.ConstellationSteps = _doc.ConnectSteps;
+        _app.SaveSettings();
+        _dirty = true;
+        _doc.Touch();
+        Flash(_doc.ConnectSteps ? "Constellation on: steps are joined by star lines" : "Constellation off");
     }
 
     private void Flash(string text)

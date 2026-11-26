@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Cometsnap.Linux.Services;
 using Cometsnap.Linux.Theme;
 
 namespace Cometsnap.Linux.Editing;
@@ -18,10 +19,12 @@ public sealed class EditCard : Window
     private readonly Image _thumb;
     private readonly TextBlock _title;
     private readonly TextBlock _detail;
-    private readonly DispatcherTimer _timer;
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(4.5) };
     private readonly Border _card;
     private Bitmap? _image;
     private string? _path;
+    private Point? _pressAt;
+    private bool _dragged;
 
     /// <summary>Raised with the saved path (if known yet) and the image when Edit is clicked.</summary>
     public event Action<string?, Bitmap>? EditRequested;
@@ -81,15 +84,34 @@ public sealed class EditCard : Window
 
         // The whole card opens the editor (faster than aiming for the button); Edit and ✕ still work.
         _card.Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(_card, "Click to edit");
+        ToolTip.SetTip(_card, "Click to edit · Drag into any app");
         _card.PointerEntered += (_, _) => _card.BorderBrush = SpaceTheme.CometBlueBrush;
         _card.PointerExited += (_, _) => _card.BorderBrush = SpaceTheme.NavyLightBrush;
+        // Click = edit; drag = drop the capture into any app (file manager, chat, mail, a browser…).
         _card.PointerPressed += (_, e) =>
         {
-            if (e.GetCurrentPoint(_card).Properties.IsLeftButtonPressed) e.Handled = true;
+            if (!e.GetCurrentPoint(_card).Properties.IsLeftButtonPressed) return;
+            e.Handled = true;
+            _pressAt = e.GetPosition(this);
+            _dragged = false;
+        };
+        _card.PointerMoved += async (_, e) =>
+        {
+            if (_pressAt is not { } start || _image is null || DragOut.Active) return;
+            if (!e.GetCurrentPoint(_card).Properties.IsLeftButtonPressed) { _pressAt = null; return; }
+            var d = e.GetPosition(this) - start;
+            if (Math.Abs(d.X) < 5 && Math.Abs(d.Y) < 5) return;
+            _pressAt = null;
+            _dragged = true;
+            _timer.Stop();
+            var dropped = await DragOut.StartAsync(_path, _image, _image);
+            if (dropped) FadeOut();
+            else if (!IsPointerOver) _timer.Start();
         };
         _card.PointerReleased += (_, e) =>
         {
+            _pressAt = null;
+            if (_dragged) { _dragged = false; e.Handled = true; return; }
             if (e.Handled || e.InitialPressMouseButton != MouseButton.Left || !_card.IsPointerOver) return;
             e.Handled = true;
             OnEdit();
@@ -104,7 +126,6 @@ public sealed class EditCard : Window
             }
         };
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
         _timer.Tick += (_, _) => FadeOut();
         PointerEntered += (_, _) => { _timer.Stop(); Opacity = 1; };
         PointerExited += (_, _) => _timer.Start();

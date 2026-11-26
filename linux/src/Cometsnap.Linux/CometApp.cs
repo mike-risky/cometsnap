@@ -9,9 +9,11 @@ using Avalonia.Threading;
 using Cometsnap.Linux.Capture;
 using Cometsnap.Linux.Core;
 using Cometsnap.Linux.Editing;
+using Cometsnap.Linux.Fun;
 using Cometsnap.Linux.Platform;
 using Cometsnap.Linux.Recording;
 using Cometsnap.Linux.Services;
+using Cometsnap.Linux.Theme;
 using Cometsnap.Linux.Tray;
 using PixelRect = Cometsnap.Linux.Core.PixelRect;
 
@@ -35,6 +37,9 @@ public sealed class CometApp : Application
     private EditCard? _card;
     private ToastWindow? _toast;
     private SettingsWindow? _settingsWindow;
+    private CometFlight? _comet;
+    private Season _season;
+    private DispatcherTimer? _seasonTimer;
     private IClassicDesktopStyleApplicationLifetime? _lifetime;
 
     /// <summary>The command this process was started with (e.g. "capture"), run once the app is up.</summary>
@@ -89,6 +94,10 @@ public sealed class CometApp : Application
 
         try { _tray = new TrayController(this); }
         catch (Exception ex) { Log.Error("Tray icon failed", ex); }
+        ApplySeason();
+        _seasonTimer = new DispatcherTimer(TimeSpan.FromHours(1), DispatcherPriority.Background, (_, _) => ApplySeason());
+        _seasonTimer.Start();
+        if (!Settings.SnapCountSeeded) SeedSnapCount();
 
         Hotkeys = new HotkeyService(Settings, RunCommand);
         _ = StartHotkeysAsync();
@@ -157,6 +166,9 @@ public sealed class CometApp : Application
     {
         var copy = Settings.CopyToClipboardOnCapture;
         if (Settings.ShowEditCard) ShowCard(image, rect, copy);
+        LaunchComet(rect, image);
+        // Counting (and any celebration) waits until the capture is fully done.
+        Dispatcher.UIThread.Post(CountSnap, DispatcherPriority.ApplicationIdle);
         var when = DateTime.Now;
         _ = Task.Run(async () =>
         {
@@ -190,6 +202,117 @@ public sealed class CometApp : Application
         }
         var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
         _card.ShowFor(image, work, scale, copied);
+    }
+
+    // ------------------------------------------------------------------ playful touches
+
+    /// <summary>Sends the comet, carrying the capture, from the captured area towards the tray.</summary>
+    private void LaunchComet(PixelRect rect, Bitmap image)
+    {
+        if (!Settings.ShowCometAnimation) return;
+        try
+        {
+            var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
+            // The tray's exact spot is unknown on Linux: aim for the panel's corner (top bar or bottom panel).
+            var screen = Screens?.ScreenFromPoint(new PixelPoint(rect.CenterX, rect.CenterY))?.Bounds ?? work;
+            var panelOnTop = work.Y > screen.Y && work.Bottom >= screen.Bottom;
+            var end = panelOnTop
+                ? new PixelPoint(work.Right - (int)(60 * scale), work.Y - (int)(12 * scale))
+                : new PixelPoint(work.Right - (int)(40 * scale), work.Bottom + (int)(10 * scale) - (work.Bottom < screen.Bottom ? 0 : (int)(20 * scale)));
+            _comet ??= new CometFlight();
+            _comet.Launch(new PixelPoint(rect.CenterX, rect.CenterY), end, scale, image);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Comet flight failed", ex);
+        }
+    }
+
+    /// <summary>Counts a snap; round numbers and the first snap of a month get a tiny celebration.</summary>
+    private void CountSnap()
+    {
+        var happened = SnapMilestones.Record(Settings, DateTime.Now);
+        SaveSettings();
+        if (!Settings.Celebrations) return;
+
+        var delay = TimeSpan.FromMilliseconds(900); // after the comet has landed
+        if (happened.FinishedMonth is { } month)
+        {
+            var count = month.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+            Celebrate(delay, 14, $"You captured {count} snap{(month.Count == 1 ? "" : "s")}", $"in {month.MonthName} {month.Year}. New month, new snaps!");
+            delay += TimeSpan.FromSeconds(3.4);
+        }
+        if (happened.Milestone is { } n)
+            Celebrate(delay, 22, "✦ " + SnapMilestones.Title(n), "Thanks for snapping with Cometsnap.");
+    }
+
+    /// <summary>A small meteor shower above the corner where the Copied card sits. Never during a capture.</summary>
+    private void Celebrate(TimeSpan after, int meteors, string title, string subtitle)
+    {
+        DispatcherTimer.RunOnce(() =>
+        {
+            if (Capture.IsBusy || Recorder.IsRecording)
+            {
+                Celebrate(TimeSpan.FromSeconds(1), meteors, title, subtitle);
+                return;
+            }
+            var p = X11.PointerPosition() ?? (0, 0);
+            var (work, scale) = WorkAreaAt(p.X, p.Y);
+            var w = (int)(380 * scale);
+            var h = (int)(250 * scale);
+            var area = new Avalonia.PixelRect(work.Right - w - (int)(12 * scale), Math.Max(work.Y, work.Bottom - h - (int)(112 * scale)), w, h);
+            MeteorShower.Play(area, scale, meteors, TimeSpan.FromSeconds(3), title, subtitle,
+                fallback: () => Toast($"{title} {subtitle}", 4000));
+        }, after);
+    }
+
+    /// <summary>↑ ↑ ↓ ↓ ← → ← → B A in the tray panel.</summary>
+    public void MeteorShowerEasterEgg()
+    {
+        Log.Info("Konami code: meteor shower");
+        var p = X11.PointerPosition() ?? (0, 0);
+        var (work, scale) = WorkAreaAt(p.X, p.Y);
+        MeteorShower.Play(work, scale, 70, TimeSpan.FromSeconds(3.6), "☄ METEOR SHOWER ☄", "You found the secret. Make a wish!",
+            captionAtBottom: false, fallback: () => Toast("☄ METEOR SHOWER ☄ You found the secret. Make a wish!", 4000));
+    }
+
+    /// <summary>First run with milestones: start from the snaps already in the captures folder, silently.</summary>
+    private void SeedSnapCount()
+    {
+        var folder = CapturesFolder;
+        _ = Task.Run(() =>
+        {
+            var times = new List<DateTime>();
+            try
+            {
+                if (Directory.Exists(folder))
+                    foreach (var f in Directory.EnumerateFiles(folder, "*.png", SearchOption.AllDirectories))
+                    {
+                        if (f.Contains(".cometsnap", StringComparison.Ordinal)) continue; // edit sidecars
+                        times.Add(File.GetLastWriteTime(f));
+                    }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not count existing snaps", ex);
+            }
+            Dispatcher.UIThread.Post(() =>
+            {
+                SnapMilestones.Seed(Settings, times, DateTime.Now);
+                SaveSettings();
+                Log.Info($"Snap count starts at {Settings.SnapCount}");
+            }, DispatcherPriority.Background);
+        });
+    }
+
+    /// <summary>Snowy comet in December, pumpkin comet at Halloween (tray icon and panel header).</summary>
+    public void ApplySeason()
+    {
+        var season = Settings.SeasonalSkins ? Seasons.For(DateTime.Now) : Season.None;
+        if (season == _season) return;
+        _season = season;
+        _tray?.SetSeason(season);
+        Flyout.SetSeason(season);
     }
 
     public void OpenInEditor(string path)

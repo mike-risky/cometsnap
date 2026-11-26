@@ -51,6 +51,9 @@ Get it from the [Latest Linux build](https://github.com/mike-risky/cometsnap/rel
 On first start Cometsnap offers to take over Print Screen from your desktop's screenshot tool
 (automatic on GNOME, Cinnamon and Xfce; other desktops get the commands to bind).
 On Wayland, captures and recordings go through the desktop portal, so the first one asks for permission.
+Drag any capture out of the tray panel (or the Copied card) into a file manager, browser, chat or office app.
+The playful extras (comet flight, milestones, seasonal looks, Constellation, the tray-panel secret) are here too;
+the comet and meteor showers need a compositing desktop, which almost every desktop is.
 
 ## Features (Phase 1)
 

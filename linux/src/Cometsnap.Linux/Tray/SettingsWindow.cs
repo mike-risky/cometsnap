@@ -36,6 +36,14 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(Toggle("Show the Edit card after a capture", s.ShowEditCard, v => s.ShowEditCard = v));
         panel.Children.Add(Toggle("Copy captures to the clipboard", s.CopyToClipboardOnCapture, v => s.CopyToClipboardOnCapture = v));
         panel.Children.Add(Toggle("Soft click sound", s.PlaySounds, v => s.PlaySounds = v));
+        panel.Children.Add(Toggle("Comet animation", s.ShowCometAnimation, v => s.ShowCometAnimation = v,
+            "The capture rides a comet towards the tray. Needs a compositor (most desktops have one)."));
+        panel.Children.Add(Toggle("Little celebrations (snap milestones)", s.Celebrations, v => s.Celebrations = v));
+        panel.Children.Add(Toggle("Seasonal looks (snowy December, Halloween pumpkin)", s.SeasonalSkins, v =>
+        {
+            s.SeasonalSkins = v;
+            _app.ApplySeason();
+        }));
         var corner = new ComboBox { ItemsSource = new[] { "Bottom left", "Bottom right", "Top left", "Top right", "Follow the cursor" }, SelectedIndex = (int)s.LoupeCorner, Width = 200 };
         corner.SelectionChanged += (_, _) => { s.LoupeCorner = (LoupeCorner)Math.Max(0, corner.SelectedIndex); _app.SaveSettings(); };
         panel.Children.Add(Row("Magnifier corner", corner));
