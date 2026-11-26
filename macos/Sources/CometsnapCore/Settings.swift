@@ -25,7 +25,7 @@ public struct AppSettings: Codable, Equatable {
     public var snapMonth: String?
     public var snapMonthCount = 0
     public var snapCountSeeded = false
-    /// "" = same as macOS, else "en", "fr", "de" or "it".
+    /// "" = same as macOS, else one of the codes in L.languages.
     public var language = ""
 
     public init() {}

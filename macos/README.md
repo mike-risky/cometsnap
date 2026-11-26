@@ -13,7 +13,7 @@ Native Swift app (AppKit + ScreenCaptureKit), same feel and features as the Wind
 | Recording | **⌘⇧7** MP4 (H.264 + Mac sound), **⌘⇧8** GIF. Pick a window or area, press again (or click the menu bar icon or the pill) to stop. The file is copied and shows in the flyout. |
 | Trimmer | Trim the start and end of an MP4 or GIF, or cut parts out of the middle. Opens from the Copied card (**Trim**) or a double-click on a recording in the panel. Space/K play, ←/→ one frame (⇧ 1 s), I/O start/end, ⌫ cuts the selection, ⌘Z/⇧⌘Z. Nothing is lost: the original stays in the hidden `.cometsnap` folder, cuts stay adjustable, Reset brings it all back. |
 | Little extras | The capture rides a comet into the menu bar. A tiny meteor shower at 10, 50, 100, 250, 500, 1,000… snaps and a recap on the first snap of each month. A pumpkin comet from Oct 18 to 31 and a snowy one all December. The editor's **Constellation** button joins numbered steps with faint star lines. One more secret in the menu bar panel. Switch the celebrations or seasonal looks off in Settings. |
-| Languages | English, French, German and Italian. Follows the Mac's language, with a Language picker in Settings that applies right away. |
+| Languages | English, French, German, Italian, Spanish, Brazilian Portuguese, Simplified Chinese and Hindi. Follows the Mac's language, with a Language picker in Settings that applies right away. |
 | Other | Start at login, sound off by default, captures in `~/Pictures/Cometsnap/yyyy-MM/`, settings in `~/Library/Application Support/Cometsnap/settings.json`. |
 
 ## Build

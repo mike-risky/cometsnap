@@ -10,6 +10,10 @@
 		<string>fr</string>
 		<string>de</string>
 		<string>it</string>
+		<string>es</string>
+		<string>pt-BR</string>
+		<string>zh-Hans</string>
+		<string>hi</string>
 	</array>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
