@@ -41,6 +41,15 @@ public sealed class ScreenRecorder : IDisposable
     private TimeSpan _duration;
     private Task<RecordingResult>? _stopTask;
 
+    private byte[]? _poster;
+    private bool _posterFinal;
+
+    /// <summary>
+    /// A frame for thumbnails (top-down BGRA, <see cref="Region"/> size): the one at half a second,
+    /// or the first frame of shorter recordings. Null until the first frame was captured.
+    /// </summary>
+    public byte[]? PosterFrame => _poster;
+
     /// <summary>Raised (on a background thread) if recording breaks; call <see cref="StopAsync"/> to keep what was recorded.</summary>
     public event Action<Exception>? Failed;
 
@@ -143,6 +152,7 @@ public sealed class ScreenRecorder : IDisposable
 
                 var now = _clock.Elapsed;
                 CaptureFrame();
+                KeepPoster(now);
                 Deliver(now);
 
                 // Fell behind (slow encoder or huge region)? Skip ahead instead of bursting.
@@ -159,6 +169,15 @@ public sealed class ScreenRecorder : IDisposable
         {
             Native.timeEndPeriod(1);
         }
+    }
+
+    private void KeepPoster(TimeSpan time)
+    {
+        if (_posterFinal) return;
+        var copy = _poster ?? new byte[_canvas.Length];
+        _canvas.Span.CopyTo(copy);
+        _poster = copy;
+        _posterFinal = time.TotalSeconds >= 0.5;
     }
 
     private void CaptureFrame()

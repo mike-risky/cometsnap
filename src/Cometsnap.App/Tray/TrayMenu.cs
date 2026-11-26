@@ -107,8 +107,15 @@ public sealed class TrayMenu
         foreach (var path in items)
         {
             var p = path;
-            var item = Item(System.IO.Path.GetFileNameWithoutExtension(p), () => _app.OpenInEditor(p));
-            item.ToolTip = "Click to edit";
+            var isRecording = Cometsnap.Core.Storage.MediaKinds.IsRecording(p);
+            var item = Item(System.IO.Path.GetFileNameWithoutExtension(p) + (isRecording ? $"  ({System.IO.Path.GetExtension(p).TrimStart('.').ToUpperInvariant()})" : ""),
+                () =>
+                {
+                    if (!isRecording) { _app.OpenInEditor(p); return; }
+                    try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(p) { UseShellExecute = true }); }
+                    catch (Exception ex) { Cometsnap.Core.Diagnostics.Log.Error("Could not play the recording", ex); }
+                });
+            item.ToolTip = isRecording ? "Click to play" : "Click to edit";
             recent.Items.Add(item);
         }
         return recent;

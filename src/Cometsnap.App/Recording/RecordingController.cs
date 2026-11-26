@@ -2,6 +2,8 @@ using System.Collections.Specialized;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Cometsnap.App.Tray;
 using Cometsnap.Core.Capture;
@@ -171,6 +173,7 @@ public sealed class RecordingController : IDisposable
         try
         {
             var result = await recorder.StopAsync();
+            AddToRecent(result.Path, recorder);
             Delivered(result);
         }
         catch (Exception ex)
@@ -178,6 +181,26 @@ public sealed class RecordingController : IDisposable
             Log.Error("Could not finish the recording", ex);
             _tray.ShowBalloon("Recording failed", ex.InnerException?.Message ?? ex.Message);
         }
+    }
+
+    /// <summary>Shows the recording in the flyout grid, with its poster frame as thumbnail.</summary>
+    private void AddToRecent(string path, ScreenRecorder recorder)
+    {
+        try
+        {
+            if (recorder.PosterFrame is { } bgra)
+            {
+                var r = recorder.Region;
+                var image = BitmapSource.Create(r.Width, r.Height, 96, 96, PixelFormats.Bgr32, null, bgra, r.Width * 4);
+                image.Freeze();
+                _app.Thumbnails.Prime(path, image);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not make the recording thumbnail", ex);
+        }
+        _app.Recent.Add(path);
     }
 
     private void Delivered(RecordingResult result)

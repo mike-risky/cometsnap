@@ -47,6 +47,23 @@ public class RecentCapturesTests : IDisposable
     }
 
     [Fact]
+    public void Recordings_are_listed_with_captures()
+    {
+        var snap = Make("2026-11", "snap_a.png", 3);
+        var video = Make("2026-11", "rec_b.mp4", 2);
+        var gif = Make("2026-11", "rec_c.gif", 1);
+        Make("2026-11", "snap_a.cometsnap.json", 0);
+
+        var recent = new RecentCaptures(10);
+        recent.Load(_root);
+
+        Assert.Equal(new[] { gif, video, snap }, recent.Snapshot());
+        Assert.True(MediaKinds.IsRecording(video));
+        Assert.True(MediaKinds.IsGif(gif));
+        Assert.False(MediaKinds.IsRecording(snap));
+    }
+
+    [Fact]
     public void Missing_folder_gives_empty_list()
     {
         var recent = new RecentCaptures(5);

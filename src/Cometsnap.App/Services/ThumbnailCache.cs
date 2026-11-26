@@ -66,7 +66,10 @@ public sealed class ThumbnailCache
             }
             else
             {
-                thumb = Decode(path, Width);
+                // Videos have no pixels WPF can decode: ask Windows for a frame instead.
+                var made = Cometsnap.Core.Storage.MediaKinds.IsVideo(path) ? ShellThumbnail.TryGet(path, Width) : Decode(path, Width);
+                if (made is null) return null;
+                thumb = made;
                 SaveDiskThumb(path, thumb);
             }
             _memory[path] = thumb;
