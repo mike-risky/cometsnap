@@ -305,7 +305,7 @@ public sealed class ScreenRecorder : IAsyncDisposable
 
     private static readonly Dictionary<string, bool> EncoderCache = new();
 
-    private static IEnumerable<string> VideoEncoderArgs(string ffmpeg, bool forGif)
+    internal static IEnumerable<string> VideoEncoderArgs(string ffmpeg, bool forGif)
     {
         if (!EncoderCache.TryGetValue("x264", out var x264)) EncoderCache["x264"] = x264 = FfmpegSupports(ffmpeg, "-encoders", "libx264");
         if (x264)
