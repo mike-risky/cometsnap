@@ -32,12 +32,47 @@ public sealed class TrayMenu
 
         _menu.Items.Add(Item("Capture region / window", Later(capture.StartRegion), _app.RegionHotkeyText));
         _menu.Items.Add(captureMenu);
+        _menu.Items.Add(RecentMenu());
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Open captures folder", _app.OpenCapturesFolder));
         _menu.Items.Add(Item("Settings…", _app.OpenSettingsFile));
         _menu.Items.Add(Item("About Cometsnap", ShowAbout));
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Quit", _app.Quit));
+    }
+
+    private MenuItem RecentMenu()
+    {
+        var recent = new MenuItem { Header = "Recent" };
+        var items = _app.Recent?.Snapshot().Take(10).ToList() ?? new List<string>();
+        if (items.Count == 0)
+        {
+            recent.Items.Add(new MenuItem { Header = "(no captures yet)", IsEnabled = false });
+            return recent;
+        }
+        foreach (var path in items)
+        {
+            var p = path;
+            var item = Item(System.IO.Path.GetFileNameWithoutExtension(p), () => CopyFile(p));
+            item.ToolTip = "Click to copy";
+            recent.Items.Add(item);
+        }
+        return recent;
+    }
+
+    private static void CopyFile(string path)
+    {
+        try
+        {
+            using var stream = System.IO.File.OpenRead(path);
+            var bmp = System.Windows.Media.Imaging.BitmapFrame.Create(stream,
+                System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
+            Services.ClipboardService.SetImage(bmp);
+        }
+        catch (Exception ex)
+        {
+            Cometsnap.Core.Diagnostics.Log.Error("Copy recent failed", ex);
+        }
     }
 
     public void Open()

@@ -33,7 +33,7 @@ public sealed class CaptureOverlay : Window
     private const int DragThreshold = 4;
     private const int SnapDistance = 8;
 
-    private static readonly SolidColorBrush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x8C, 0x07, 0x0A, 0x1C)));
+    private static readonly SolidColorBrush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x8C, 0x07, 0x11, 0x3A)));
     private static readonly SolidColorBrush GlowBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x55, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
     private static readonly SolidColorBrush GuideBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x70, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
 
@@ -125,8 +125,8 @@ public sealed class CaptureOverlay : Window
         _guideH = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
         _guideV = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
 
-        _labelText = new TextBlock { Foreground = SpaceTheme.StarWhiteBrush, FontFamily = new FontFamily("Segoe UI Semibold") };
-        _label = new Border { Child = _labelText, Background = SpaceTheme.NavyBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _labelText = new TextBlock { Foreground = SpaceTheme.VoidBrush, FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.SemiBold };
+        _label = new Border { Child = _labelText, Background = SpaceTheme.SunBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
 
         _loupe = new Loupe();
         _layer = new AnnotationLayer { Document = _doc, Clip = _layerClip };
@@ -775,7 +775,7 @@ public sealed class CaptureOverlay : Window
             FontWeight = FontWeights.SemiBold,
             FontSize = TextSize,
             Foreground = Annotation.CreateBrush(_color),
-            Background = new SolidColorBrush(Color.FromArgb(0x66, 0x07, 0x0A, 0x1C)),
+            Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0x66),
             CaretBrush = SpaceTheme.StarWhiteBrush,
             BorderBrush = SpaceTheme.CometBlueBrush,
             BorderThickness = new Thickness(Math.Max(1, Math.Round(_dpi))),

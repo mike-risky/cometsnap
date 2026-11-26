@@ -208,6 +208,40 @@ public static class Win32
     [DllImport("gdi32.dll", SetLastError = true)]
     public static extern IntPtr CreateDIBSection(IntPtr hdc, ref BITMAPINFOHEADER pbmi, uint usage, out IntPtr ppvBits, IntPtr hSection, uint offset);
 
+    // ---------------------------------------------------------------- misc
+
+    [DllImport("winmm.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PlaySound(IntPtr pszSound, IntPtr hmod, uint fdwSound);
+
+    public const uint SND_ASYNC = 0x0001;
+    public const uint SND_NODEFAULT = 0x0002;
+    public const uint SND_MEMORY = 0x0004;
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [DllImport("shcore.dll")]
+    public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWCP_ROUND = 2;
+
+    public static RECT? GetWorkArea(int x, int y, out RECT monitor, out double scale)
+    {
+        var h = MonitorFromPoint(new POINT(x, y), MONITOR_DEFAULTTONEAREST);
+        var info = new MONITORINFO { cbSize = (uint)Marshal.SizeOf<MONITORINFO>() };
+        scale = 1;
+        monitor = default;
+        if (!GetMonitorInfo(h, ref info)) return null;
+        monitor = info.rcMonitor;
+        if (GetDpiForMonitor(h, 0, out var dpiX, out _) == 0 && dpiX > 0) scale = dpiX / 96.0;
+        return info.rcWork;
+    }
+
     // ---------------------------------------------------------------- shell32
 
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]

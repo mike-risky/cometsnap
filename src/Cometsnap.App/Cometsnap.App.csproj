@@ -29,6 +29,10 @@
 
   <ItemGroup>
     <Resource Include="..\..\assets\cometsnap.ico" Link="Assets\cometsnap.ico" />
+    <Resource Include="..\..\assets\png\cometsnap-256.png" Link="Assets\cometsnap-256.png" />
+    <Resource Include="..\..\assets\whoosh.wav" Link="Assets\whoosh.wav" />
+    <Resource Include="..\..\assets\fonts\BungeeShade-Regular.ttf" Link="Assets\Fonts\BungeeShade-Regular.ttf" />
+    <Resource Include="..\..\assets\fonts\Bungee-Regular.ttf" Link="Assets\Fonts\Bungee-Regular.ttf" />
   </ItemGroup>
 
 </Project>

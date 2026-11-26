@@ -15,7 +15,7 @@ public enum AnnotationTool { None, Ellipse, Arrow, Text, Rectangle }
 /// </summary>
 public sealed class QuickBar : Border
 {
-    public static readonly string[] Palette = { "#FF3B5C", "#FFB020", "#2ED573", "#4FC3FF", "#FFFFFF", "#111111" };
+    public static readonly string[] Palette = { "#E5484D", "#FFD60A", "#2ED573", "#3D6BFF", "#FFFFFF", "#111111" };
 
     private readonly ScaleTransform _scale = new(1, 1);
     private readonly Dictionary<AnnotationTool, Border> _toolButtons = new();
@@ -45,7 +45,7 @@ public sealed class QuickBar : Border
         AddTool(row, AnnotationTool.Arrow, Icon("M3,13 L13,3 M7.5,3 L13,3 L13,8.5"), "Arrow (A) · Shift = 45° steps");
         AddTool(row, AnnotationTool.Text, new TextBlock
         {
-            Text = "T", FontFamily = new FontFamily("Segoe UI"), FontWeight = FontWeights.Bold, FontSize = 16,
+            Text = "T", FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.Bold, FontSize = 16,
             Foreground = SpaceTheme.StarWhiteBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         }, "Text (T) · Enter to finish, Shift+Enter new line");
         AddTool(row, AnnotationTool.Rectangle, Icon("M2.5,3.5 H13.5 V12.5 H2.5 Z"), "Rectangle (R) · Shift = square");
@@ -82,7 +82,7 @@ public sealed class QuickBar : Border
 
     private static readonly SolidColorBrush ActiveBrush = Frozen(Color.FromArgb(0x66, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B));
     private static readonly SolidColorBrush HoverBrush = Frozen(Color.FromArgb(0xFF, SpaceTheme.NavyLight.R, SpaceTheme.NavyLight.G, SpaceTheme.NavyLight.B));
-    private static readonly SolidColorBrush AccentBrush = Frozen(Color.FromArgb(0x40, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B));
+    private static readonly SolidColorBrush AccentBrush = SpaceTheme.TerracottaBrush;
 
     private void AddTool(Panel row, AnnotationTool tool, UIElement icon, string tip)
     {

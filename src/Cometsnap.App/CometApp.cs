@@ -23,12 +23,17 @@ public sealed class CometApp : Application
     private TrayIcon? _tray;
     private TrayMenu? _menu;
     private HotkeyManager? _hotkeys;
+    private TrayFlyout? _flyout;
+    private SoundService? _sounds;
+    private CometFlight? _comet;
 
     public static new CometApp Current => (CometApp)Application.Current;
 
     public AppPaths Paths { get; private set; } = null!;
     public AppSettings Settings { get; private set; } = null!;
     public CaptureController Capture { get; private set; } = null!;
+    public RecentCaptures Recent { get; private set; } = null!;
+    public ThumbnailCache Thumbnails { get; private set; } = null!;
 
     /// <summary>Text of the hotkey that actually works for region capture (shown in menus).</summary>
     public string? RegionHotkeyText { get; private set; }
@@ -54,12 +59,25 @@ public sealed class CometApp : Application
 
         _host = HiddenHost.Create();
         Capture = new CaptureController(this);
+        Recent = new RecentCaptures(Math.Clamp(Settings.RecentCount, 6, 200));
+        Thumbnails = new ThumbnailCache(Paths.ThumbnailCacheDirectory);
+        _ = Task.Run(() => Recent.Load(CapturesFolder));
+
+        _sounds = new SoundService();
+        _comet = new CometFlight();
+        Capture.CaptureTaken += OnCaptureTaken;
+        Capture.CaptureStored += (path, image) =>
+        {
+            Thumbnails.Prime(path, image);
+            Recent.Add(path);
+        };
 
         _tray = new TrayIcon(_host, "Cometsnap");
         _menu = new TrayMenu(this);
+        _flyout = new TrayFlyout(this, Recent, Thumbnails);
+        _flyout.Prewarm();
         _tray.ContextMenuRequested += (_, _) => ShowTrayMenu();
-        _tray.Activated += ShowTrayMenu; // replaced by the flyout panel
-        _tray.DoubleClicked += Capture.StartRegion;
+        _tray.Activated += () => _flyout.Toggle(_tray.GetIconRect());
 
         _hotkeys = new HotkeyManager(_host);
         RegisterHotkeys();
@@ -86,6 +104,25 @@ public sealed class CometApp : Application
         }
     }
 
+    private void OnCaptureTaken(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect from)
+    {
+        if (Settings.PlaySounds) _sounds?.Whoosh();
+        if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
+
+        var start = new Point(from.CenterX, from.CenterY);
+        Point end;
+        if (_tray.GetIconRect() is { } icon)
+        {
+            end = new Point((icon.Left + icon.Right) / 2.0, (icon.Top + icon.Bottom) / 2.0);
+        }
+        else
+        {
+            var work = Win32.GetWorkArea(from.CenterX, from.CenterY, out _, out _) ?? default;
+            end = new Point(work.Right - 40, work.Bottom - 10);
+        }
+        _comet.Launch(start, end);
+    }
+
     public static string Version =>
         typeof(CometApp).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
@@ -100,6 +137,7 @@ public sealed class CometApp : Application
         if (_host is null || _menu is null) return;
         // The menu only closes on outside clicks when our process owns the foreground.
         Win32.SetForegroundWindow(_host.Handle);
+        _menu.Rebuild();
         _menu.Open();
     }
 
@@ -126,6 +164,7 @@ public sealed class CometApp : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
+        _sounds?.Dispose();
         _tray?.Dispose();
         _host?.Dispose();
         Log.Info("Cometsnap exiting");

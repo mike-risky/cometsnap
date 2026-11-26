@@ -31,6 +31,7 @@ public sealed class AppSettings
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;
     public bool PlaySounds { get; set; } = true;
+    public bool ShowCometAnimation { get; set; } = true;
     public bool CopyToClipboardOnCapture { get; set; } = true;
     public bool AutoSave { get; set; } = true;
     public int RecentCount { get; set; } = 30;
