@@ -32,6 +32,12 @@
     <AvaloniaResource Include="..\..\..\assets\png\cometsnap-512.png" Link="Assets\cometsnap-512.png" />
   </ItemGroup>
 
+  <!-- The app's wording is shared with the Windows app: same texts, same translations. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Cometsnap.Core\Localization\L.cs" Link="Core\Localization\L.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Localization\Strings.cs" Link="Core\Localization\Strings.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Cometsnap.Linux.Tests" />
   </ItemGroup>

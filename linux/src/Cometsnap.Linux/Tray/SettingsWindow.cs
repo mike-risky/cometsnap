@@ -17,7 +17,7 @@ public sealed class SettingsWindow : Window
     {
         _app = app;
         var s = app.Settings;
-        Title = "Cometsnap settings";
+        Title = T("Cometsnap settings");
         Width = 520;
         Height = 680;
         Background = SpaceTheme.NebulaBrush;
@@ -28,40 +28,60 @@ public sealed class SettingsWindow : Window
         RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
 
         var panel = new StackPanel { Margin = new Thickness(24, 18), Spacing = 6 };
-        panel.Children.Add(new TextBlock { Text = "SETTINGS", FontFamily = SpaceTheme.DisplayFont, FontSize = 30, Foreground = SpaceTheme.SunBrush, Margin = new Thickness(0, 0, 0, 8) });
+        panel.Children.Add(new TextBlock { Text = T("SETTINGS"), FontFamily = SpaceTheme.DisplayFont, FontSize = 30, Foreground = SpaceTheme.SunBrush, Margin = new Thickness(0, 0, 0, 8) });
 
-        panel.Children.Add(Section("Capture"));
-        panel.Children.Add(Toggle("Detect windows under the mouse", s.WindowDetection, v => s.WindowDetection = v,
-            WindowFinder.IsAvailable ? null : "Wayland does not let apps see other windows: click captures the screen, drag picks an area."));
-        panel.Children.Add(Toggle("Show the Edit card after a capture", s.ShowEditCard, v => s.ShowEditCard = v));
-        panel.Children.Add(Toggle("Copy captures to the clipboard", s.CopyToClipboardOnCapture, v => s.CopyToClipboardOnCapture = v));
-        panel.Children.Add(Toggle("Soft click sound", s.PlaySounds, v => s.PlaySounds = v));
-        panel.Children.Add(Toggle("Comet animation", s.ShowCometAnimation, v => s.ShowCometAnimation = v,
-            "The capture rides a comet towards the tray. Needs a compositor (most desktops have one)."));
-        panel.Children.Add(Toggle("Little celebrations (snap milestones)", s.Celebrations, v => s.Celebrations = v));
-        panel.Children.Add(Toggle("Seasonal looks (snowy December, Halloween pumpkin)", s.SeasonalSkins, v =>
+        // Language: the desktop's, or one picked here; applies at once.
+        var system = Loc.Languages.FirstOrDefault(l => l.Code == Cometsnap.Core.Localization.L.FromCulture(Loc.SystemCulture())).Name ?? "English";
+        var languages = new List<(string Code, string Name)> { ("", F("Same as the system ({0})", system)) };
+        languages.AddRange(Loc.Languages);
+        var language = new ComboBox
+        {
+            ItemsSource = languages.Select(l => l.Name).ToList(),
+            SelectedIndex = Math.Max(0, languages.FindIndex(l => l.Code == s.Language)),
+            Width = 260,
+        };
+        language.SelectionChanged += (_, _) =>
+        {
+            var code = languages[Math.Max(0, language.SelectedIndex)].Code;
+            if (code == s.Language) return;
+            Close();
+            _app.SetLanguage(code);
+            _app.OpenSettings();
+        };
+        panel.Children.Add(Row(T("Language"), language));
+
+        panel.Children.Add(Section(T("Capture")));
+        panel.Children.Add(Toggle(T("Detect windows under the mouse"), s.WindowDetection, v => s.WindowDetection = v,
+            WindowFinder.IsAvailable ? null : T("Wayland does not let apps see other windows: click captures the screen, drag picks an area.")));
+        panel.Children.Add(Toggle(T("Show the Edit card after a capture"), s.ShowEditCard, v => s.ShowEditCard = v));
+        panel.Children.Add(Toggle(T("Copy captures to the clipboard"), s.CopyToClipboardOnCapture, v => s.CopyToClipboardOnCapture = v));
+        panel.Children.Add(Toggle(T("Soft click sound"), s.PlaySounds, v => s.PlaySounds = v));
+        panel.Children.Add(Toggle(T("Comet animation"), s.ShowCometAnimation, v => s.ShowCometAnimation = v,
+            T("The capture rides a comet towards the tray. Needs a compositor (most desktops have one).")));
+        panel.Children.Add(Toggle(T("Little celebrations (snap milestones)"), s.Celebrations, v => s.Celebrations = v));
+        panel.Children.Add(Toggle(T("Seasonal looks (snowy December, Halloween pumpkin)"), s.SeasonalSkins, v =>
         {
             s.SeasonalSkins = v;
             _app.ApplySeason();
         }));
-        var corner = new ComboBox { ItemsSource = new[] { "Bottom left", "Bottom right", "Top left", "Top right", "Follow the cursor" }, SelectedIndex = (int)s.LoupeCorner, Width = 200 };
+        var corner = new ComboBox { ItemsSource = new[] { T("Bottom left"), T("Bottom right"), T("Top left"), T("Top right"), T("Follow the cursor") }, SelectedIndex = (int)s.LoupeCorner, Width = 200 };
         corner.SelectionChanged += (_, _) => { s.LoupeCorner = (LoupeCorner)Math.Max(0, corner.SelectedIndex); _app.SaveSettings(); };
-        panel.Children.Add(Row("Magnifier corner", corner));
+        panel.Children.Add(Row(T("Magnifier corner"), corner));
 
-        panel.Children.Add(Section("Recording"));
-        panel.Children.Add(Toggle("Record the computer's sound", s.RecordSystemAudio, v => s.RecordSystemAudio = v));
-        panel.Children.Add(Toggle("Record the microphone", s.RecordMicrophone, v => s.RecordMicrophone = v));
-        panel.Children.Add(Toggle("Show the mouse pointer", s.RecordShowCursor, v => s.RecordShowCursor = v));
-        panel.Children.Add(Toggle("Copy recordings to the clipboard", s.RecordCopyToClipboard, v => s.RecordCopyToClipboard = v));
+        panel.Children.Add(Section(T("Recording")));
+        panel.Children.Add(Toggle(T("Record the computer's sound"), s.RecordSystemAudio, v => s.RecordSystemAudio = v));
+        panel.Children.Add(Toggle(T("Record the microphone"), s.RecordMicrophone, v => s.RecordMicrophone = v));
+        panel.Children.Add(Toggle(T("Show the mouse pointer"), s.RecordShowCursor, v => s.RecordShowCursor = v));
+        panel.Children.Add(Toggle(T("Copy recordings to the clipboard"), s.RecordCopyToClipboard, v => s.RecordCopyToClipboard = v));
 
-        panel.Children.Add(Section("Desktop"));
-        panel.Children.Add(Toggle("Start Cometsnap when I log in", s.StartAtLogin, v =>
+        panel.Children.Add(Section(T("Desktop")));
+        panel.Children.Add(Toggle(T("Start Cometsnap when I log in"), s.StartAtLogin, v =>
         {
             s.StartAtLogin = v;
             DesktopIntegration.SetStartAtLogin(v);
         }));
-        var keyText = s.ReplacedDesktopTool ? "Give Print Screen back to the desktop" : "Use Print Screen for Cometsnap…";
-        panel.Children.Add(Ui.ActionButton(keyText, null, "Your desktop's own screenshot shortcut", () =>
+        var keyText = s.ReplacedDesktopTool ? T("Give Print Screen back to the desktop") : T("Use Print Screen for Cometsnap…");
+        panel.Children.Add(Ui.ActionButton(keyText, null, T("Your desktop's own screenshot shortcut"), () =>
         {
             Close();
             if (_app.Settings.ReplacedDesktopTool) _app.GiveBackPrintScreen();
@@ -69,15 +89,15 @@ public sealed class SettingsWindow : Window
         }));
         panel.Children.Add(new TextBlock
         {
-            Text = $"Captures folder: {_app.CapturesFolder}", Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0),
+            Text = F("Captures folder: {0}", _app.CapturesFolder), Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 0),
         });
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 6, 0, 0) };
-        buttons.Children.Add(Ui.ActionButton("Open captures folder", null, "", _app.OpenCapturesFolder));
-        buttons.Children.Add(Ui.ActionButton("Edit settings file", null, "All settings, including shortcuts, as JSON", () => Tools.Open(_app.Paths.SettingsFile)));
+        buttons.Children.Add(Ui.ActionButton(T("Open captures folder"), null, "", _app.OpenCapturesFolder));
+        buttons.Children.Add(Ui.ActionButton(T("Edit settings file"), null, T("All settings, including shortcuts, as JSON"), () => Tools.Open(_app.Paths.SettingsFile)));
         panel.Children.Add(buttons);
         panel.Children.Add(new TextBlock
         {
-            Text = $"Cometsnap {typeof(SettingsWindow).Assembly.GetName().Version?.ToString(3)} · {DesktopSession.Describe()} · MIT license",
+            Text = $"Cometsnap {typeof(SettingsWindow).Assembly.GetName().Version?.ToString(3)} · {DesktopSession.Describe()} · " + T("MIT license"),
             Foreground = SpaceTheme.DustBrush, FontSize = 11, Margin = new Thickness(0, 14, 0, 0), TextWrapping = TextWrapping.Wrap,
         });
 

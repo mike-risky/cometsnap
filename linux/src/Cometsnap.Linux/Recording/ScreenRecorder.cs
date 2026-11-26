@@ -57,9 +57,9 @@ public sealed class ScreenRecorder : IAsyncDisposable
 
     public static string? MissingToolMessage()
     {
-        if (Tools.Ffmpeg is null) return "Recording needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again.";
+        if (Tools.Ffmpeg is null) return T("Recording needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again.");
         if (DesktopSession.IsWayland && !ScreenGrabber.ForceX11 && !GStreamer.HasElement("pipewiresrc"))
-            return "Recording on Wayland needs the GStreamer PipeWire plugin (gstreamer1.0-pipewire / gst-plugin-pipewire).";
+            return T("Recording on Wayland needs the GStreamer PipeWire plugin (gstreamer1.0-pipewire / gst-plugin-pipewire).");
         return null;
     }
 

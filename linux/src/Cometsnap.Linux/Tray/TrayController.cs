@@ -20,9 +20,10 @@ public sealed class TrayController : IDisposable
     private WindowIcon _normal;
     private bool _isRecording;
     private readonly WindowIcon _recording;
-    private readonly NativeMenuItem _recent;
-    private readonly NativeMenuItem _stop;
-    private readonly NativeMenuItem _captureItem;
+    private NativeMenuItem _recent = null!;
+    private NativeMenuItem _stop = null!;
+    private NativeMenuItem _captureItem = null!;
+    private string? _captureHint;
 
     public TrayController(CometApp app)
     {
@@ -30,38 +31,11 @@ public sealed class TrayController : IDisposable
         _everyday = _normal = new WindowIcon(SpaceTheme.LoadAsset("cometsnap-256.png"));
         _recording = new WindowIcon(WithRedDot(SpaceTheme.LoadAsset("cometsnap-256.png")));
 
-        var menu = new NativeMenu();
-        menu.Add(Item("Open Cometsnap", () => _app.Flyout.ShowNearPointer()));
-        menu.Add(new NativeMenuItemSeparator());
-        _captureItem = Item("Capture window / region", () => Later(_app.Capture.StartRegion));
-        menu.Add(_captureItem);
-        menu.Add(Item("Capture full screen", () => Later(_app.Capture.CaptureFullscreen)));
-        var delayed = new NativeMenuItem("Delayed capture") { Menu = new NativeMenu() };
-        foreach (var s in new[] { 3, 5, 10 }) delayed.Menu.Add(Item($"{s} seconds", () => _app.Capture.StartDelayed(s)));
-        menu.Add(delayed);
-
-        var record = new NativeMenuItem("Record") { Menu = new NativeMenu() };
-        record.Menu.Add(Item("Region / window (MP4)", () => Later(() => _app.Recorder.ToggleRegion(RecordingFormat.Mp4))));
-        record.Menu.Add(Item("Full screen (MP4)", () => Later(() => _app.Recorder.ToggleFullscreen(RecordingFormat.Mp4))));
-        record.Menu.Add(Item("Region / window (GIF)", () => Later(() => _app.Recorder.ToggleRegion(RecordingFormat.Gif))));
-        menu.Add(record);
-        _stop = Item("Stop recording", () => _app.Recorder.Stop());
-        _stop.IsVisible = false;
-        menu.Add(_stop);
-
-        _recent = new NativeMenuItem("Recent") { Menu = new NativeMenu() };
-        menu.Add(_recent);
-        menu.Add(new NativeMenuItemSeparator());
-        menu.Add(Item("Open captures folder", _app.OpenCapturesFolder));
-        menu.Add(Item("Settings", _app.OpenSettings));
-        menu.Add(new NativeMenuItemSeparator());
-        menu.Add(Item("Quit Cometsnap", _app.Quit));
-
         _icon = new TrayIcon
         {
             Icon = _normal,
             ToolTipText = "Cometsnap",
-            Menu = menu,
+            Menu = BuildMenu(),
             IsVisible = true,
         };
         _icon.Clicked += (_, _) => _app.Flyout.Toggle();
@@ -72,10 +46,52 @@ public sealed class TrayController : IDisposable
         RefreshRecent();
     }
 
+    /// <summary>Builds the menu again in the current language.</summary>
+    public void Rebuild()
+    {
+        _icon.Menu = BuildMenu();
+        RefreshRecent();
+        SetRecording(_isRecording);
+        if (_captureHint is not null) SetCaptureHint(_captureHint);
+    }
+
+    private NativeMenu BuildMenu()
+    {
+        var menu = new NativeMenu();
+        menu.Add(Item(T("Open Cometsnap"), () => _app.Flyout.ShowNearPointer()));
+        menu.Add(new NativeMenuItemSeparator());
+        _captureItem = Item(T("Capture window / region"), () => Later(_app.Capture.StartRegion));
+        menu.Add(_captureItem);
+        menu.Add(Item(T("Capture full screen"), () => Later(_app.Capture.CaptureFullscreen)));
+        var delayed = new NativeMenuItem(T("Delayed capture")) { Menu = new NativeMenu() };
+        foreach (var s in new[] { 3, 5, 10 }) delayed.Menu.Add(Item($"{s} seconds", () => _app.Capture.StartDelayed(s)));
+        menu.Add(delayed);
+
+        var record = new NativeMenuItem(T("Record")) { Menu = new NativeMenu() };
+        record.Menu.Add(Item(T("Region / window (MP4)"), () => Later(() => _app.Recorder.ToggleRegion(RecordingFormat.Mp4))));
+        record.Menu.Add(Item(T("Full screen (MP4)"), () => Later(() => _app.Recorder.ToggleFullscreen(RecordingFormat.Mp4))));
+        record.Menu.Add(Item(T("Region / window (GIF)"), () => Later(() => _app.Recorder.ToggleRegion(RecordingFormat.Gif))));
+        menu.Add(record);
+        _stop = Item(T("Stop recording"), () => _app.Recorder.Stop());
+        _stop.IsVisible = false;
+        menu.Add(_stop);
+
+        _recent = new NativeMenuItem(T("Recent")) { Menu = new NativeMenu() };
+        menu.Add(_recent);
+        menu.Add(new NativeMenuItemSeparator());
+        menu.Add(Item(T("Open captures folder"), _app.OpenCapturesFolder));
+        menu.Add(Item(T("Settings"), _app.OpenSettings));
+        menu.Add(new NativeMenuItemSeparator());
+        menu.Add(Item(T("Quit Cometsnap"), _app.Quit));
+
+        return menu;
+    }
+
     public void SetCaptureHint(string label)
     {
-        _captureItem.Header = $"Capture window / region ({label})";
-        _icon.ToolTipText = $"Cometsnap · {label} to capture";
+        _captureHint = label;
+        _captureItem.Header = $"{T("Capture window / region")} ({label})";
+        _icon.ToolTipText = F("Cometsnap · {0} to capture", label);
     }
 
     private static NativeMenuItem Item(string header, Action click)
@@ -96,7 +112,7 @@ public sealed class TrayController : IDisposable
         var items = _app.Recent.Snapshot().Take(10).ToList();
         if (items.Count == 0)
         {
-            menu.Add(new NativeMenuItem("No captures yet") { IsEnabled = false });
+            menu.Add(new NativeMenuItem(T("No captures yet")) { IsEnabled = false });
             return;
         }
         foreach (var path in items)
@@ -122,7 +138,7 @@ public sealed class TrayController : IDisposable
         _isRecording = on;
         _icon.Icon = on ? _recording : _normal;
         _stop.IsVisible = on;
-        _icon.ToolTipText = on ? "Cometsnap · recording (click the pill or press the shortcut to stop)" : "Cometsnap";
+        _icon.ToolTipText = on ? T("Cometsnap · recording (click the pill or press the shortcut to stop)") : "Cometsnap";
     }
 
     /// <summary>The comet plus a red dot at the bottom-right, as in the brand guide.</summary>

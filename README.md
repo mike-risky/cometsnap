@@ -62,6 +62,7 @@ On Wayland, captures and recordings go through the desktop portal, so the first 
 Drag any capture out of the tray panel (or the Copied card) into a file manager, browser, chat or office app.
 The playful extras (comet flight, milestones, seasonal looks, Constellation, the tray-panel secret) are here too;
 the comet and meteor showers need a compositing desktop, which almost every desktop is.
+It speaks English, French, German and Italian, following your desktop's language (change it in *Settings*).
 
 ## Features
 
