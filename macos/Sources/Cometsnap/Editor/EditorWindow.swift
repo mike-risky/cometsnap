@@ -16,7 +16,7 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
     private let widthSlider = NSSlider(value: 4, minValue: 1, maxValue: 12, target: nil, action: nil)
     private let zoomLabel = NSTextField(labelWithString: "100%")
     private var savedDoc: AnnotationDocument
-    private let constellation = SpaceButton(title: "Constellation", symbol: "sparkles", tip: "Join the numbered steps with faint star lines")
+    private let constellation = SpaceButton(title: L.t("Constellation"), symbol: "sparkles", tip: L.t("Join the numbered steps with faint star lines"))
 
     init(app: AppController, url: URL?, image: CGImage?, scale: CGFloat?) {
         self.app = app
@@ -68,26 +68,26 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         contentView = root
 
         // Top bar: undo/redo, zoom, then Save as, Save, Copy on the right.
-        let undo = SpaceButton(title: "", symbol: "arrow.uturn.backward", tip: "Undo (⌘Z)")
+        let undo = SpaceButton(title: "", symbol: "arrow.uturn.backward", tip: L.t("Undo (⌘Z)"))
         undo.onClick = { [weak self] in self?.canvas.undo() }
-        let redo = SpaceButton(title: "", symbol: "arrow.uturn.forward", tip: "Redo (⇧⌘Z)")
+        let redo = SpaceButton(title: "", symbol: "arrow.uturn.forward", tip: L.t("Redo (⇧⌘Z)"))
         redo.onClick = { [weak self] in self?.canvas.redo() }
-        let fit = SpaceButton(title: "Fit", symbol: "arrow.up.left.and.arrow.down.right", tip: "Fit to window (⌘0)")
+        let fit = SpaceButton(title: L.t("Fit"), symbol: "arrow.up.left.and.arrow.down.right", tip: L.t("Fit to window (⌘0)"))
         fit.onClick = { [weak self] in self?.zoomToFit() }
-        let actual = SpaceButton(title: "1:1", symbol: nil, tip: "Actual size (⌘1)")
+        let actual = SpaceButton(title: "1:1", symbol: nil, tip: L.t("Actual size (⌘1)"))
         actual.onClick = { [weak self] in self?.setZoom(1) }
         zoomLabel.textColor = Theme.muted
         zoomLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        let saveAs = SpaceButton(title: "Save as…", symbol: "square.and.arrow.down.on.square", tip: "Save a copy somewhere else (⇧⌘S)")
+        let saveAs = SpaceButton(title: L.t("Save as…"), symbol: "square.and.arrow.down.on.square", tip: L.t("Save a copy somewhere else (⇧⌘S)"))
         saveAs.onClick = { [weak self] in self?.saveAs() }
-        let save = SpaceButton(title: "Save", symbol: "square.and.arrow.down", fill: Theme.surface, tip: "Save and close (⌘S)")
+        let save = SpaceButton(title: L.t("Save"), symbol: "square.and.arrow.down", fill: Theme.surface, tip: L.t("Save and close (⌘S)"))
         save.layer?.borderWidth = 1
         save.onClick = { [weak self] in self?.save(close: true) }
-        let copy = SpaceButton(title: "Copy", symbol: "doc.on.doc", fill: Theme.terracotta, tip: "Copy, save and close (⌘C or ⌘↩)")
+        let copy = SpaceButton(title: L.t("Copy"), symbol: "doc.on.doc", fill: Theme.terracotta, tip: L.t("Copy, save and close (⌘C or ⌘↩)"))
         copy.onClick = { [weak self] in self?.performCopyAndClose() }
 
         constellation.onClick = { [weak self] in self?.toggleConstellation() }
-        constellation.widthAnchor.constraint(equalToConstant: 128).isActive = true
+        constellation.widthAnchor.constraint(equalToConstant: 146).isActive = true
         constellation.heightAnchor.constraint(equalToConstant: 32).isActive = true
         let left = NSStackView(views: [undo, redo, fit, actual, zoomLabel, constellation])
         left.spacing = 6
@@ -127,26 +127,26 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         let colors = NSStackView()
         colors.spacing = 6
         for (i, c) in RGBA.palette.enumerated() {
-            let s = SwatchView(color: c, tip: "\(RGBA.paletteNames[i]) (\(i + 1))")
+            let s = SwatchView(color: c, tip: "\(L.t(RGBA.paletteNames[i])) (\(i + 1))")
             s.onClick = { [weak self] in self?.setColor(c) }
             s.widthAnchor.constraint(equalToConstant: 22).isActive = true
             s.heightAnchor.constraint(equalToConstant: 22).isActive = true
             colors.addArrangedSubview(s)
             swatches.append(s)
         }
-        let custom = SpaceButton(title: "", symbol: "eyedropper", tip: "Pick any color")
+        let custom = SpaceButton(title: "", symbol: "eyedropper", tip: L.t("Pick any color"))
         custom.layer?.borderWidth = 0
         custom.onClick = { [weak self] in self?.pickCustomColor() }
         custom.widthAnchor.constraint(equalToConstant: 28).isActive = true
         custom.heightAnchor.constraint(equalToConstant: 26).isActive = true
         colors.addArrangedSubview(custom)
-        let thickness = NSTextField(labelWithString: "Thickness")
+        let thickness = NSTextField(labelWithString: L.t("Thickness"))
         thickness.textColor = Theme.muted
         thickness.font = Theme.ui(11)
         widthSlider.target = self
         widthSlider.action = #selector(widthChanged)
         widthSlider.widthAnchor.constraint(equalToConstant: 140).isActive = true
-        let hint = NSTextField(labelWithString: "Keys: V A L R E T K H P N B S C · 1–8 colors · ⌫ delete")
+        let hint = NSTextField(labelWithString: L.t("Keys: V A L R E T K H P N B S C · 1–8 colors · ⌫ delete"))
         hint.textColor = Theme.muted
         hint.font = Theme.ui(11)
         hint.lineBreakMode = .byTruncatingTail
@@ -364,11 +364,11 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         canvas.commitText()
         guard canvas.doc != savedDoc else { return true }
         let alert = NSAlert()
-        alert.messageText = "Keep your changes?"
-        alert.informativeText = "Your shapes stay editable: you can reopen this capture later and still move them."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Discard")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = L.t("Keep your changes?")
+        alert.informativeText = L.t("Your shapes stay editable: you can reopen this capture later and still move them.")
+        alert.addButton(withTitle: L.t("Save"))
+        alert.addButton(withTitle: L.t("Discard"))
+        alert.addButton(withTitle: L.t("Cancel"))
         alert.beginSheetModal(for: self) { [weak self] resp in
             guard let self else { return }
             switch resp {

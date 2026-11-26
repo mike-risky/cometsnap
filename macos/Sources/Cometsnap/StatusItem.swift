@@ -57,41 +57,41 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let m = NSMenu()
         let keys = app.hotkeyDisplay
         let capture = NSMenu()
-        capture.addItem(action("Region / Window\t\(keys.capture)", #selector(region)))
-        capture.addItem(action("Fullscreen", #selector(fullscreen)))
+        capture.addItem(action(L.t("Region / Window") + "\t\(keys.capture)", #selector(region)))
+        capture.addItem(action(L.t("Fullscreen"), #selector(fullscreen)))
         capture.addItem(.separator())
         for s in [3, 5, 10] {
-            let i = action("Delayed \(s) s", #selector(delayed(_:)))
+            let i = action(L.f("Delayed {0} s", s), #selector(delayed(_:)))
             i.tag = s
             capture.addItem(i)
         }
-        m.addItem(sub("Capture", capture, symbol: "camera.viewfinder"))
+        m.addItem(sub(L.t("Capture"), capture, symbol: "camera.viewfinder"))
 
         let record = NSMenu()
         if app.recorder.isRecording {
-            record.addItem(action("Stop recording", #selector(stopRecording)))
+            record.addItem(action(L.t("Stop recording"), #selector(stopRecording)))
         } else {
-            record.addItem(action("Video of a region\t\(keys.video)", #selector(recordRegion)))
-            record.addItem(action("Video of the whole screen", #selector(recordScreen)))
-            record.addItem(action("GIF of a region\t\(keys.gif)", #selector(recordGif)))
+            record.addItem(action(L.t("Video of a region") + "\t\(keys.video)", #selector(recordRegion)))
+            record.addItem(action(L.t("Video of the whole screen"), #selector(recordScreen)))
+            record.addItem(action(L.t("GIF of a region") + "\t\(keys.gif)", #selector(recordGif)))
         }
-        m.addItem(sub("Record", record, symbol: "record.circle"))
+        m.addItem(sub(L.t("Record"), record, symbol: "record.circle"))
 
         let recent = NSMenu()
         let items = app.recentItems.prefix(10)
-        if items.isEmpty { recent.addItem(withTitle: "No captures yet", action: nil, keyEquivalent: "") }
+        if items.isEmpty { recent.addItem(withTitle: L.t("No captures yet"), action: nil, keyEquivalent: "") }
         for r in items {
             let i = action(r.name, #selector(openRecent(_:)))
             i.representedObject = r.url
             recent.addItem(i)
         }
-        m.addItem(sub("Recent", recent, symbol: "clock"))
+        m.addItem(sub(L.t("Recent"), recent, symbol: "clock"))
         m.addItem(.separator())
-        m.addItem(action("Open captures folder", #selector(openFolder), symbol: "folder"))
-        m.addItem(action("Settings…", #selector(settings), key: ",", symbol: "gearshape"))
-        m.addItem(action("About Cometsnap", #selector(about), symbol: "info.circle"))
+        m.addItem(action(L.t("Open captures folder"), #selector(openFolder), symbol: "folder"))
+        m.addItem(action(L.t("Settings…"), #selector(settings), key: ",", symbol: "gearshape"))
+        m.addItem(action(L.t("About Cometsnap"), #selector(about), symbol: "info.circle"))
         m.addItem(.separator())
-        m.addItem(action("Quit Cometsnap", #selector(quit), key: "q"))
+        m.addItem(action(L.t("Quit Cometsnap"), #selector(quit), key: "q"))
         return m
     }
 
@@ -131,7 +131,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if on {
             pulseOn = true
             b.image = Theme.recordingIcon(dotVisible: true)
-            b.toolTip = "Recording… click to stop"
+            b.toolTip = L.t("Recording… click to stop")
             pulseTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { [weak self] _ in
                 guard let self else { return }
                 self.pulseOn.toggle()

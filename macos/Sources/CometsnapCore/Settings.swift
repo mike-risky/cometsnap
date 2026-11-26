@@ -25,13 +25,15 @@ public struct AppSettings: Codable, Equatable {
     public var snapMonth: String?
     public var snapMonthCount = 0
     public var snapCountSeeded = false
+    /// "" = same as macOS, else "en", "fr", "de" or "it".
+    public var language = ""
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
-             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded
+             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language
     }
 
     public init(from decoder: Decoder) throws {
@@ -54,6 +56,7 @@ public struct AppSettings: Codable, Equatable {
         snapMonth = try? c.decodeIfPresent(String.self, forKey: .snapMonth)
         snapMonthCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .snapMonthCount)) ?? 0)
         snapCountSeeded = (try? c.decodeIfPresent(Bool.self, forKey: .snapCountSeeded)) ?? false
+        language = (try? c.decodeIfPresent(String.self, forKey: .language)) ?? ""
         videoFramesPerSecond = min(60, max(10, (try? c.decodeIfPresent(Int.self, forKey: .videoFramesPerSecond)) ?? d.videoFramesPerSecond))
     }
 

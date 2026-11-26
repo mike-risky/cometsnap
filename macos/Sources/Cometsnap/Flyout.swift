@@ -60,19 +60,19 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         let bw = (W - pad * 2 - gap * 3) / 4
         let y0: CGFloat = 84
         let keys = app.hotkeyDisplay
-        let region = SpaceButton(title: "Region / Window", symbol: "viewfinder", fill: Theme.terracotta, vertical: true, fontSize: 11,
-                                 tip: "Capture a region or a window (\(keys.capture))")
+        let region = SpaceButton(title: L.t("Region / Window"), symbol: "viewfinder", fill: Theme.terracotta, vertical: true, fontSize: 11,
+                                 tip: L.f("Capture a region or a window ({0})", keys.capture))
         region.onClick = { [weak self] in self?.app.capture.startRegion() }
-        let full = SpaceButton(title: "Fullscreen", symbol: "rectangle.inset.filled", vertical: true, fontSize: 11,
-                               tip: "Capture the screen under the mouse")
+        let full = SpaceButton(title: L.t("Fullscreen"), symbol: "rectangle.inset.filled", vertical: true, fontSize: 11,
+                               tip: L.t("Capture the screen under the mouse"))
         full.onClick = { [weak self] in self?.app.capture.captureFullscreen() }
-        let delayed = SpaceButton(title: "Delayed", symbol: "timer", vertical: true, fontSize: 11, tip: "Capture after 3, 5 or 10 seconds")
+        let delayed = SpaceButton(title: L.t("Delayed"), symbol: "timer", vertical: true, fontSize: 11, tip: L.t("Capture after 3, 5 or 10 seconds: time to open a menu or hover something first"))
         delayed.onClick = { [weak self, weak delayed] in
             guard let self, let delayed else { return }
             self.popMenu(self.delayMenu(), from: delayed)
         }
-        let record = SpaceButton(title: "Record", symbol: "record.circle", vertical: true, fontSize: 11,
-                                 tip: "Record a video (\(keys.video)) or a GIF (\(keys.gif))")
+        let record = SpaceButton(title: L.t("Record"), symbol: "record.circle", vertical: true, fontSize: 11,
+                                 tip: L.f("Record a video ({0}) or a GIF ({1})", keys.video, keys.gif))
         record.onClick = { [weak self, weak record] in
             guard let self, let record else { return }
             self.popMenu(self.recordMenu(), from: record)
@@ -83,12 +83,12 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         }
 
         search.frame = CGRect(x: pad, y: y0 + 78, width: W - pad * 2, height: 26)
-        search.placeholderString = "Search by name or date (e.g. 2026-11-26)"
+        search.placeholderString = L.t("Search by name or date (e.g. 2026-11-26)")
         search.delegate = self
         search.focusRingType = .none
         root.addSubview(search)
 
-        let recent = NSTextField(labelWithString: "RECENT")
+        let recent = NSTextField(labelWithString: L.t("RECENT"))
         recent.font = Theme.heading(12)
         recent.textColor = Theme.muted
         recent.frame = CGRect(x: pad + 2, y: y0 + 114, width: 200, height: 18)
@@ -105,7 +105,7 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         grid.frame = CGRect(x: 0, y: 0, width: W, height: 10)
         root.addSubview(scroll)
 
-        empty.stringValue = "No captures yet.\nPress \(keys.capture) and grab something! ☄️"
+        empty.stringValue = L.t("No captures yet.") + "\n" + L.f("Press {0} and grab something!", keys.capture) + " ☄️"
         empty.alignment = .center
         empty.textColor = Theme.muted
         empty.font = Theme.ui(14)
@@ -118,9 +118,9 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         line.layer?.backgroundColor = Theme.line.cgColor
         root.addSubview(line)
 
-        let folder = LinkLabel("Open folder") { [weak self] in self?.hide(); self?.app.openCapturesFolder() }
-        let settings = LinkLabel("Settings") { [weak self] in self?.hide(); self?.app.showSettings() }
-        let quit = LinkLabel("Quit") { NSApp.terminate(nil) }
+        let folder = LinkLabel(L.t("Open folder")) { [weak self] in self?.hide(); self?.app.openCapturesFolder() }
+        let settings = LinkLabel(L.t("Settings")) { [weak self] in self?.hide(); self?.app.showSettings() }
+        let quit = LinkLabel(L.t("Quit")) { NSApp.terminate(nil) }
         folder.sizeToFit(); settings.sizeToFit(); quit.sizeToFit()
         let fy = H - footerH + 12
         folder.setFrameOrigin(CGPoint(x: pad, y: fy))
@@ -134,12 +134,12 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
 
     private func delayMenu() -> NSMenu {
         let m = NSMenu()
-        let explain = NSMenuItem(title: "Wait a few seconds before capturing, so you can open a menu or a tooltip first.", action: nil, keyEquivalent: "")
+        let explain = NSMenuItem(title: L.t("Wait a few seconds before capturing, so you can open a menu or a tooltip first."), action: nil, keyEquivalent: "")
         explain.isEnabled = false
         m.addItem(explain)
         m.addItem(.separator())
         for s in [3, 5, 10] {
-            let i = ClosureMenuItem(title: "In \(s) seconds") { [weak self] in self?.app.capture.captureDelayed(s) }
+            let i = ClosureMenuItem(title: L.f("{0} seconds", s)) { [weak self] in self?.app.capture.captureDelayed(s) }
             m.addItem(i)
         }
         return m
@@ -148,13 +148,13 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
     private func recordMenu() -> NSMenu {
         let m = NSMenu()
         if app.recorder.isRecording {
-            m.addItem(ClosureMenuItem(title: "Stop recording") { [weak self] in self?.app.recorder.stop() })
+            m.addItem(ClosureMenuItem(title: L.t("Stop recording")) { [weak self] in self?.app.recorder.stop() })
             return m
         }
         let k = app.hotkeyDisplay
-        m.addItem(ClosureMenuItem(title: "Video of a region  (\(k.video))") { [weak self] in self?.app.recorder.toggleRegion(format: .mp4) })
-        m.addItem(ClosureMenuItem(title: "Video of the whole screen") { [weak self] in self?.app.recorder.startFullscreen(format: .mp4) })
-        m.addItem(ClosureMenuItem(title: "GIF of a region  (\(k.gif))") { [weak self] in self?.app.recorder.toggleRegion(format: .gif) })
+        m.addItem(ClosureMenuItem(title: L.t("Video of a region") + "  (\(k.video))") { [weak self] in self?.app.recorder.toggleRegion(format: .mp4) })
+        m.addItem(ClosureMenuItem(title: L.t("Video of the whole screen")) { [weak self] in self?.app.recorder.startFullscreen(format: .mp4) })
+        m.addItem(ClosureMenuItem(title: L.t("GIF of a region") + "  (\(k.gif))") { [weak self] in self?.app.recorder.toggleRegion(format: .gif) })
         return m
     }
 
@@ -260,7 +260,7 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         grid.frame = CGRect(x: 0, y: 0, width: FlyoutPanel.width, height: max(scroll.contentSize.height, 8 + CGFloat(rows) * (th + gap)))
         empty.isHidden = !all.isEmpty
         let count = all.count
-        status.stringValue = count == 0 ? "" : (count >= 60 ? "60+ captures" : "\(count) capture\(count == 1 ? "" : "s")")
+        status.stringValue = count == 0 ? "" : (count >= 60 ? L.t("60+ captures") : count == 1 ? L.t("1 capture") : L.f("{0} captures", count))
     }
 }
 
@@ -294,7 +294,7 @@ final class TileView: NSView, NSDraggingSource {
     private var downPoint: CGPoint?
     private let actions = NSStackView()
     private let badge = NSTextField(labelWithString: "")
-    private let flash = NSTextField(labelWithString: "COPIED!")
+    private let flash = NSTextField(labelWithString: L.t("COPIED!"))
 
     init(item: RecentItem, app: AppController) {
         self.item = item
@@ -309,7 +309,7 @@ final class TileView: NSView, NSDraggingSource {
         imageLayer.contentsGravity = .resizeAspectFill
         imageLayer.masksToBounds = true
         layer?.addSublayer(imageLayer)
-        toolTip = "\(item.name)\nClick: copy · Double-click: \(item.kind == .image ? "edit" : "play") · Drag: drop into any app"
+        toolTip = item.name + "\n" + (item.kind == .image ? L.t("Click: copy · Double-click: edit · Drag: drop into any app") : L.t("Click: copy · Double-click: play · Drag: drop into any app"))
 
         if item.kind != .image {
             badge.stringValue = item.kind == .gif ? " GIF " : " ▶ MP4 "
@@ -323,10 +323,10 @@ final class TileView: NSView, NSDraggingSource {
         }
 
         let specs: [(String, String, () -> Void)] = [
-            ("pencil", item.kind == .image ? "Edit" : "Play", { [weak self] in self?.primary() }),
-            ("doc.on.doc", "Copy", { [weak self] in self?.copyItem() }),
-            ("folder", "Show in Finder", { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }),
-            ("trash", "Move to Trash", { [weak self] in self?.trash() }),
+            ("pencil", item.kind == .image ? L.t("Edit") : L.t("Play"), { [weak self] in self?.primary() }),
+            ("doc.on.doc", L.t("Copy"), { [weak self] in self?.copyItem() }),
+            ("folder", L.t("Show in Finder"), { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }),
+            ("trash", L.t("Move to Trash"), { [weak self] in self?.trash() }),
         ]
         for (sym, tip, act) in specs {
             let b = SpaceButton(title: "", symbol: sym, fill: Theme.night.withAlphaComponent(0.85), tip: tip)
@@ -522,7 +522,7 @@ final class StarHeaderView: NSView {
         wordmark.frame = CGRect(x: 16, y: bounds.height - 46, width: 300, height: 38)
         root.addSublayer(wordmark)
 
-        tagline.string = NSAttributedString(string: "Snap it. Mark it. Share it.",
+        tagline.string = NSAttributedString(string: L.t("Snap it. Mark it. Share it."),
                                             attributes: [.font: Theme.ui(11, .medium), .foregroundColor: Theme.muted])
         tagline.contentsScale = scale
         tagline.frame = CGRect(x: 18, y: 8, width: 300, height: 16)

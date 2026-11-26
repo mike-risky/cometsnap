@@ -48,7 +48,7 @@ final class Recorder: NSObject, SCStreamDelegate {
             do {
                 let content = try await ScreenGrabber.shared.content(fresh: true)
                 guard let display = ScreenGrabber.shared.display(for: screen, in: content) else {
-                    throw CaptureError.failed("That screen is not available for recording.")
+                    throw CaptureError.failed(L.t("That screen is not available for recording."))
                 }
                 let own = ScreenGrabber.shared.ownApplication(in: content)
                 let filter = SCContentFilter(display: display, excludingApplications: own.map { [$0] } ?? [], exceptingWindows: [])
@@ -177,7 +177,7 @@ final class RecordingSession: NSObject, SCStreamOutput {
         super.init()
         if format == .gif {
             guard let d = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, RecordingSession.maxGifFrames, nil) else {
-                throw CaptureError.failed("Could not create the GIF file.")
+                throw CaptureError.failed(L.t("Could not create the GIF file."))
             }
             CGImageDestinationSetProperties(d, [kCGImagePropertyGIFDictionary as String: [kCGImagePropertyGIFLoopCount as String: 0]] as CFDictionary)
             gif = d
@@ -197,7 +197,7 @@ final class RecordingSession: NSObject, SCStreamOutput {
             ] as [String: Any],
         ])
         video.expectsMediaDataInRealTime = true
-        guard w.canAdd(video) else { throw CaptureError.failed("Could not set up the video encoder.") }
+        guard w.canAdd(video) else { throw CaptureError.failed(L.t("Could not set up the video encoder.")) }
         w.add(video)
         videoInput = video
         if audio {
@@ -267,7 +267,7 @@ final class RecordingSession: NSObject, SCStreamOutput {
                 if let pending = self.gifPending { self.writeGif(pending.0, delay: 0.5) }
                 guard let gif = self.gif, self.gifFrames > 0, CGImageDestinationFinalize(gif) else {
                     try? FileManager.default.removeItem(at: self.url)
-                    done(nil, nil, CaptureError.failed("The GIF was empty: nothing moved on screen."))
+                    done(nil, nil, CaptureError.failed(L.t("The GIF was empty: nothing moved on screen.")))
                     return
                 }
                 done(self.url, self.thumbnail, nil)
@@ -276,14 +276,14 @@ final class RecordingSession: NSObject, SCStreamOutput {
             guard let w = self.writer, self.started else {
                 self.writer?.cancelWriting()
                 try? FileManager.default.removeItem(at: self.url)
-                done(nil, nil, CaptureError.failed("The recording was empty."))
+                done(nil, nil, CaptureError.failed(L.t("The recording was empty.")))
                 return
             }
             self.videoInput?.markAsFinished()
             self.audioInput?.markAsFinished()
             if self.lastPTS.isValid { w.endSession(atSourceTime: self.lastPTS) }
             w.finishWriting {
-                if w.status == .completed { done(self.url, self.thumbnail, nil) } else { done(nil, nil, w.error ?? CaptureError.failed("Saving the video failed.")) }
+                if w.status == .completed { done(self.url, self.thumbnail, nil) } else { done(nil, nil, w.error ?? CaptureError.failed(L.t("Saving the video failed."))) }
             }
         }
     }
@@ -367,7 +367,7 @@ final class RecordingPill: NSPanel {
         time.font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
         time.textColor = Theme.muted
         time.frame = CGRect(x: 76, y: 11, width: 50, height: 18)
-        let stop = SpaceButton(title: "Stop", symbol: "stop.fill", fill: Theme.recordRed, tip: "Stop recording (same hotkey, or click the menu bar icon)")
+        let stop = SpaceButton(title: L.t("Stop"), symbol: "stop.fill", fill: Theme.recordRed, tip: L.t("Stop recording (same hotkey, or click the menu bar icon)"))
         stop.layer?.cornerRadius = 14
         stop.frame = CGRect(x: 128, y: 6, width: 74, height: 28)
         stop.onClick = onStop
