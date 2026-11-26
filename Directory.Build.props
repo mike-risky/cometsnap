@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <Version>0.1.0</Version>
+    <Product>Cometsnap</Product>
+    <Authors>Michael Solioz</Authors>
+    <Company>Michael Solioz</Company>
+    <Copyright>Copyright (c) 2026 Michael Solioz</Copyright>
+    <Description>A free, fun and snappy screenshot tool for Windows.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/mike-risky/cometsnap</RepositoryUrl>
+  </PropertyGroup>
+
+</Project>

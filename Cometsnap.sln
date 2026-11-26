@@ -1,0 +1,50 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{406634B0-8FFE-4291-8A3E-369E0CA364D7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Core", "src\Cometsnap.Core\Cometsnap.Core.csproj", "{FE9A07B1-8667-4A21-89F5-681BCBE3F981}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Editor", "src\Cometsnap.Editor\Cometsnap.Editor.csproj", "{C5D9488D-6887-4BF8-BE0E-EE246D85EC13}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.App", "src\Cometsnap.App\Cometsnap.App.csproj", "{7C9CA4AA-29C4-4202-9141-F20F6200258C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Core.Tests", "tests\Cometsnap.Core.Tests\Cometsnap.Core.Tests.csproj", "{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FE9A07B1-8667-4A21-89F5-681BCBE3F981}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE9A07B1-8667-4A21-89F5-681BCBE3F981}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE9A07B1-8667-4A21-89F5-681BCBE3F981}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE9A07B1-8667-4A21-89F5-681BCBE3F981}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C9CA4AA-29C4-4202-9141-F20F6200258C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C9CA4AA-29C4-4202-9141-F20F6200258C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C9CA4AA-29C4-4202-9141-F20F6200258C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C9CA4AA-29C4-4202-9141-F20F6200258C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FE9A07B1-8667-4A21-89F5-681BCBE3F981} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
+		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
+		{7C9CA4AA-29C4-4202-9141-F20F6200258C} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
+		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6} = {406634B0-8FFE-4291-8A3E-369E0CA364D7}
+	EndGlobalSection
+EndGlobal
