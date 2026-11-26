@@ -17,6 +17,8 @@ public class LocalizationTests
     [InlineData("en_US.UTF-8", null, "en")]
     [InlineData("es_ES.UTF-8", null, "es")]
     [InlineData("pt_BR.UTF-8", null, "pt")]
+    [InlineData("zh_CN.UTF-8", null, "zh")]
+    [InlineData("hi_IN", null, "hi")]
     [InlineData("ja_JP.UTF-8", null, "en")]
     [InlineData("C.UTF-8", null, "en")]
     [InlineData("en_US.UTF-8", "fr_FR:en", "fr")]
@@ -64,17 +66,19 @@ public class LocalizationTests
         foreach (var color in EditorTools.PaletteNames) keys.Add(color);
         Assert.True(keys.Count > 100);
 
-        foreach (var code in new[] { "fr", "de", "it" })
+        var problems = new List<string>();
+        foreach (var code in L.Languages.Select(l => l.Code).Where(c => c != "en"))
         {
             var shared = L.Table(code)!;
             var own = LinuxStrings.Table(code)!;
             foreach (var key in keys)
             {
                 var found = own.TryGetValue(key, out var text) || shared.TryGetValue(key, out text);
-                Assert.True(found && !string.IsNullOrEmpty(text), $"{code}: missing \"{key}\"");
-                Assert.Equal(Placeholders(key), Placeholders(text!));
+                if (!found || string.IsNullOrEmpty(text)) problems.Add($"{code}: missing \"{key}\"");
+                else if (Placeholders(key) != Placeholders(text!)) problems.Add($"{code}: placeholders differ in \"{key}\"");
             }
         }
+        Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 
     private static string Placeholders(string s) =>
