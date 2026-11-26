@@ -1,0 +1,79 @@
+name: macos
+
+on:
+  push:
+    branches: [main]
+    paths: ['macos/**', 'assets/**', '.github/workflows/macos.yml']
+  pull_request:
+    paths: ['macos/**', 'assets/**', '.github/workflows/macos.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Compile (universal)
+        run: |
+          set -o pipefail
+          if ! swift build -c release --arch arm64 --arch x86_64 2>&1 | tee build.log; then
+            # Surface compiler errors as annotations on the run.
+            grep -E '^/.+\.swift:[0-9]+:[0-9]+: error: ' build.log | sort -u | head -45 | while IFS= read -r line; do
+              file="${line%%:*}"; rest="${line#*:}"; ln="${rest%%:*}"; msg="${line#*: error: }"
+              echo "::error file=${file#$GITHUB_WORKSPACE/},line=${ln}::${msg}"
+            done
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: swift test 2>&1 | tail -40
+
+      - name: Bundle .app, .dmg and .zip
+        run: |
+          VERSION="0.1.0"
+          scripts/make-app.sh "$VERSION" "${{ github.run_number }}"
+
+      - name: Update the macOS "latest build" pre-release (main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete macos-nightly --yes --cleanup-tag || true
+          gh release create macos-nightly build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip \
+            --prerelease --latest=false --target "${{ github.sha }}" \
+            --title "Latest macOS build (main)" --notes-file FIRST-LAUNCH.txt
+
+      - name: Update the macOS test pre-release of this pull request
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh release delete "macos-test-pr$PR" --yes --cleanup-tag || true
+          {
+            echo "macOS test build of pull request #$PR (commit ${HEAD_SHA::7}). One universal app for Apple Silicon and Intel, macOS 14 Sonoma or newer."
+            echo
+            cat FIRST-LAUNCH.txt
+          } > notes.txt
+          gh release create "macos-test-pr$PR" build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip \
+            --prerelease --latest=false --target "$HEAD_SHA" \
+            --title "macOS test build: PR #$PR" --notes-file notes.txt
