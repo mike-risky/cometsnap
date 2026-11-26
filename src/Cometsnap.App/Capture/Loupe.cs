@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Cometsnap.App.Theme;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Capture;
 
@@ -141,7 +142,7 @@ public sealed class Loupe : Border
         _swatch.BorderThickness = new Thickness(1);
         _swatch.Margin = new Thickness(0, 0, pad, 0);
         _hint.Margin = new Thickness(pad, 0, 0, 0);
-        _hint.Text = "C copy";
+        _hint.Text = L.T("C copy");
         _info.Margin = new Thickness(pad, pad, pad, pad / 2.0);
 
         BorderThickness = new Thickness(Math.Max(1, Math.Round(dpiScale)));
@@ -167,7 +168,7 @@ public sealed class Loupe : Border
     }
 
     public void FlashHint(string text) => _hint.Text = text;
-    public void ResetHint() => _hint.Text = "C copy";
+    public void ResetHint() => _hint.Text = L.T("C copy");
 
     public static string HexOf(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
 }

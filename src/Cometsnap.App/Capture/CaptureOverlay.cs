@@ -12,6 +12,7 @@ using Cometsnap.Core.Geometry;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
 using Cometsnap.Editor;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Capture;
 
@@ -618,7 +619,7 @@ public sealed class CaptureOverlay : Window
                 if (_screen is not null)
                 {
                     var hex = Loupe.HexOf(_screen.ColorAt(_cx, _cy));
-                    if (Services.ClipboardService.SetText(hex)) _loupe.FlashHint("Copied!");
+                    if (Services.ClipboardService.SetText(hex)) _loupe.FlashHint(L.T("Copied!"));
                 }
                 return;
 
@@ -709,7 +710,7 @@ public sealed class CaptureOverlay : Window
 
             // Once selected, the tag also tells what the keys do: drawing starts with a tool.
             _labelText.Text = _mode == Mode.Selected && _tool == AnnotationTool.None
-                ? $"{r.Width} × {r.Height}   ·   E circle  A arrow  T text  R box  ·  Enter copy"
+                ? $"{r.Width} × {r.Height}   ·   " + L.T("E circle  A arrow  T text  R box  ·  Enter copy")
                 : $"{r.Width} × {r.Height}";
             _label.Visibility = Visibility.Visible;
             _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));

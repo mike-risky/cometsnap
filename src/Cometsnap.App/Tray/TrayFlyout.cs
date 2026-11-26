@@ -14,6 +14,7 @@ using Cometsnap.Core.Fun;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Storage;
 using Path = System.IO.Path;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Tray;
 
@@ -74,24 +75,20 @@ public sealed class TrayFlyout : Window
 
         // ---- big capture buttons
         var buttons = new UniformGrid { Columns = 4, Margin = new Thickness(12, 0, 12, 10) };
-        buttons.Children.Add(BigButton("Region / Window", "M2,5 V2 H5 M11,2 H14 V5 M14,11 V14 H11 M5,14 H2 V11", primary: true,
+        buttons.Children.Add(BigButton(L.T("Region / Window"), "M2,5 V2 H5 M11,2 H14 V5 M14,11 V14 H11 M5,14 H2 V11", primary: true,
             () => HideThen(_app.Capture.StartRegion)));
-        buttons.Children.Add(BigButton("Fullscreen", "M2,3 H14 V11 H2 Z M6,14 H10", primary: false,
+        buttons.Children.Add(BigButton(L.T("Fullscreen"), "M2,3 H14 V11 H2 Z M6,14 H10", primary: false,
             () => HideThen(_app.Capture.CaptureFullscreen)));
-        var delayed = BigButton("Delayed", "M8,2.5 A5.5,5.5 0 1 1 7.99,2.5 Z M8,5 V8 L10,10", primary: false, () => { });
-        delayed.ContextMenu = DelayMenu();
-        delayed.MouseLeftButtonUp += (_, e) =>
-        {
-            e.Handled = true;
-            delayed.ContextMenu.PlacementTarget = delayed;
-            delayed.ContextMenu.Placement = PlacementMode.Bottom;
-            delayed.ContextMenu.IsOpen = true;
-        };
+        // Delayed: a left click opens a small picker (3 s, 5 s, 10 s) that says what it is for.
+        Border? delayed = null;
+        delayed = BigButton(L.T("Delayed"), "M8,2.5 A5.5,5.5 0 1 1 7.99,2.5 Z M8,5 V8 L10,10", primary: false, () => ShowDelayPicker(delayed!));
+        delayed.ToolTip = L.T("Capture after 3, 5 or 10 seconds: time to open a menu or hover something first");
         buttons.Children.Add(delayed);
         // Record: click = region video, right-click = fullscreen / GIF.
-        var record = BigButton("Record", "M8,3 A5,5 0 1 1 7.99,3 Z M8,6 A2,2 0 1 1 7.99,6 Z", primary: false,
+        var record = BigButton(L.T("Record"), "M8,3 A5,5 0 1 1 7.99,3 Z M8,6 A2,2 0 1 1 7.99,6 Z", primary: false,
             () => HideThen(() => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4)));
         record.ContextMenu = RecordMenu();
+        record.ToolTip = L.T("Click: record a video of an area · Right-click: fullscreen or GIF");
         buttons.Children.Add(record);
 
         // ---- search
@@ -104,7 +101,7 @@ public sealed class TrayFlyout : Window
         _search.TextChanged += (_, _) => Populate();
         var searchHint = new TextBlock
         {
-            Text = "Search by name or date (e.g. 2026-11-26)", Foreground = SpaceTheme.DustBrush, FontSize = 13,
+            Text = L.T("Search by name or date (e.g. 2026-11-26)"), Foreground = SpaceTheme.DustBrush, FontSize = 13,
             Margin = new Thickness(27, 6, 0, 0), IsHitTestVisible = false,
         };
         _search.TextChanged += (_, _) => searchHint.Visibility = _search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -114,7 +111,7 @@ public sealed class TrayFlyout : Window
 
         var recentTitle = new TextBlock
         {
-            Text = "RECENT", FontFamily = SpaceTheme.HeadingFont, FontSize = 13, Foreground = SpaceTheme.DustBrush,
+            Text = L.T("RECENT"), FontFamily = SpaceTheme.HeadingFont, FontSize = 13, Foreground = SpaceTheme.DustBrush,
             Margin = new Thickness(16, 2, 16, 6),
         };
 
@@ -127,7 +124,7 @@ public sealed class TrayFlyout : Window
         };
         _empty = new TextBlock
         {
-            Text = "No captures yet.\nPress Print Screen and grab something! ☄️",
+            Text = L.T("No captures yet.") + "\n" + L.T("Press Print Screen and grab something!") + " ☄️",
             Foreground = SpaceTheme.DustBrush, TextAlignment = TextAlignment.Center, FontSize = 14,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
         };
@@ -138,8 +135,8 @@ public sealed class TrayFlyout : Window
         // ---- footer
         _status = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var footer = new DockPanel { Margin = new Thickness(12, 8, 12, 10), LastChildFill = false };
-        var openFolder = LinkButton("Open folder", () => { Hide(); _app.OpenCapturesFolder(); });
-        var settings = LinkButton("Settings", () => { Hide(); _app.OpenSettingsFile(); });
+        var openFolder = LinkButton(L.T("Open folder"), () => { Hide(); _app.OpenCapturesFolder(); });
+        var settings = LinkButton(L.T("Settings"), () => { Hide(); _app.OpenSettingsFile(); });
         DockPanel.SetDock(openFolder, Dock.Left);
         DockPanel.SetDock(settings, Dock.Right);
         DockPanel.SetDock(_status, Dock.Left);
@@ -181,11 +178,13 @@ public sealed class TrayFlyout : Window
             }
             _app.MeteorShowerEasterEgg();
         };
-        _recent.Changed += () => Dispatcher.BeginInvoke(() =>
+        Action onRecent = () => Dispatcher.BeginInvoke(() =>
         {
             _dirty = true;
             if (IsVisible) Populate();
         });
+        _recent.Changed += onRecent;
+        Closed += (_, _) => _recent.Changed -= onRecent; // a language switch replaces the panel
     }
 
     /// <summary>Creates the window once, cloaked, so the first real open is instant.</summary>
@@ -262,6 +261,7 @@ public sealed class TrayFlyout : Window
         _hiddenAt = DateTime.UtcNow;
         _sky?.Stop();
         _konami.Reset();
+        if (_delayPicker is not null) _delayPicker.IsOpen = false;
         Hide();
     }
 
@@ -285,22 +285,69 @@ public sealed class TrayFlyout : Window
             item.Click += (_, _) => HideThen(action);
             menu.Items.Add(item);
         }
-        Add("Region / window (MP4)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4));
-        Add("Fullscreen (MP4)", () => _app.Recorder.ToggleFullscreen(Cometsnap.Video.RecordingFormat.Mp4));
-        Add("Region / window (GIF)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Gif));
+        Add(L.T("Region / window (MP4)"), () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4));
+        Add(L.T("Fullscreen (MP4)"), () => _app.Recorder.ToggleFullscreen(Cometsnap.Video.RecordingFormat.Mp4));
+        Add(L.T("Region / window (GIF)"), () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Gif));
         return menu;
     }
 
-    private ContextMenu DelayMenu()
+    private System.Windows.Controls.Primitives.Popup? _delayPicker;
+
+    /// <summary>The little "Delayed capture" picker under the button: what it does, and 3 / 5 / 10 seconds.</summary>
+    private void ShowDelayPicker(FrameworkElement anchor)
     {
-        var menu = new ContextMenu();
-        foreach (var s in new[] { 3, 5, 10 })
+        if (_delayPicker is null)
         {
-            var item = new MenuItem { Header = $"{s} seconds" };
-            item.Click += (_, _) => { HideFlyout(); _app.Capture.StartDelayed(s); };
-            menu.Items.Add(item);
+            var title = new TextBlock { Text = L.T("Delayed capture"), FontWeight = FontWeights.SemiBold, FontSize = 13, Foreground = SpaceTheme.StarWhiteBrush };
+            var explain = new TextBlock
+            {
+                Text = L.T("Wait a few seconds before capturing, so you can open a menu or a tooltip first."),
+                TextWrapping = TextWrapping.Wrap, FontSize = 12, Foreground = SpaceTheme.DustBrush, Margin = new Thickness(0, 4, 0, 10),
+            };
+            var choices = new UniformGrid { Columns = 3 };
+            foreach (var seconds in new[] { 3, 5, 10 })
+            {
+                var s = seconds;
+                var pill = new Border
+                {
+                    Height = 34, Margin = new Thickness(3, 0, 3, 0), CornerRadius = new CornerRadius(8), Cursor = Cursors.Hand,
+                    Background = s == 3 ? SpaceTheme.TerracottaBrush : SpaceTheme.NavyBrush,
+                    BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(s == 3 ? 0 : 1),
+                    Child = new TextBlock
+                    {
+                        Text = L.F("{0} s", s), FontWeight = FontWeights.SemiBold, FontSize = 14, Foreground = SpaceTheme.StarWhiteBrush,
+                        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    },
+                };
+                var rest = pill.Background;
+                pill.MouseEnter += (_, _) => pill.Background = SpaceTheme.CometBlueBrush;
+                pill.MouseLeave += (_, _) => pill.Background = rest;
+                pill.MouseLeftButtonUp += (_, e) =>
+                {
+                    e.Handled = true;
+                    _delayPicker!.IsOpen = false;
+                    HideFlyout();
+                    _app.Capture.StartDelayed(s);
+                };
+                choices.Children.Add(pill);
+            }
+            var body = new StackPanel();
+            body.Children.Add(title);
+            body.Children.Add(explain);
+            body.Children.Add(choices);
+            _delayPicker = new System.Windows.Controls.Primitives.Popup
+            {
+                AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, PopupAnimation = PopupAnimation.Fade,
+                Child = new Border
+                {
+                    Width = 270, Padding = new Thickness(12, 10, 12, 12), Margin = new Thickness(0, 4, 8, 12), CornerRadius = new CornerRadius(10),
+                    Background = SpaceTheme.VoidBrush, BorderBrush = SpaceTheme.CometBlueBrush, BorderThickness = new Thickness(1), Child = body,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black },
+                },
+            };
         }
-        return menu;
+        _delayPicker.PlacementTarget = anchor;
+        _delayPicker.IsOpen = !_delayPicker.IsOpen;
     }
 
     // ------------------------------------------------------------------ thumbnails
@@ -316,7 +363,7 @@ public sealed class TrayFlyout : Window
         _grid.Children.Clear();
         foreach (var path in paths) _grid.Children.Add(Tile(path));
         _empty.Visibility = paths.Count == 0 && filter.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-        _status.Text = paths.Count == 0 ? "" : $"{paths.Count} recent";
+        _status.Text = paths.Count == 0 ? "" : L.F("{0} recent", paths.Count);
     }
 
     private FrameworkElement Tile(string path)
@@ -333,11 +380,11 @@ public sealed class TrayFlyout : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), Visibility = Visibility.Collapsed,
         };
-        if (isRecording) actions.Children.Add(MiniButton("M5,3 L13,8 L5,13 Z", "Play", () => Open(path)));
-        else actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Edit (circle, arrow, text…)", () => Open(path)));
-        actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy", () => CopyFile(path)));
-        actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", "Show in folder", () => ShowInFolder(path)));
-        actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete (to Recycle Bin)", () => Delete(path)));
+        if (isRecording) actions.Children.Add(MiniButton("M5,3 L13,8 L5,13 Z", L.T("Play"), () => Open(path)));
+        else actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", L.T("Edit (circle, arrow, text…)"), () => Open(path)));
+        actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", L.T("Copy"), () => CopyFile(path)));
+        actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", L.T("Show in folder"), () => ShowInFolder(path)));
+        actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", L.T("Delete (to Recycle Bin)"), () => Delete(path)));
 
         var frame = new Border
         {
@@ -345,8 +392,8 @@ public sealed class TrayFlyout : Window
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
             ClipToBounds = true, Cursor = Cursors.Hand,
             ToolTip = isRecording
-                ? $"{Path.GetFileName(path)}\nClick: copy · Double-click: play · Drag: drop into any app"
-                : $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag: drop into any app",
+                ? Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: play · Drag: drop into any app")
+                : Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: edit · Drag: drop into any app"),
         };
         var inner = new Grid { ClipToBounds = true };
         inner.Children.Add(image);
@@ -447,12 +494,12 @@ public sealed class TrayFlyout : Window
             try
             {
                 Clipboard.SetFileDropList(new System.Collections.Specialized.StringCollection { path });
-                Flash("Copied the file ✓");
+                Flash(L.T("Copied the file ✓"));
             }
             catch (Exception ex)
             {
                 Log.Error("Copy recording from flyout failed", ex);
-                Flash("Could not copy");
+                Flash(L.T("Could not copy"));
             }
             return;
         }
@@ -460,12 +507,12 @@ public sealed class TrayFlyout : Window
         {
             using var stream = File.OpenRead(path);
             var bmp = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            if (ClipboardService.SetImage(bmp)) Flash("Copied to clipboard ✓");
+            if (ClipboardService.SetImage(bmp)) Flash(L.T("Copied to clipboard ✓"));
         }
         catch (Exception ex)
         {
             Log.Error("Copy from flyout failed", ex);
-            Flash("Could not copy");
+            Flash(L.T("Could not copy"));
         }
     }
 
@@ -500,12 +547,12 @@ public sealed class TrayFlyout : Window
             Cometsnap.Core.Storage.EditSidecar.DeleteFor(path);
             _thumbs.Forget(path);
             _recent.Remove(path);
-            Flash("Moved to the Recycle Bin");
+            Flash(L.T("Moved to the Recycle Bin"));
         }
         catch (Exception ex)
         {
             Log.Error("Delete failed", ex);
-            Flash("Could not delete");
+            Flash(L.T("Could not delete"));
         }
     }
 
@@ -515,7 +562,7 @@ public sealed class TrayFlyout : Window
         _status.Foreground = SpaceTheme.SunBrush;
         await Task.Delay(1500);
         _status.Foreground = SpaceTheme.DustBrush;
-        _status.Text = _grid.Children.Count == 0 ? "" : $"{_grid.Children.Count} recent";
+        _status.Text = _grid.Children.Count == 0 ? "" : L.F("{0} recent", _grid.Children.Count);
     }
 
     // ------------------------------------------------------------------ building blocks

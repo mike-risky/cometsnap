@@ -8,6 +8,7 @@ using System.Windows.Shapes;
 using Cometsnap.App.Theme;
 using Cometsnap.Core.Geometry;
 using Cometsnap.Core.Native;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Recording;
 
@@ -68,7 +69,7 @@ internal sealed class RecordingPill : Window
             Child = stopIcon,
             Margin = new Thickness(0, 0, 4, 0),
             Cursor = Cursors.Hand,
-            ToolTip = "Stop recording",
+            ToolTip = L.T("Stop recording"),
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
         };

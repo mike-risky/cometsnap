@@ -19,7 +19,13 @@ enum AnnotationRenderer {
         ctx.interpolationQuality = .high
         drawImage(base, in: full, ctx: ctx)
         var spotlightDone = false
+        // Constellation lines sit under the shapes (after blur and spotlight).
+        var constellationDone = !doc.connectSteps
         for a in doc.annotations where a.id != skip {
+            if !constellationDone, a.kind != .blur, a.kind != .spotlight {
+                constellationDone = true
+                drawConstellation(doc.orderedSteps, ctx: ctx)
+            }
             if a.kind == .spotlight {
                 if !spotlightDone {
                     spotlightDone = true
@@ -29,6 +35,56 @@ enum AnnotationRenderer {
             }
             draw(a, base: base, ctx: ctx)
         }
+        if !constellationDone { drawConstellation(doc.orderedSteps, ctx: ctx) }
+    }
+
+    /// Faint dotted lines from step 1 to 2 to 3…, with a little four-pointed star halfway along each.
+    static func drawConstellation(_ steps: [Annotation], ctx: CGContext) {
+        guard steps.count > 1 else { return }
+        for i in 1..<steps.count {
+            let a = steps[i - 1], b = steps[i]
+            let ra = CGFloat(a.stepRadius), rb = CGFloat(b.stepRadius)
+            let from = a.start, to = b.start
+            let dx = to.x - from.x, dy = to.y - from.y
+            let length = hypot(dx, dy)
+            guard length > ra + rb + 4 else { continue }
+            let ux = dx / length, uy = dy / length
+            let start = CGPoint(x: from.x + ux * (ra + 3), y: from.y + uy * (ra + 3))
+            let end = CGPoint(x: to.x - ux * (rb + 3), y: to.y - uy * (rb + 3))
+            let width = max(1.2, (ra + rb) / 16)
+            ctx.saveGState()
+            ctx.setLineCap(.round)
+            ctx.setStrokeColor(NSColor(srgbRed: 0xA9 / 255.0, green: 0xC8 / 255.0, blue: 1, alpha: 0x38 / 255.0).cgColor)
+            ctx.setLineWidth(width * 4)
+            ctx.move(to: start)
+            ctx.addLine(to: end)
+            ctx.strokePath()
+            ctx.setStrokeColor(NSColor.white.withAlphaComponent(0xC0 / 255.0).cgColor)
+            ctx.setLineWidth(width)
+            ctx.setLineDash(phase: 0, lengths: [0, width * 3.2])
+            ctx.move(to: start)
+            ctx.addLine(to: end)
+            ctx.strokePath()
+            ctx.restoreGState()
+            drawSparkle(CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2), r: max(4, width * 3.2), ctx: ctx)
+        }
+    }
+
+    private static func drawSparkle(_ c: CGPoint, r: CGFloat, ctx: CGContext) {
+        let k = r * 0.22
+        ctx.saveGState()
+        ctx.setFillColor(NSColor(srgbRed: 1, green: 0xE8 / 255.0, blue: 0x80 / 255.0, alpha: 0x50 / 255.0).cgColor)
+        ctx.fillEllipse(in: CGRect(x: c.x - r * 0.8, y: c.y - r * 0.8, width: r * 1.6, height: r * 1.6))
+        let star = CGMutablePath()
+        star.addLines(between: [
+            CGPoint(x: c.x, y: c.y - r), CGPoint(x: c.x + k, y: c.y - k), CGPoint(x: c.x + r, y: c.y), CGPoint(x: c.x + k, y: c.y + k),
+            CGPoint(x: c.x, y: c.y + r), CGPoint(x: c.x - k, y: c.y + k), CGPoint(x: c.x - r, y: c.y), CGPoint(x: c.x - k, y: c.y - k),
+        ])
+        star.closeSubpath()
+        ctx.addPath(star)
+        ctx.setFillColor(NSColor(srgbRed: 1, green: 0xF4 / 255.0, blue: 0xC2 / 255.0, alpha: 1).cgColor)
+        ctx.fillPath()
+        ctx.restoreGState()
     }
 
     static func drawSpotlights(_ spots: [Annotation], full: CGRect, ctx: CGContext) {

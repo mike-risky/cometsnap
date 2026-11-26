@@ -13,6 +13,7 @@ using Cometsnap.Core.Diagnostics;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Storage;
 using Cometsnap.Editor;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Editing;
 
@@ -157,7 +158,7 @@ public sealed class EditorWindow : Window
             var b = new Border
             {
                 Child = cell, Height = 30, Padding = new Thickness(9, 0, 10, 0), CornerRadius = new CornerRadius(7), Cursor = Cursors.Hand,
-                ToolTip = $"Size {SizeNames[i]}  ([ and ] to change)", Background = new SolidColorBrush(Colors.Transparent),
+                ToolTip = L.F("Size {0}  ([ and ] to change)", SizeNames[i]), Background = new SolidColorBrush(Colors.Transparent),
             };
             b.MouseLeftButtonDown += (_, e) => { e.Handled = true; EditorUi.Press(b); };
             b.MouseLeftButtonUp += (_, e) => { e.Handled = true; SetSize(index); };
@@ -168,22 +169,22 @@ public sealed class EditorWindow : Window
         top.Children.Add(sizes);
         top.Children.Add(EditorUi.Divider(vertical: true));
 
-        top.Children.Add(EditorUi.PillButton(EditorUi.Icon("M5.5,4 L2.5,7 L5.5,10 M2.5,7 H10 A3.5,3.5 0 0 1 10,14 H7", null, 16), "Undo", "Undo (Ctrl+Z)", Undo));
-        top.Children.Add(EditorUi.PillButton(EditorUi.Icon("M10.5,4 L13.5,7 L10.5,10 M13.5,7 H6 A3.5,3.5 0 0 0 6,14 H9", null, 16), "Redo", "Redo (Ctrl+Y)", () => { CommitText(); Select(null); _doc.Redo(); }));
-        _deleteButton = EditorUi.PillButton(EditorUi.Icon("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", null, 16), "Delete", "Delete the selected shape (Del)", DeleteSelected);
+        top.Children.Add(EditorUi.PillButton(EditorUi.Icon("M5.5,4 L2.5,7 L5.5,10 M2.5,7 H10 A3.5,3.5 0 0 1 10,14 H7", null, 16), L.T("Undo"), L.T("Undo (Ctrl+Z)"), Undo));
+        top.Children.Add(EditorUi.PillButton(EditorUi.Icon("M10.5,4 L13.5,7 L10.5,10 M13.5,7 H6 A3.5,3.5 0 0 0 6,14 H9", null, 16), L.T("Redo"), L.T("Redo (Ctrl+Y)"), () => { CommitText(); Select(null); _doc.Redo(); }));
+        _deleteButton = EditorUi.PillButton(EditorUi.Icon("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", null, 16), L.T("Delete"), L.T("Delete the selected shape (Del)"), DeleteSelected);
         _deleteButton.Visibility = Visibility.Collapsed;
         top.Children.Add(_deleteButton);
 
         // Constellation mode: shown once there are two steps to connect.
         _constellationButton = EditorUi.PillButton(EditorUi.Icon("M3,12 L7,6 L12,9 L14,3 M3,12 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M7,6 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M12,9 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0", null, 16),
-            "Constellation", "Join the numbered steps with faint star lines", ToggleConstellation);
+            L.T("Constellation"), L.T("Join the numbered steps with faint star lines"), ToggleConstellation);
         _constellationButton.Visibility = Visibility.Collapsed;
         if (_doc.ConnectSteps) EditorUi.SetActive(_constellationButton, true);
         top.Children.Add(_constellationButton);
 
-        var copy = EditorUi.PillButton(EditorUi.Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", null, 16), "Copy & close", "Copy to the clipboard, save, and close (Ctrl+C or Ctrl+Enter)", CopyAndClose, SpaceTheme.TerracottaBrush, bold: true);
-        var save = EditorUi.PillButton(EditorUi.Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5", null, 16), "Save", "Save and close (Ctrl+S)", SaveAndClose, SpaceTheme.NavyBrush);
-        var saveAs = EditorUi.PillButton(EditorUi.Icon("M2.5,2.5 H11 L13.5,5 V13.5 H2.5 Z M5,2.5 V6 H10 V2.5 M5,13.5 V9.5 H11 V13.5", null, 16), "Save as…", "Save a copy somewhere else (Ctrl+Shift+S)", SaveAsAndClose);
+        var copy = EditorUi.PillButton(EditorUi.Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", null, 16), L.T("Copy & close"), L.T("Copy to the clipboard, save, and close (Ctrl+C or Ctrl+Enter)"), CopyAndClose, SpaceTheme.TerracottaBrush, bold: true);
+        var save = EditorUi.PillButton(EditorUi.Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5", null, 16), L.T("Save"), L.T("Save and close (Ctrl+S)"), SaveAndClose, SpaceTheme.NavyBrush);
+        var saveAs = EditorUi.PillButton(EditorUi.Icon("M2.5,2.5 H11 L13.5,5 V13.5 H2.5 Z M5,2.5 V6 H10 V2.5 M5,13.5 V9.5 H11 V13.5", null, 16), L.T("Save as…"), L.T("Save a copy somewhere else (Ctrl+Shift+S)"), SaveAsAndClose);
         DockPanel.SetDock(copy, Dock.Right);
         DockPanel.SetDock(save, Dock.Right);
         DockPanel.SetDock(saveAs, Dock.Right);
@@ -257,7 +258,7 @@ public sealed class EditorWindow : Window
         catch (Exception ex)
         {
             Log.Error($"Could not open {path} in the editor", ex);
-            MessageBox.Show($"Could not open this capture:\n{ex.Message}", "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(L.T("Could not open this capture:") + "\n" + ex.Message, "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
             return null;
         }
     }
@@ -318,13 +319,13 @@ public sealed class EditorWindow : Window
 
     private void UpdateStatus()
     {
-        var name = _path is null ? "New capture" : Path.GetFileName(_path);
+        var name = _path is null ? L.T("New capture") : Path.GetFileName(_path);
         var tool = EditorUi.Tools.First(t => t.Tool == _tool);
         _status.Text = $"{name}   ·   {_base.PixelWidth} × {_base.PixelHeight}   ·   {Math.Round(_zoom * 100)}%   ·   {tool.Tip}";
     }
 
     private string TitleText() =>
-        $"{(_dirty ? "• " : "")}{(_path is null ? "New capture" : Path.GetFileName(_path))} - Cometsnap";
+        $"{(_dirty ? "• " : "")}{(_path is null ? L.T("New capture") : Path.GetFileName(_path))} - Cometsnap";
 
     private void Flash(string text)
     {
@@ -590,7 +591,7 @@ public sealed class EditorWindow : Window
         }
         if (done.IsDegenerate) return;
         _doc.Add(done);
-        if (done is CropAnnotation) Flash("Cropped. Undo (Ctrl+Z) to bring it back");
+        if (done is CropAnnotation) Flash(L.T("Cropped. Undo (Ctrl+Z) to bring it back"));
     }
 
     // ------------------------------------------------------------------ text & callouts
@@ -728,7 +729,7 @@ public sealed class EditorWindow : Window
         _app.Settings.ConstellationSteps = _doc.ConnectSteps;
         _app.TrySaveSettings();
         _doc.Touch();
-        Flash(_doc.ConnectSteps ? "Constellation on: steps are joined by star lines" : "Constellation off");
+        Flash(_doc.ConnectSteps ? L.T("Constellation on: steps are joined by star lines") : L.T("Constellation off"));
     }
 
     private BitmapSource Flattened()
@@ -743,7 +744,7 @@ public sealed class EditorWindow : Window
         var image = Flattened();
         if (!ClipboardService.SetImage(image))
         {
-            Flash("Could not copy, try again");
+            Flash(L.T("Could not copy, try again"));
             return;
         }
         if (_dirty && !Save(image)) return;
@@ -810,7 +811,7 @@ public sealed class EditorWindow : Window
         catch (Exception ex)
         {
             Log.Error("Editor save failed", ex);
-            MessageBox.Show(this, $"Could not save the capture:\n{ex.Message}", "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, L.T("Could not save the capture:") + "\n" + ex.Message, "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
     }
@@ -820,10 +821,10 @@ public sealed class EditorWindow : Window
         var image = Flattened();
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Save a copy",
+            Title = L.T("Save a copy"),
             FileName = _path is null ? SnapNaming.BaseName(DateTime.Now) : Path.GetFileNameWithoutExtension(_path) + "-edited",
             DefaultExt = ".png",
-            Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg",
+            Filter = L.T("PNG image") + " (*.png)|*.png|" + L.T("JPEG image") + " (*.jpg)|*.jpg",
             InitialDirectory = _path is null ? _app.CapturesFolder : Path.GetDirectoryName(_path),
         };
         if (dialog.ShowDialog(this) != true) return false;
@@ -847,7 +848,7 @@ public sealed class EditorWindow : Window
         catch (Exception ex)
         {
             Log.Error("Editor save as failed", ex);
-            MessageBox.Show(this, $"Could not save:\n{ex.Message}", "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, L.T("Could not save:") + "\n" + ex.Message, "Cometsnap", MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
     }
@@ -857,7 +858,7 @@ public sealed class EditorWindow : Window
         CommitText();
         if (_closingAfterSave || !_dirty) return;
         var answer = MessageBox.Show(this,
-            _path is null ? "Save this capture?" : "Save your changes to this capture?",
+            _path is null ? L.T("Save this capture?") : L.T("Save your changes to this capture?"),
             "Cometsnap", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (answer == MessageBoxResult.Cancel || (answer == MessageBoxResult.Yes && !Save(Flattened())))
             e.Cancel = true;

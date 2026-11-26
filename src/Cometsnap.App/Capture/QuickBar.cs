@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using Cometsnap.App.Theme;
 using Path = System.Windows.Shapes.Path;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Capture;
 
@@ -43,26 +44,26 @@ public sealed class QuickBar : Border
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
 
-        AddTool(row, AnnotationTool.Ellipse, Icon("M8,2.5 A5.5,5.5 0 1 1 7.99,2.5 Z"), "Circle (E) · Shift = perfect circle");
-        AddTool(row, AnnotationTool.Arrow, Icon("M3,13 L13,3 M7.5,3 L13,3 L13,8.5"), "Arrow (A) · Shift = 45° steps");
+        AddTool(row, AnnotationTool.Ellipse, Icon("M8,2.5 A5.5,5.5 0 1 1 7.99,2.5 Z"), L.T("Circle (E) · Shift = perfect circle"));
+        AddTool(row, AnnotationTool.Arrow, Icon("M3,13 L13,3 M7.5,3 L13,3 L13,8.5"), L.T("Arrow (A) · Shift = 45° steps"));
         AddTool(row, AnnotationTool.Text, new TextBlock
         {
             Text = "T", FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.Bold, FontSize = 16,
             Foreground = SpaceTheme.StarWhiteBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-        }, "Text (T) · Enter to finish, Shift+Enter new line");
-        AddTool(row, AnnotationTool.Rectangle, Icon("M2.5,3.5 H13.5 V12.5 H2.5 Z"), "Rectangle (R) · Shift = square");
+        }, L.T("Text (T) · Enter to finish, Shift+Enter new line"));
+        AddTool(row, AnnotationTool.Rectangle, Icon("M2.5,3.5 H13.5 V12.5 H2.5 Z"), L.T("Rectangle (R) · Shift = square"));
 
         row.Children.Add(Divider());
         for (var i = 0; i < Palette.Length; i++) AddSwatch(row, Palette[i], i + 1);
         row.Children.Add(Divider());
 
-        row.Children.Add(Button(Icon("M5.5,4 L2.5,7 L5.5,10 M2.5,7 H10 A3.5,3.5 0 0 1 10,14 H7"), "Undo (Ctrl+Z)", () => UndoClicked?.Invoke()));
+        row.Children.Add(Button(Icon("M5.5,4 L2.5,7 L5.5,10 M2.5,7 H10 A3.5,3.5 0 0 1 10,14 H7"), L.T("Undo (Ctrl+Z)"), () => UndoClicked?.Invoke()));
         if (!inEditor)
-            row.Children.Add(Button(Icon("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5"), "Open in editor (Ctrl+E)", () => EditClicked?.Invoke()));
+            row.Children.Add(Button(Icon("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5"), L.T("Open in editor (Ctrl+E)"), () => EditClicked?.Invoke()));
         row.Children.Add(Divider());
-        row.Children.Add(Button(Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5"), inEditor ? "Copy (Ctrl+C)" : "Copy (Enter)", () => CopyClicked?.Invoke(), accent: true));
-        row.Children.Add(Button(Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5"), inEditor ? "Save (Ctrl+S) · Save as: Ctrl+Shift+S" : "Save as… (Ctrl+S)", () => SaveClicked?.Invoke()));
-        row.Children.Add(Button(Icon("M4,4 L12,12 M12,4 L4,12"), "Close (Esc)", () => CloseClicked?.Invoke()));
+        row.Children.Add(Button(Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5"), inEditor ? L.T("Copy (Ctrl+C)") : L.T("Copy (Enter)"), () => CopyClicked?.Invoke(), accent: true));
+        row.Children.Add(Button(Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5"), inEditor ? L.T("Save (Ctrl+S) · Save as: Ctrl+Shift+S") : L.T("Save as… (Ctrl+S)"), () => SaveClicked?.Invoke()));
+        row.Children.Add(Button(Icon("M4,4 L12,12 M12,4 L4,12"), L.T("Close (Esc)"), () => CloseClicked?.Invoke()));
 
         Child = row;
         SetActive(AnnotationTool.None, Palette[0]);
@@ -111,7 +112,7 @@ public sealed class QuickBar : Border
         {
             Width = 24, Height = 24, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(2),
             BorderBrush = Brushes.Transparent, Child = dot, Margin = new Thickness(2, 0, 2, 0),
-            VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand, ToolTip = $"Color {number}",
+            VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand, ToolTip = L.F("Color {0}", number),
             Background = Brushes.Transparent,
         };
         ring.MouseLeftButtonDown += (_, e) => e.Handled = true;

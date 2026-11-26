@@ -19,6 +19,7 @@ using Cometsnap.Core.Storage;
 using Cometsnap.Core.Takeover;
 using Cometsnap.Editor;
 using Cometsnap.Video;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App;
 
@@ -69,6 +70,8 @@ public sealed class CometApp : Application
         DispatcherUnhandledException += OnUnhandledException;
 
         Settings = AppSettings.Load(Paths.SettingsFile);
+        L.Use(Settings.Language);
+        Log.Info($"Language: {L.Language}");
         TrySaveSettings(); // writes defaults on first run and keeps upgrades of older files
 
         _host = HiddenHost.Create();
@@ -79,12 +82,7 @@ public sealed class CometApp : Application
 
         _sounds = new SoundService();
         _comet = new CometFlight();
-        _card = new EditCard();
-        _card.EditRequested += (path, image) =>
-        {
-            if (path is not null) OpenInEditor(path);
-            else OpenInEditor(image, new AnnotationDocument());
-        };
+        _card = NewEditCard();
         Capture.CaptureTaken += OnCaptureTaken;
         Capture.CaptureStored += (path, image) =>
         {
@@ -220,9 +218,9 @@ public sealed class CometApp : Application
         if (!main && announce)
         {
             var msg = fallback
-                ? $"{Settings.CaptureHotkey} is taken by another app (often Windows' own Snipping Tool). Use {Settings.CaptureHotkeyFallback}, or turn off \"Use the Print screen key to open screen capture\" in Windows Settings > Accessibility > Keyboard and restart Cometsnap."
-                : "No capture hotkey could be registered. Double-click the tray icon to capture.";
-            _tray?.ShowBalloon("Cometsnap is ready", msg);
+                ? L.F("{0} is taken by another app (often Windows' own Snipping Tool). Use {1}, or turn off \"Use the Print screen key to open screen capture\" in Windows Settings > Accessibility > Keyboard and restart Cometsnap.", Settings.CaptureHotkey, Settings.CaptureHotkeyFallback)
+                : L.T("No capture hotkey could be registered. Double-click the tray icon to capture.");
+            _tray?.ShowBalloon(L.T("Cometsnap is ready"), msg);
         }
         return main;
     }
@@ -244,7 +242,7 @@ public sealed class CometApp : Application
     private void OfferReplace(bool printScreenRegistered, bool justInstalled = false)
     {
         var report = CaptureTools.Detect(printScreenRegistered);
-        var window = new ReplaceWindow(report, Settings.StartWithWindows, justInstalled ? $"Cometsnap {Version} is installed" : null);
+        var window = new ReplaceWindow(report, Settings.StartWithWindows, justInstalled ? L.F("Cometsnap {0} is installed", Version) : null);
         window.ShowDialog();
 
         Settings.ReplaceOfferAnswered = true;
@@ -261,14 +259,14 @@ public sealed class CometApp : Application
             Settings.TakeOverPrintScreen = true;
             TrySaveSettings();
             var ok = RegisterHotkeys(announce: false);
-            _tray?.ShowBalloon(ok ? "Print Screen is now Cometsnap" : "Cometsnap is ready",
-                ok ? "Press Print Screen, click a window or drag a box. That's it." : $"Use {RegionHotkeyText ?? "the tray icon"} to capture.");
+            _tray?.ShowBalloon(ok ? L.T("Print Screen is now Cometsnap") : L.T("Cometsnap is ready"),
+                ok ? L.T("Press Print Screen, click a window or drag a box. That's it.") : L.F("Use {0} to capture.", RegionHotkeyText ?? L.T("the tray icon")));
         }
         else
         {
             TrySaveSettings();
             RegisterHotkeys(announce: true);
-            if (justInstalled) _tray?.ShowBalloon($"Cometsnap {Version} is installed", "It lives here in the tray. Press Print Screen to capture.");
+            if (justInstalled) _tray?.ShowBalloon(L.F("Cometsnap {0} is installed", Version), L.T("It lives here in the tray. Press Print Screen to capture."));
         }
     }
 
@@ -309,12 +307,13 @@ public sealed class CometApp : Application
         var delay = TimeSpan.FromMilliseconds(900); // after the comet has landed
         if (happened.FinishedMonth is { } month)
         {
-            var count = month.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
-            Celebrate(delay, 14, $"You captured {count} snap{(month.Count == 1 ? "" : "s")}", $"in {month.MonthName} {month.Year}. New month, new snaps!");
+            var name = new DateTime(month.Year, month.Month, 1).ToString("MMMM yyyy", L.Culture);
+            Celebrate(delay, 14, month.Count == 1 ? L.T("You captured 1 snap") : L.F("You captured {0:N0} snaps", month.Count),
+                L.F("in {0}. New month, new snaps!", name));
             delay += TimeSpan.FromSeconds(3.4);
         }
         if (happened.Milestone is { } n)
-            Celebrate(delay, 22, "✦ " + SnapMilestones.Title(n), "Thanks for snapping with Cometsnap.");
+            Celebrate(delay, 22, "✦ " + L.F("{0:N0}th snap!", n), L.T("Thanks for snapping with Cometsnap."));
     }
 
     /// <summary>A small meteor shower above the corner where the Copied card sits.</summary>
@@ -335,7 +334,7 @@ public sealed class CometApp : Application
     public void MeteorShowerEasterEgg()
     {
         Log.Info("Konami code: meteor shower");
-        MeteorShower.Play(SystemParameters.WorkArea, 70, TimeSpan.FromSeconds(3.6), "☄ METEOR SHOWER ☄", "You found the secret. Make a wish!", captionAtBottom: false);
+        MeteorShower.Play(SystemParameters.WorkArea, 70, TimeSpan.FromSeconds(3.6), "☄ " + L.T("METEOR SHOWER") + " ☄", L.T("You found the secret. Make a wish!"), captionAtBottom: false);
     }
 
     /// <summary>First run with milestones: start from the snaps already in the captures folder.</summary>
@@ -361,6 +360,39 @@ public sealed class CometApp : Application
                 TrySaveSettings();
             });
         });
+    }
+
+    /// <summary>Switches the app language now: menus, the tray panel and the Copied card are rebuilt.</summary>
+    public void SetLanguage(string code)
+    {
+        Settings.Language = code;
+        TrySaveSettings();
+        L.Use(code);
+        Log.Info($"Language switched to {L.Language}");
+        if (_flyout is not null && _tray is not null)
+        {
+            _flyout.Close();
+            _flyout = new TrayFlyout(this, Recent, Thumbnails);
+            _flyout.Prewarm();
+            _flyout.SetSeason(_season);
+        }
+        if (_card is not null)
+        {
+            _card.Close();
+            _card = NewEditCard();
+        }
+        _menu?.Rebuild();
+    }
+
+    private EditCard NewEditCard()
+    {
+        var card = new EditCard();
+        card.EditRequested += (path, image) =>
+        {
+            if (path is not null) OpenInEditor(path);
+            else OpenInEditor(image, new AnnotationDocument());
+        };
+        return card;
     }
 
     /// <summary>Snowy comet in December, pumpkin comet at Halloween (tray icon and panel header).</summary>
