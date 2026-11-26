@@ -78,6 +78,22 @@ public sealed class EditCard : Window
             Child = row,
         };
         Content = _card;
+
+        // The whole card opens the editor (faster than aiming for the button); Edit and ✕ still work.
+        _card.Cursor = new Cursor(StandardCursorType.Hand);
+        ToolTip.SetTip(_card, "Click to edit");
+        _card.PointerEntered += (_, _) => _card.BorderBrush = SpaceTheme.CometBlueBrush;
+        _card.PointerExited += (_, _) => _card.BorderBrush = SpaceTheme.NavyLightBrush;
+        _card.PointerPressed += (_, e) =>
+        {
+            if (e.GetCurrentPoint(_card).Properties.IsLeftButtonPressed) e.Handled = true;
+        };
+        _card.PointerReleased += (_, e) =>
+        {
+            if (e.Handled || e.InitialPressMouseButton != MouseButton.Left || !_card.IsPointerOver) return;
+            e.Handled = true;
+            OnEdit();
+        };
         // Without a compositor there is no transparency: blend the margin with the card instead of black.
         Opened += (_, _) =>
         {
@@ -132,6 +148,7 @@ public sealed class EditCard : Window
     private void OnEdit()
     {
         _timer.Stop();
+        _card.BorderBrush = SpaceTheme.NavyLightBrush;
         Hide();
         if (_image is not null) EditRequested?.Invoke(_path, _image);
     }
