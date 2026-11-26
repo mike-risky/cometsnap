@@ -1,0 +1,48 @@
+name: winget
+
+# Writes the winget manifests for a tagged release and, once the WINGET_TOKEN secret exists,
+# opens the pull request on microsoft/winget-pkgs. Called by build.yml after each v* release;
+# can also be run by hand for an existing tag. Details: docs/RELEASING.md.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release tag, for example v0.2.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  manifests:
+    runs-on: windows-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write the manifests
+        shell: pwsh
+        run: ./packaging/winget/New-WingetManifests.ps1 -Tag "${{ inputs.version }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: winget-manifests
+          path: out/winget/
+      - name: Submit to microsoft/winget-pkgs
+        if: env.WINGET_TOKEN != ''
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe submit --token $env:WINGET_TOKEN `
+            --prtitle "New version: MichaelSolioz.Cometsnap version $("${{ inputs.version }}".TrimStart('v'))" `
+            $env:MANIFEST_DIR
+      - name: No WINGET_TOKEN yet
+        if: env.WINGET_TOKEN == ''
+        shell: pwsh
+        run: echo "::notice::winget manifests written (artifact winget-manifests). Add the WINGET_TOKEN secret to submit them automatically."

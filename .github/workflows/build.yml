@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      sign:
+        description: Sign this build with SignPath (needs the SignPath settings, see docs/CODE_SIGNING_SETUP.md)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -53,7 +58,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet publish src/Cometsnap.App/Cometsnap.App.csproj -c Release -r win-${{ matrix.arch }} `
-            -p:Version=$env:VERSION -o out/${{ matrix.arch }}
+            -p:Version=$env:VERSION -p:IncludeSourceRevisionInInformationalVersion=false -o out/${{ matrix.arch }}
           Get-ChildItem out/${{ matrix.arch }}
       - name: Build Cometsnap-Setup-${{ matrix.arch }}.exe
         shell: pwsh
@@ -74,11 +79,155 @@ jobs:
             out/${{ matrix.arch }}/Cometsnap-Setup-${{ matrix.arch }}.exe
           if-no-files-found: error
 
-  release:
+  # Code signing with SignPath (free for open source, certificate by SignPath Foundation).
+  # Stays switched off until the repository variable SIGNPATH_ORGANIZATION_ID exists, then signs
+  # every tagged release (v*) and any manual run with "sign" ticked. Each run sends two signing
+  # requests that a maintainer approves on signpath.io:
+  #   1. "app": Cometsnap.exe (x64, arm64) and the Inno Setup uninstallers
+  #   2. "installer": Cometsnap-Setup-x64.exe and Cometsnap-Setup-arm64.exe, built around the signed files
+  # Setup: docs/CODE_SIGNING_SETUP.md. Artifact configurations: .signpath/artifact-configurations/.
+  sign:
     needs: publish
+    if: vars.SIGNPATH_ORGANIZATION_ID != '' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.sign))
+    runs-on: windows-latest
+    env:
+      SIGNPATH_PROJECT: ${{ vars.SIGNPATH_PROJECT_SLUG || 'cometsnap' }}
+      SIGNPATH_POLICY: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pick the version
+        shell: pwsh
+        run: |
+          $version = "0.1.${{ github.run_number }}"
+          if ("${{ github.ref_type }}" -eq "tag") { $version = "${{ github.ref_name }}".TrimStart("v") }
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - uses: actions/download-artifact@v4
+        with:
+          name: Cometsnap-x64
+          path: unsigned/x64
+      - uses: actions/download-artifact@v4
+        with:
+          name: Cometsnap-arm64
+          path: unsigned/arm64
+      - name: Find Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          "ISCC=$iscc" >> $env:GITHUB_ENV
+      - name: Extract the uninstallers to sign
+        shell: pwsh
+        run: |
+          # With SignedUninstaller=yes and no SignTool, ISCC writes the unsigned uninstaller
+          # (uninst-<inno version>-<hash>.e32) into SignedUninstallerDir and stops, asking for it
+          # to be signed. The next compile picks the signed copy up and embeds its signature.
+          New-Item -ItemType Directory -Force sign-app | Out-Null
+          foreach ($arch in "x64", "arm64") {
+            $dir = "$PWD\uninst\$arch"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            & $env:ISCC "/DAppVersion=$env:VERSION" "/DArch=$arch" "/DSignedUninstallerDir=$dir" `
+              "/DSourceExe=$PWD\unsigned\$arch\Cometsnap.exe" "/O$PWD\scratch\$arch" installer\Cometsnap.iss | Out-Host
+            $files = @(Get-ChildItem $dir -Filter "uninst-*.e*")
+            if ($files.Count -ne 1) { throw "Expected one unsigned uninstaller in $dir, found $($files.Count)" }
+            New-Item -ItemType Directory -Force "sign-app\$arch", "sign-app\uninstaller-$arch" | Out-Null
+            Copy-Item "unsigned\$arch\Cometsnap.exe" "sign-app\$arch\Cometsnap.exe"
+            # SignPath picks PE files by extension, so the uninstaller travels as .exe.
+            Copy-Item $files[0].FullName "sign-app\uninstaller-$arch\$($files[0].Name).exe"
+          }
+          $global:LASTEXITCODE = 0
+          Get-ChildItem -Recurse sign-app | Select-Object FullName, Length | Format-Table -AutoSize
+      - id: upload-app
+        uses: actions/upload-artifact@v4
+        with:
+          name: signpath-app-unsigned
+          path: sign-app/
+          if-no-files-found: error
+      - name: Sign Cometsnap.exe and the uninstallers (approve on signpath.io)
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: app
+          github-artifact-id: ${{ steps.upload-app.outputs.artifact-id }}
+          parameters: |
+            version: "${{ env.VERSION }}"
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 18000
+          output-artifact-directory: signed-app
+      - name: Check the signatures and put the signed uninstallers back
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem -Recurse signed-app -Filter *.exe) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            "{0}: {1} ({2})" -f $f.FullName, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne "Valid") { throw "$($f.Name) is not validly signed" }
+          }
+          foreach ($arch in "x64", "arm64") {
+            $signed = @(Get-ChildItem "signed-app\uninstaller-$arch" -Filter "uninst-*.exe")
+            if ($signed.Count -ne 1) { throw "Signed uninstaller for $arch missing" }
+            Copy-Item $signed[0].FullName ("uninst\$arch\" + $signed[0].BaseName) -Force
+          }
+      - name: Build the installers around the signed files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force sign-installer | Out-Null
+          foreach ($arch in "x64", "arm64") {
+            & $env:ISCC "/DAppVersion=$env:VERSION" "/DArch=$arch" "/DSignedUninstallerDir=$PWD\uninst\$arch" `
+              "/DSourceExe=$PWD\signed-app\$arch\Cometsnap.exe" "/O$PWD\sign-installer" installer\Cometsnap.iss
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          Get-ChildItem sign-installer
+      - id: upload-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: signpath-installer-unsigned
+          path: sign-installer/
+          if-no-files-found: error
+      - name: Sign the installers (approve on signpath.io)
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT }}
+          signing-policy-slug: ${{ env.SIGNPATH_POLICY }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.upload-installer.outputs.artifact-id }}
+          parameters: |
+            version: "${{ env.VERSION }}"
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 18000
+          output-artifact-directory: signed-installer
+      - name: Collect the signed release files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force rel | Out-Null
+          Copy-Item signed-app\x64\Cometsnap.exe rel\Cometsnap-x64.exe
+          Copy-Item signed-app\arm64\Cometsnap.exe rel\Cometsnap-arm64.exe
+          Copy-Item signed-installer\Cometsnap-Setup-x64.exe, signed-installer\Cometsnap-Setup-arm64.exe rel\
+          foreach ($f in Get-ChildItem rel) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            "{0}: {1} ({2})" -f $f.Name, $sig.Status, $sig.SignerCertificate.Subject
+            if ($sig.Status -ne "Valid") { throw "$($f.Name) is not validly signed" }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Cometsnap-signed
+          path: rel/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: [publish, sign]
     # Pushes to main / tags, and pull requests from this repo (each gets a "test-prN" pre-release
-    # with direct exe downloads, easier than Actions artifacts).
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    # with direct exe downloads, easier than Actions artifacts). Runs when signing was skipped
+    # (not set up, or not a tag), never when signing was attempted and failed.
+    if: >-
+      always() && needs.publish.result == 'success' &&
+      (needs.sign.result == 'success' || needs.sign.result == 'skipped') &&
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -91,7 +240,12 @@ jobs:
           cp dl/Cometsnap-arm64/Cometsnap.exe rel/Cometsnap-arm64.exe
           cp dl/Cometsnap-x64/Cometsnap-Setup-x64.exe rel/
           cp dl/Cometsnap-arm64/Cometsnap-Setup-arm64.exe rel/
-          ls -la rel
+          if [ -d dl/Cometsnap-signed ]; then
+            echo "Using the SignPath-signed files"
+            cp -f dl/Cometsnap-signed/*.exe rel/
+          fi
+          (cd rel && sha256sum *.exe > SHA256SUMS.txt)
+          ls -la rel && cat rel/SHA256SUMS.txt
       - name: Update the "latest build" pre-release (main)
         if: github.ref == 'refs/heads/main'
         env:
@@ -99,9 +253,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release delete nightly --yes --cleanup-tag || true
-          gh release create nightly rel/*.exe --prerelease --target "${{ github.sha }}" \
+          gh release create nightly rel/* --prerelease --target "${{ github.sha }}" \
             --title "Latest build (main)" \
-            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe."
+            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. Code signing policy: https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md"
       - name: Update the test pre-release of this pull request
         if: github.event_name == 'pull_request'
         env:
@@ -112,12 +266,26 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           gh release delete "test-pr$PR" --yes --cleanup-tag || true
-          gh release create "test-pr$PR" rel/*.exe --prerelease --latest=false --target "$HEAD_SHA" \
+          gh release create "test-pr$PR" rel/* --prerelease --latest=false --target "$HEAD_SHA" \
             --title "Test build: PR #$PR" \
-            --notes "Test build of pull request #$PR ($PR_TITLE), commit ${HEAD_SHA::7}. Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe."
+            --notes "Test build of pull request #$PR ($PR_TITLE), commit ${HEAD_SHA::7}. Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. Code signing policy: https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md"
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: gh release create "${{ github.ref_name }}" rel/*.exe --title "Cometsnap ${{ github.ref_name }}" --generate-notes
+          NOTES: |
+            Install: **Cometsnap-Setup-x64.exe** (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X).
+            Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. SHA256SUMS.txt lists the checksums.
+
+            **Code signing policy:** free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+            Details: [CODE_SIGNING.md](https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md).
+        run: gh release create "${{ github.ref_name }}" rel/* --title "Cometsnap ${{ github.ref_name }}" --notes "$NOTES" --generate-notes
+
+  winget:
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/winget.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
