@@ -17,4 +17,9 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/mike-risky/cometsnap</RepositoryUrl>
   </PropertyGroup>
+
+  <!-- WPF projects drop System.IO from implicit usings; we want it everywhere. -->
+  <ItemGroup>
+    <Using Include="System.IO" />
+  </ItemGroup>
 </Project>
