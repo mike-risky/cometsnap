@@ -78,7 +78,7 @@ public sealed class TrayFlyout : Window
         header.Children.Add(word);
 
         // ---- big capture buttons
-        var buttons = new UniformGrid { Columns = 3, Margin = new Thickness(12, 0, 12, 10) };
+        var buttons = new UniformGrid { Columns = 4, Margin = new Thickness(12, 0, 12, 10) };
         buttons.Children.Add(BigButton("Region / Window", "M2,5 V2 H5 M11,2 H14 V5 M14,11 V14 H11 M5,14 H2 V11", primary: true,
             () => HideThen(_app.Capture.StartRegion)));
         buttons.Children.Add(BigButton("Fullscreen", "M2,3 H14 V11 H2 Z M6,14 H10", primary: false,
@@ -93,6 +93,11 @@ public sealed class TrayFlyout : Window
             delayed.ContextMenu.IsOpen = true;
         };
         buttons.Children.Add(delayed);
+        // Record: click = region video, right-click = fullscreen / GIF.
+        var record = BigButton("Record", "M8,3 A5,5 0 1 1 7.99,3 Z M8,6 A2,2 0 1 1 7.99,6 Z", primary: false,
+            () => HideThen(() => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4)));
+        record.ContextMenu = RecordMenu();
+        buttons.Children.Add(record);
 
         // ---- search
         _search = new TextBox
@@ -254,6 +259,21 @@ public sealed class TrayFlyout : Window
             await Task.Delay(150);
             action();
         });
+    }
+
+    private ContextMenu RecordMenu()
+    {
+        var menu = new ContextMenu();
+        void Add(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => HideThen(action);
+            menu.Items.Add(item);
+        }
+        Add("Region / window (MP4)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4));
+        Add("Fullscreen (MP4)", () => _app.Recorder.ToggleFullscreen(Cometsnap.Video.RecordingFormat.Mp4));
+        Add("Region / window (GIF)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Gif));
+        return menu;
     }
 
     private ContextMenu DelayMenu()

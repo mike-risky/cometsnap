@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -14,6 +14,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.App", "src\Cometsnap.App\Cometsnap.App.csproj", "{7C9CA4AA-29C4-4202-9141-F20F6200258C}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Core.Tests", "tests\Cometsnap.Core.Tests\Cometsnap.Core.Tests.csproj", "{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Video", "src\Cometsnap.Video\Cometsnap.Video.csproj", "{C87C10A0-0675-491C-AA83-1519AA13AE92}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cometsnap.Video.Tests", "tests\Cometsnap.Video.Tests\Cometsnap.Video.Tests.csproj", "{041D1055-C1B2-428A-B279-F815276FFEC7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -37,6 +41,14 @@ Global
 		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C87C10A0-0675-491C-AA83-1519AA13AE92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C87C10A0-0675-491C-AA83-1519AA13AE92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C87C10A0-0675-491C-AA83-1519AA13AE92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C87C10A0-0675-491C-AA83-1519AA13AE92}.Release|Any CPU.Build.0 = Release|Any CPU
+		{041D1055-C1B2-428A-B279-F815276FFEC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{041D1055-C1B2-428A-B279-F815276FFEC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{041D1055-C1B2-428A-B279-F815276FFEC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{041D1055-C1B2-428A-B279-F815276FFEC7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -46,5 +58,7 @@ Global
 		{C5D9488D-6887-4BF8-BE0E-EE246D85EC13} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
 		{7C9CA4AA-29C4-4202-9141-F20F6200258C} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
 		{D7E44D5C-E4AF-4FD3-A9AE-056A1F1FCDB6} = {406634B0-8FFE-4291-8A3E-369E0CA364D7}
+		{C87C10A0-0675-491C-AA83-1519AA13AE92} = {22404CB3-CB2E-4307-A10B-A4E6EB46BDA9}
+		{041D1055-C1B2-428A-B279-F815276FFEC7} = {406634B0-8FFE-4291-8A3E-369E0CA364D7}
 	EndGlobalSection
 EndGlobal

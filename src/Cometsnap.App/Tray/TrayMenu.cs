@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using Cometsnap.Video;
 
 namespace Cometsnap.App.Tray;
 
@@ -30,8 +31,11 @@ public sealed class TrayMenu
             delayed.Items.Add(Item($"{s} seconds", () => capture.StartDelayed(s)));
         captureMenu.Items.Add(delayed);
 
+        var recorder = _app.Recorder;
+        if (recorder.IsRecording) _menu.Items.Add(Item("Stop recording", recorder.Stop, _app.Settings.RecordHotkey));
         _menu.Items.Add(Item("Capture region / window", Later(capture.StartRegion), _app.RegionHotkeyText));
         _menu.Items.Add(captureMenu);
+        _menu.Items.Add(RecordMenu());
         _menu.Items.Add(RecentMenu());
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Open captures folder", _app.OpenCapturesFolder));
@@ -41,6 +45,31 @@ public sealed class TrayMenu
         _menu.Items.Add(Item("About Cometsnap", ShowAbout));
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Quit", _app.Quit));
+    }
+
+    private MenuItem RecordMenu()
+    {
+        var r = _app.Recorder;
+        var s = _app.Settings;
+        var record = new MenuItem { Header = "Record" };
+        record.Items.Add(Item("Region / window (MP4)", Later(() => r.ToggleRegion(RecordingFormat.Mp4)), s.RecordHotkey));
+        record.Items.Add(Item("Fullscreen (MP4)", Later(() => r.ToggleFullscreen(RecordingFormat.Mp4))));
+        record.Items.Add(Item("Region / window (GIF)", Later(() => r.ToggleRegion(RecordingFormat.Gif)), s.RecordGifHotkey));
+        record.Items.Add(new Separator());
+        record.Items.Add(Toggle("Record PC sound", s.RecordSystemAudio, v => s.RecordSystemAudio = v));
+        record.Items.Add(Toggle("Record microphone", s.RecordMicrophone, v => s.RecordMicrophone = v));
+        record.Items.Add(Toggle("Show the mouse cursor", s.RecordShowCursor, v => s.RecordShowCursor = v));
+        var fps = new MenuItem { Header = "Frame rate" };
+        foreach (var f in new[] { 15, 30, 60 })
+        {
+            var rate = f;
+            var item = new MenuItem { Header = $"{f} fps", IsCheckable = true, IsChecked = s.RecordFramesPerSecond == f };
+            item.Click += (_, _) => { s.RecordFramesPerSecond = rate; _app.TrySaveSettings(); };
+            fps.Items.Add(item);
+        }
+        record.Items.Add(fps);
+        record.IsEnabled = !r.IsRecording;
+        return record;
     }
 
     private MenuItem OptionsMenu()

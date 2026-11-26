@@ -49,6 +49,8 @@ click **More info → Run anyway**.
 | Anywhere | **Print Screen** (or **Ctrl+Shift+S**) | Region / window capture |
 | Anywhere | **Ctrl+Print Screen** | Fullscreen of the monitor under the mouse |
 | Anywhere | **Alt+Print Screen** | Active window |
+| Anywhere | **Shift+Print Screen** | Record a region / window to MP4 (press again, click the tray icon or ■ to stop) |
+| Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
 | Overlay | arrows / **Shift**+arrows | Move the cursor 1 px / 10 px |

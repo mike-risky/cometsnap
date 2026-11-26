@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Cometsnap.Core\Cometsnap.Core.csproj" />
     <ProjectReference Include="..\Cometsnap.Editor\Cometsnap.Editor.csproj" />
+    <ProjectReference Include="..\Cometsnap.Video\Cometsnap.Video.csproj" />
   </ItemGroup>
 
   <ItemGroup>

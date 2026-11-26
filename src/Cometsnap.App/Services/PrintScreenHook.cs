@@ -30,6 +30,12 @@ public sealed class PrintScreenHook : IDisposable
         _proc = HookProc;
     }
 
+    /// <summary>Optional: Shift+Print Screen (start / stop a video recording).</summary>
+    public Action? Shift { get; set; }
+
+    /// <summary>Optional: Ctrl+Shift+Print Screen (start / stop a GIF recording).</summary>
+    public Action? CtrlShift { get; set; }
+
     public bool IsInstalled => _hook != IntPtr.Zero;
 
     public bool Install()
@@ -68,7 +74,11 @@ public sealed class PrintScreenHook : IDisposable
                 if (isDown && !_down)
                 {
                     _down = true;
-                    var action = Win32.IsKeyDown(Win32.VK_CONTROL) ? _ctrl
+                    var shift = Win32.IsKeyDown(Win32.VK_SHIFT);
+                    var ctrl = Win32.IsKeyDown(Win32.VK_CONTROL);
+                    var action = shift && ctrl && CtrlShift is not null ? CtrlShift
+                        : shift && !ctrl && Shift is not null ? Shift
+                        : ctrl ? _ctrl
                         : Win32.IsKeyDown(Win32.VK_MENU) ? _alt
                         : _plain;
                     // Never do real work inside the hook: Windows drops slow hooks.

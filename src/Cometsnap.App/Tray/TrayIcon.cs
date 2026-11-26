@@ -17,6 +17,7 @@ public sealed class TrayIcon : IDisposable
     private readonly HwndSource _host;
     private readonly uint _taskbarCreatedMessage;
     private readonly IntPtr _icon;
+    private IntPtr _override;
     private readonly bool _ownsIcon;
     private string _tooltip;
     private bool _added;
@@ -47,6 +48,15 @@ public sealed class TrayIcon : IDisposable
             var data = CreateData(Win32.NIF_TIP | Win32.NIF_SHOWTIP);
             Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, ref data);
         }
+    }
+
+    /// <summary>Temporarily shows another icon (e.g. the recording pulse). Zero restores the app icon.</summary>
+    public void SetIcon(IntPtr icon)
+    {
+        _override = icon;
+        if (!_added) return;
+        var data = CreateData(Win32.NIF_ICON);
+        Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, ref data);
     }
 
     /// <summary>Shows a Windows notification balloon from the tray icon.</summary>
@@ -92,7 +102,7 @@ public sealed class TrayIcon : IDisposable
         uID = IconId,
         uFlags = flags,
         uCallbackMessage = CallbackMessage,
-        hIcon = _icon,
+        hIcon = _override != IntPtr.Zero ? _override : _icon,
         szTip = _tooltip.Length > 127 ? _tooltip[..127] : _tooltip,
         szInfo = "",
         szInfoTitle = "",
