@@ -58,7 +58,9 @@ jobs:
 
   release:
     needs: publish
-    if: github.event_name == 'push'
+    # Pushes to main / tags, and pull requests from this repo (each gets a "test-prN" pre-release
+    # with direct exe downloads, easier than Actions artifacts).
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -80,6 +82,19 @@ jobs:
           gh release create nightly rel/*.exe --prerelease --target "${{ github.sha }}" \
             --title "Latest build (main)" \
             --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Portable: download the exe for your PC (x64 for most PCs, arm64 for Snapdragon / Surface Pro X) and run it."
+      - name: Update the test pre-release of this pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          gh release delete "test-pr$PR" --yes --cleanup-tag || true
+          gh release create "test-pr$PR" rel/*.exe --prerelease --latest=false --target "$HEAD_SHA" \
+            --title "Test build: PR #$PR" \
+            --notes "Test build of pull request #$PR ($PR_TITLE), commit ${HEAD_SHA::7}. Portable: download Cometsnap-x64.exe (most PCs) or Cometsnap-arm64.exe (Snapdragon / Surface Pro X) and run it."
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
