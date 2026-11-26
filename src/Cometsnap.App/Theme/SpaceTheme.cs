@@ -30,11 +30,11 @@ public static class SpaceTheme
 
     public static readonly LinearGradientBrush NebulaBrush = FrozenGradient();
 
-    /// <summary>H1 / display font, 28 px or larger only.</summary>
-    public static readonly FontFamily DisplayFont = new(new Uri("pack://application:,,,/"), "./Assets/Fonts/#Bungee Shade");
+    /// <summary>H1 / display font, 28 px or larger only. Chinese and Hindi fall back to Windows fonts.</summary>
+    public static readonly FontFamily DisplayFont = new(new Uri("pack://application:,,,/"), "./Assets/Fonts/#Bungee Shade, Microsoft YaHei UI, Nirmala UI, Segoe UI");
 
     /// <summary>H2 / H3 font.</summary>
-    public static readonly FontFamily HeadingFont = new(new Uri("pack://application:,,,/"), "./Assets/Fonts/#Bungee");
+    public static readonly FontFamily HeadingFont = new(new Uri("pack://application:,,,/"), "./Assets/Fonts/#Bungee, Microsoft YaHei UI, Nirmala UI, Segoe UI");
 
     /// <summary>UI text: native Windows 11 font, falling back to Segoe UI on Windows 10.</summary>
     public static readonly FontFamily UiFont = new("Segoe UI Variable Text, Segoe UI");

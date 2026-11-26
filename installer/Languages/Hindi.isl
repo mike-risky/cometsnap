@@ -1,0 +1,70 @@
+﻿; Cometsnap: Hindi messages for Inno Setup, laid over Default.isl (anything not listed stays English).
+; Inno Setup ships no Hindi translation, so this covers the screens Cometsnap's Setup shows.
+
+[LangOptions]
+LanguageName=हिन्दी
+LanguageID=$0439
+LanguageCodePage=0
+DialogFontName=Nirmala UI
+WelcomeFontName=Nirmala UI
+
+[Messages]
+SetupAppTitle=सेटअप
+SetupWindowTitle=सेटअप - %1
+UninstallAppTitle=अनइंस्टॉल
+UninstallAppFullTitle=%1 अनइंस्टॉल
+ErrorTitle=त्रुटि
+SetupLdrStartupMessage=यह %1 इंस्टॉल करेगा। क्या आप आगे बढ़ना चाहते हैं?
+ExitSetupTitle=सेटअप से बाहर निकलें
+ExitSetupMessage=सेटअप पूरा नहीं हुआ है। अगर आप अभी बाहर निकलते हैं, तो प्रोग्राम इंस्टॉल नहीं होगा।%n%nआप इंस्टॉलेशन पूरा करने के लिए बाद में सेटअप फिर से चला सकते हैं।%n%nसेटअप से बाहर निकलें?
+ButtonBack=< &पीछे
+ButtonNext=&आगे >
+ButtonInstall=&इंस्टॉल करें
+ButtonOK=ठीक है
+ButtonCancel=रद्द करें
+ButtonYes=&हाँ
+ButtonYesToAll=&सभी के लिए हाँ
+ButtonNo=&नहीं
+ButtonNoToAll=स&भी के लिए नहीं
+ButtonFinish=&पूरा करें
+ButtonBrowse=&ब्राउज़ करें...
+ButtonWizardBrowse=ब्रा&उज़ करें...
+WelcomeLabel1=[name] सेटअप विज़ार्ड में आपका स्वागत है
+WelcomeLabel2=यह आपके कंप्यूटर पर [name/ver] इंस्टॉल करेगा।%n%nआगे बढ़ने से पहले बाकी सभी ऐप्लिकेशन बंद कर देना बेहतर है।
+WizardSelectTasks=अतिरिक्त काम चुनें
+SelectTasksDesc=कौन-से अतिरिक्त काम किए जाएँ?
+SelectTasksLabel2=[name] इंस्टॉल करते समय सेटअप जो अतिरिक्त काम करे, उन्हें चुनें, फिर आगे पर क्लिक करें।
+WizardReady=इंस्टॉल के लिए तैयार
+ReadyLabel1=सेटअप अब आपके कंप्यूटर पर [name] इंस्टॉल करने के लिए तैयार है।
+ReadyLabel2a=इंस्टॉलेशन जारी रखने के लिए इंस्टॉल करें पर क्लिक करें, या सेटिंग्स देखने या बदलने के लिए पीछे पर क्लिक करें।
+ReadyLabel2b=इंस्टॉलेशन जारी रखने के लिए इंस्टॉल करें पर क्लिक करें।
+ReadyMemoTasks=अतिरिक्त काम:
+WizardPreparing=इंस्टॉल की तैयारी
+PreparingDesc=सेटअप आपके कंप्यूटर पर [name] इंस्टॉल करने की तैयारी कर रहा है।
+ApplicationsFound=नीचे दिए गए ऐप्लिकेशन ऐसी फ़ाइलें इस्तेमाल कर रहे हैं जिन्हें सेटअप को अपडेट करना है। बेहतर है कि सेटअप इन्हें अपने आप बंद कर दे।
+ApplicationsFound2=नीचे दिए गए ऐप्लिकेशन ऐसी फ़ाइलें इस्तेमाल कर रहे हैं जिन्हें सेटअप को अपडेट करना है। बेहतर है कि सेटअप इन्हें अपने आप बंद कर दे। इंस्टॉलेशन के बाद सेटअप इन्हें फिर से शुरू करने की कोशिश करेगा।
+CloseApplications=ऐप्लिकेशन &अपने आप बंद करें
+DontCloseApplications=ऐप्लिकेशन बंद &न करें
+WizardInstalling=इंस्टॉल हो रहा है
+InstallingLabel=कृपया प्रतीक्षा करें, सेटअप आपके कंप्यूटर पर [name] इंस्टॉल कर रहा है।
+FinishedHeadingLabel=[name] सेटअप विज़ार्ड पूरा हो रहा है
+FinishedLabelNoIcons=सेटअप ने आपके कंप्यूटर पर [name] इंस्टॉल कर दिया है।
+FinishedLabel=सेटअप ने आपके कंप्यूटर पर [name] इंस्टॉल कर दिया है। इंस्टॉल किए गए शॉर्टकट से ऐप्लिकेशन खोला जा सकता है।
+ClickFinish=सेटअप से बाहर निकलने के लिए पूरा करें पर क्लिक करें।
+RunEntryExec=%1 चलाएँ
+StatusClosingApplications=ऐप्लिकेशन बंद हो रहे हैं...
+StatusCreateDirs=फ़ोल्डर बन रहे हैं...
+StatusExtractFiles=फ़ाइलें निकाली जा रही हैं...
+StatusCreateIcons=शॉर्टकट बन रहे हैं...
+StatusCreateRegistryEntries=रजिस्ट्री एंट्री बन रही हैं...
+StatusSavingUninstall=अनइंस्टॉल की जानकारी सेव हो रही है...
+StatusRunProgram=इंस्टॉलेशन पूरा हो रहा है...
+StatusRestartingApplications=ऐप्लिकेशन फिर से शुरू हो रहे हैं...
+StatusRollback=बदलाव वापस लिए जा रहे हैं...
+UninstallAppRunningError=अनइंस्टॉल ने पाया कि %1 अभी चल रहा है।%n%nकृपया इसे पूरी तरह बंद करें, फिर आगे बढ़ने के लिए ठीक है पर क्लिक करें, या बाहर निकलने के लिए रद्द करें।
+ConfirmUninstall=क्या आप सच में %1 और इसके सभी हिस्से पूरी तरह हटाना चाहते हैं?
+UninstallStatusLabel=कृपया प्रतीक्षा करें, %1 आपके कंप्यूटर से हटाया जा रहा है।
+UninstalledAll=%1 आपके कंप्यूटर से हटा दिया गया।
+UninstalledMost=%1 का अनइंस्टॉल पूरा हुआ।%n%nकुछ चीज़ें हटाई नहीं जा सकीं। इन्हें आप खुद हटा सकते हैं।
+WizardUninstalling=अनइंस्टॉल की स्थिति
+StatusUninstalling=%1 अनइंस्टॉल हो रहा है...

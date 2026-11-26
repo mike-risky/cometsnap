@@ -70,7 +70,8 @@ Described for Windows (keys use Print Screen). The macOS and Linux apps share th
 see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
-- Speaks **English, French, German and Italian**: it follows the Windows display language (English otherwise), and *Options > Language* switches it on the spot. The installer follows Windows too.
+- Speaks **English, Spanish, Portuguese, French, German, Italian, Simplified Chinese and Hindi**: it follows the Windows display language (English otherwise), and *Settings > Language* switches it on the spot. The installer follows Windows too.
+- A proper **Settings** window (tray panel > Settings): language, start with Windows, sounds, shortcuts (click and press the new keys), captures folder, recording and the playful extras. Every change applies right away
 - **Print Screen** (or Ctrl+Shift+S) freezes the screen instantly
 - Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows).
   The moment you let go it's copied and saved: no toolbar in the way

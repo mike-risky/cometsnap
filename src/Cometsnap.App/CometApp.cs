@@ -7,6 +7,7 @@ using Cometsnap.App.Capture;
 using Cometsnap.App.Editing;
 using Cometsnap.App.Fun;
 using Cometsnap.App.Onboarding;
+using Cometsnap.App.Preferences;
 using Cometsnap.App.Recording;
 using Cometsnap.App.Services;
 using Cometsnap.App.Theme;
@@ -40,6 +41,8 @@ public sealed class CometApp : Application
     private EditCard? _card;
     private Season _season;
     private DispatcherTimer? _seasonTimer;
+    private SettingsWindow? _settingsWindow;
+    private readonly HashSet<string> _failedHotkeys = new(StringComparer.OrdinalIgnoreCase);
 
     public static new CometApp Current => (CometApp)Application.Current;
 
@@ -202,11 +205,16 @@ public sealed class CometApp : Application
 
         // Owning Print Screen with the keyboard hook beats Snipping Tool, OneDrive and friends.
         var hooked = Settings.TakeOverPrintScreen && _printScreen!.Install();
-        bool Register(string gesture, Action action) =>
-            hooked && UsesPrintScreen(gesture) ? HookCovers(gesture) : _hotkeys.TryRegister(gesture, action);
+        _failedHotkeys.Clear();
+        bool Register(string gesture, Action action)
+        {
+            var ok = hooked && UsesPrintScreen(gesture) ? HookCovers(gesture) : _hotkeys.TryRegister(gesture, action);
+            if (!ok) _failedHotkeys.Add(gesture);
+            return ok;
+        }
 
         var main = Register(Settings.CaptureHotkey, Capture.StartRegion);
-        var fallback = _hotkeys.TryRegister(Settings.CaptureHotkeyFallback, Capture.StartRegion);
+        var fallback = Register(Settings.CaptureHotkeyFallback, Capture.StartRegion);
         Register(Settings.FullscreenHotkey, Capture.CaptureFullscreen);
         Register(Settings.ActiveWindowHotkey, Capture.CaptureActiveWindow);
         Register(Settings.RecordHotkey, () => Recorder.ToggleRegion(RecordingFormat.Mp4));
@@ -233,6 +241,44 @@ public sealed class CometApp : Application
             || g.Equals("Alt+PrintScreen", StringComparison.OrdinalIgnoreCase)
             || g.Equals("Shift+PrintScreen", StringComparison.OrdinalIgnoreCase)
             || g.Equals("Ctrl+Shift+PrintScreen", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Registers the hotkeys again after a change. With a gesture: returns whether that one works.</summary>
+    public bool ReapplyHotkeys(string? gesture = null)
+    {
+        var main = RegisterHotkeys(announce: false);
+        return gesture is null ? main : !_failedHotkeys.Contains(gesture);
+    }
+
+    /// <summary>Lets keys through while the Settings window records a new shortcut.</summary>
+    public void PauseHotkeys()
+    {
+        _hotkeys?.UnregisterAll();
+        _printScreen?.Uninstall();
+    }
+
+    // ------------------------------------------------------------------ settings
+
+    /// <summary>The in-app Settings window (one at a time).</summary>
+    public void OpenSettings()
+    {
+        if (_settingsWindow is null)
+        {
+            _settingsWindow = new SettingsWindow(this);
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
+        }
+        if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;
+        _settingsWindow.Activate();
+    }
+
+    /// <summary>Moves new captures to another folder ("" = the default) and reloads the recent list.</summary>
+    public void SetCapturesFolder(string folder)
+    {
+        Settings.CapturesFolder = string.Equals(folder, Paths.DefaultCapturesDirectory, StringComparison.OrdinalIgnoreCase) ? "" : folder;
+        TrySaveSettings();
+        var root = CapturesFolder;
+        _ = Task.Run(() => Recent.Load(root));
+    }
 
     // ------------------------------------------------------------------ replace the old tool
 
