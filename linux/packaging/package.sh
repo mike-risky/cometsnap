@@ -28,7 +28,7 @@ rm -f "$WORK/app"/*.pdb
 echo "== static ffmpeg ($FFMPEG)"
 mkdir -p "$WORK/ff"
 curl -fsSL --retry 4 -o "$WORK/ff/ffmpeg.tar.xz" \
-  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-$FFMPEG-gpl-7.1.tar.xz"
+  "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-$FFMPEG-gpl.tar.xz"
 tar -xJf "$WORK/ff/ffmpeg.tar.xz" -C "$WORK/ff" --wildcards '*/bin/ffmpeg'
 mkdir -p "$WORK/app/libexec"
 install -m 755 "$(find "$WORK/ff" -path '*/bin/ffmpeg' -type f | head -1)" "$WORK/app/libexec/ffmpeg"
