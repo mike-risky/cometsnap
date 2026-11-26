@@ -109,11 +109,36 @@ public sealed class CometApp : Application
         var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
         ListenForOtherLaunches();
-        ApplyStartWithWindows(userAsked: false);
+        var fromInstaller = TakeInstallerChoices();
+        ApplyStartWithWindows(userAsked: fromInstaller);
         Log.Info($"Started in {sw.ElapsedMilliseconds} ms");
 
-        if (!Settings.ReplaceOfferAnswered)
-            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk));
+        // Right after Setup, always show the replace step, so installing (or reinstalling) is clear.
+        var afterInstall = e.Args.Any(a => a.Equals("--after-install", StringComparison.OrdinalIgnoreCase));
+        if (afterInstall || !Settings.ReplaceOfferAnswered)
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk, afterInstall));
+    }
+
+    /// <summary>
+    /// Setup leaves its "Start with Windows" answer in HKCU\Software\Cometsnap; take it into the
+    /// settings once and remove it. Returns true when there was one.
+    /// </summary>
+    private bool TakeInstallerChoices()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Cometsnap", writable: true);
+            if (key?.GetValue("InstallerStartWithWindows") is not int value) return false;
+            Settings.StartWithWindows = value != 0;
+            key.DeleteValue("InstallerStartWithWindows", throwOnMissingValue: false);
+            TrySaveSettings();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not read the installer choices", ex);
+            return false;
+        }
     }
 
     /// <summary>
@@ -206,11 +231,10 @@ public sealed class CometApp : Application
     /// <summary>"Replace your old screen capture with Cometsnap": first run, or from the tray menu.</summary>
     public void OfferReplace() => OfferReplace(RegionHotkeyText == Settings.CaptureHotkey);
 
-    private void OfferReplace(bool printScreenRegistered)
+    private void OfferReplace(bool printScreenRegistered, bool justInstalled = false)
     {
         var report = CaptureTools.Detect(printScreenRegistered);
-        var exe = Environment.ProcessPath ?? "";
-        var window = new ReplaceWindow(report, CaptureTools.IsCometsnapStartingWithWindows(exe));
+        var window = new ReplaceWindow(report, Settings.StartWithWindows, justInstalled ? $"Cometsnap {Version} is installed" : null);
         window.ShowDialog();
 
         Settings.ReplaceOfferAnswered = true;
@@ -234,6 +258,7 @@ public sealed class CometApp : Application
         {
             TrySaveSettings();
             RegisterHotkeys(announce: true);
+            if (justInstalled) _tray?.ShowBalloon($"Cometsnap {Version} is installed", "It lives here in the tray. Press Print Screen to capture.");
         }
     }
 

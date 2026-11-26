@@ -26,7 +26,7 @@ public sealed class ReplaceWindow : Window
 
     public ReplaceChoice? Choice { get; private set; }
 
-    public ReplaceWindow(TakeoverReport report, bool startsWithWindows)
+    public ReplaceWindow(TakeoverReport report, bool startsWithWindows, string? installedBanner = null)
     {
         _report = report;
         Title = "Cometsnap";
@@ -53,6 +53,18 @@ public sealed class ReplaceWindow : Window
         try { logo.Source = new BitmapImage(new Uri("pack://application:,,,/Assets/cometsnap-256.png")); }
         catch { logo.Visibility = Visibility.Collapsed; }
         stack.Children.Add(logo);
+
+        if (installedBanner is not null)
+        {
+            // Shown right after Setup: say plainly what just happened.
+            stack.Children.Add(new Border
+            {
+                Background = SpaceTheme.WithAlpha(SpaceTheme.CometBlue, 0x40), BorderBrush = SpaceTheme.CometBlueBrush,
+                BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 5, 14, 5),
+                HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12),
+                Child = new TextBlock { Text = "✓  " + installedBanner, FontWeight = FontWeights.SemiBold, Foreground = SpaceTheme.StarWhiteBrush },
+            });
+        }
 
         stack.Children.Add(new TextBlock
         {
@@ -90,7 +102,7 @@ public sealed class ReplaceWindow : Window
         }
 
         _startupBox = Check("Start Cometsnap with Windows", "So Print Screen always works, right after you log in.");
-        _startupBox.IsChecked = true;
+        _startupBox.IsChecked = startsWithWindows;
         stack.Children.Add(_startupBox);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
