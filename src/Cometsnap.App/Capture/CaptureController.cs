@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Cometsnap.App.Services;
@@ -33,6 +34,7 @@ public sealed class CaptureController
 
         _overlay = new CaptureOverlay();
         _overlay.Confirmed += (image, _) => Deliver(image);
+        _overlay.SaveRequested += SaveAs;
         _overlay.Prewarm();
     }
 
@@ -129,6 +131,41 @@ public sealed class CaptureController
         _delayTimer.Stop();
         _delayTimer = null;
         _app.SetTrayStatus(null);
+    }
+
+    /// <summary>Copies like a normal capture, then asks where to save an extra copy.</summary>
+    private void SaveAs(BitmapSource image)
+    {
+        Deliver(image);
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save capture",
+            FileName = SnapNaming.BaseName(DateTime.Now),
+            DefaultExt = ".png",
+            Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg",
+            InitialDirectory = _app.CapturesFolder,
+        };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            if (dialog.FileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
+                || dialog.FileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                var encoder = new JpegBitmapEncoder { QualityLevel = 92 };
+                encoder.Frames.Add(BitmapFrame.Create(image));
+                using var fs = File.Create(dialog.FileName);
+                encoder.Save(fs);
+            }
+            else
+            {
+                CaptureStore.SavePng(image, dialog.FileName);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Save as failed", ex);
+            System.Windows.MessageBox.Show($"Could not save the capture:\n{ex.Message}", "Cometsnap");
+        }
     }
 
     private void Deliver(BitmapSource image)
