@@ -85,6 +85,12 @@ public sealed class TrayMenu
         options.Items.Add(Toggle("Instant capture (no toolbar)", s.InstantCapture, v => s.InstantCapture = v));
         options.Items.Add(Toggle("Show the Edit card after a capture", s.ShowEditCard, v => s.ShowEditCard = v));
         options.Items.Add(Toggle("Comet animation", s.ShowCometAnimation, v => s.ShowCometAnimation = v));
+        options.Items.Add(Toggle("Little celebrations (snap milestones)", s.Celebrations, v => s.Celebrations = v));
+        options.Items.Add(Toggle("Seasonal looks (snowy December, Halloween pumpkin)", s.SeasonalSkins, v =>
+        {
+            s.SeasonalSkins = v;
+            _app.ApplySeason();
+        }));
         options.Items.Add(Toggle("Sound on capture", s.PlaySounds, v => s.PlaySounds = v));
         options.Items.Add(Toggle("Detect windows under the mouse", s.WindowDetection, v => s.WindowDetection = v));
         return options;

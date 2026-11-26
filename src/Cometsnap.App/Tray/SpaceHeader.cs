@@ -5,6 +5,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Cometsnap.App.Theme;
+using Cometsnap.Core.Fun;
 
 namespace Cometsnap.App.Tray;
 
@@ -18,7 +19,11 @@ public sealed class SpaceHeader : Grid
     private const int FrameRate = 30;
     private readonly List<(IAnimatable Target, DependencyProperty Property)> _running = new();
     private readonly List<(Ellipse Star, double Low, double High, double Seconds, double Delay)> _stars = new();
-    private readonly Image _logo;
+    private readonly Grid _logo;
+    private readonly Image _seasonOverlay = new() { Width = 36, Height = 36, IsHitTestVisible = false };
+    private readonly Canvas _snowLayer = new() { IsHitTestVisible = false };
+    private readonly List<(Ellipse Flake, TranslateTransform Move, double X, double Seconds, double Delay, double Drift)> _snow = new();
+    private Season _season;
     private readonly TranslateTransform _logoFloat = new();
     private readonly RotateTransform _logoTilt = new();
     private readonly ScaleTransform _logoPop = new(1, 1);
@@ -78,23 +83,52 @@ public sealed class SpaceHeader : Grid
         Canvas.SetTop(_shootingStar, 0);
         sky2.Children.Add(_shootingStar);
         Children.Add(sky2);
+        Children.Add(_snowLayer);
 
         // Logo and wordmark.
         var word = new TextBlock { FontFamily = SpaceTheme.DisplayFont, FontSize = 28, VerticalAlignment = VerticalAlignment.Center };
         word.Inlines.Add(new System.Windows.Documents.Run("COMET") { Foreground = SpaceTheme.StarWhiteBrush });
         word.Inlines.Add(new System.Windows.Documents.Run("SNAP") { Foreground = SpaceTheme.SunBrush });
-        _logo = new Image
+        var logoImage = new Image { Source = new BitmapImage(new Uri("pack://application:,,,/Assets/cometsnap-256.png")), Width = 36, Height = 36 };
+        RenderOptions.SetBitmapScalingMode(logoImage, BitmapScalingMode.HighQuality);
+        // The logo and its seasonal decoration (snow cap, pumpkin) float together.
+        _logo = new Grid
         {
-            Source = new BitmapImage(new Uri("pack://application:,,,/Assets/cometsnap-256.png")),
             Width = 36, Height = 36, Margin = new Thickness(0, 0, 10, 0),
             RenderTransformOrigin = new Point(0.5, 0.5),
             RenderTransform = new TransformGroup { Children = { _logoPop, _logoTilt, _logoFloat } },
         };
-        RenderOptions.SetBitmapScalingMode(_logo, BitmapScalingMode.HighQuality);
+        _logo.Children.Add(logoImage);
+        _logo.Children.Add(_seasonOverlay);
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 16, 0), VerticalAlignment = VerticalAlignment.Center };
         row.Children.Add(_logo);
         row.Children.Add(word);
         Children.Add(row);
+    }
+
+    /// <summary>Snow cap and falling snow in December, a pumpkin comet at Halloween.</summary>
+    public void SetSeason(Season season)
+    {
+        if (season == _season) return;
+        _season = season;
+        _seasonOverlay.Source = SeasonalArt.OverlayImage(season);
+        if (season == Season.Winter && _snow.Count == 0)
+        {
+            var rng = new Random(12);
+            for (var i = 0; i < 18; i++)
+            {
+                var size = 1.6 + rng.NextDouble() * 1.8;
+                var flake = new Ellipse { Width = size, Height = size, Fill = SpaceTheme.StarWhiteBrush, Opacity = 0.45 + rng.NextDouble() * 0.4 };
+                var move = new TranslateTransform();
+                flake.RenderTransform = move;
+                var x = rng.NextDouble() * (_width - 4);
+                Canvas.SetLeft(flake, x);
+                Canvas.SetTop(flake, -6);
+                _snowLayer.Children.Add(flake);
+                _snow.Add((flake, move, x, 3.2 + rng.NextDouble() * 3, rng.NextDouble() * 4, -6 + rng.NextDouble() * 12));
+            }
+        }
+        _snowLayer.Visibility = season == Season.Winter ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Starts the sky. Call when the flyout appears.</summary>
@@ -128,6 +162,19 @@ public sealed class SpaceHeader : Grid
         {
             AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = sine,
         });
+
+        if (_season == Season.Winter)
+        {
+            foreach (var (_, move, _, seconds, delay, drift) in _snow)
+            {
+                var fall = TimeSpan.FromSeconds(seconds);
+                Run(move, TranslateTransform.YProperty, new DoubleAnimation(0, Height + 12, fall) { BeginTime = TimeSpan.FromSeconds(delay), RepeatBehavior = RepeatBehavior.Forever });
+                Run(move, TranslateTransform.XProperty, new DoubleAnimation(-drift / 2, drift / 2, TimeSpan.FromSeconds(seconds / 2))
+                {
+                    BeginTime = TimeSpan.FromSeconds(delay), AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever, EasingFunction = sine,
+                });
+            }
+        }
 
         // Shooting star crosses the top right once, shortly after opening.
         var begin = TimeSpan.FromMilliseconds(280);

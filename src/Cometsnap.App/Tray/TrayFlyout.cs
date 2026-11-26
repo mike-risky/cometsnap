@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using Cometsnap.App.Services;
 using Cometsnap.App.Theme;
 using Cometsnap.Core.Diagnostics;
+using Cometsnap.Core.Fun;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Storage;
 using Path = System.IO.Path;
@@ -25,6 +26,7 @@ public sealed class TrayFlyout : Window
 {
     private FrameworkElement? _content;
     private SpaceHeader? _sky;
+    private readonly KonamiCode _konami = new();
     // Wide enough for 3 thumbnails per row and 3+ rows, and for every button label in full.
     private const double PanelWidth = 560;
     private const double PanelHeight = 660;
@@ -43,6 +45,7 @@ public sealed class TrayFlyout : Window
     private DateTime _hiddenAt;
     private Point _dragStart;
     private bool _suppressClick;
+    private string? _dragArmed;
 
     public TrayFlyout(CometApp app, RecentCaptures recent, ThumbnailCache thumbs)
     {
@@ -165,6 +168,19 @@ public sealed class TrayFlyout : Window
 
         Deactivated += (_, _) => HideFlyout();
         KeyDown += (_, e) => { if (e.Key == Key.Escape) HideFlyout(); };
+        // ↑ ↑ ↓ ↓ ← → ← → B A: a meteor shower. Watched, never swallowed, so typing in search still works.
+        PreviewKeyDown += (_, e) =>
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            if (!_konami.Push(key.ToString())) return;
+            if (_search.IsKeyboardFocusWithin && _search.Text.EndsWith("b", StringComparison.OrdinalIgnoreCase))
+            {
+                // The B already went into the search box and the A is about to: keep the search clean.
+                _search.Text = _search.Text[..^1];
+                e.Handled = true;
+            }
+            _app.MeteorShowerEasterEgg();
+        };
         _recent.Changed += () => Dispatcher.BeginInvoke(() =>
         {
             _dirty = true;
@@ -237,11 +253,15 @@ public sealed class TrayFlyout : Window
         _ = monitor;
     }
 
+    /// <summary>Applies the seasonal skin to the header (snowy or pumpkin comet).</summary>
+    public void SetSeason(Season season) => _sky?.SetSeason(season);
+
     private void HideFlyout()
     {
         if (!IsVisible) return;
         _hiddenAt = DateTime.UtcNow;
         _sky?.Stop();
+        _konami.Reset();
         Hide();
     }
 
@@ -348,6 +368,7 @@ public sealed class TrayFlyout : Window
         frame.MouseLeftButtonDown += (_, e) =>
         {
             _dragStart = e.GetPosition(this);
+            _dragArmed = path;
             _suppressClick = false;
             if (e.ClickCount == 2)
             {
@@ -357,16 +378,22 @@ public sealed class TrayFlyout : Window
         };
         frame.MouseLeftButtonUp += (_, e) =>
         {
+            _dragArmed = null;
             if (_suppressClick) return;
             CopyFile(path);
         };
         frame.MouseMove += (_, e) =>
         {
-            if (e.LeftButton != MouseButtonState.Pressed) return;
+            // Only a press that started on this tile can drag it (not one on a mini button or elsewhere).
+            if (e.LeftButton != MouseButtonState.Pressed || _dragArmed != path) return;
             var d = e.GetPosition(this) - _dragStart;
             if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _suppressClick = true;
-            StartDrag(frame, path);
+            _dragArmed = null;
+            Zoom(1);
+            frame.Opacity = 0.55;
+            try { DragOut.Start(frame, path, null, image.Source); }
+            finally { frame.Opacity = 1; }
         };
         return frame;
     }
@@ -410,29 +437,6 @@ public sealed class TrayFlyout : Window
     {
         var thumb = await _thumbs.GetAsync(path);
         if (thumb is not null) target.Source = thumb;
-    }
-
-    private void StartDrag(DependencyObject source, string path)
-    {
-        if (!File.Exists(path)) return;
-        // A file drop works with Word, Outlook, Teams, browsers, Explorer...
-        var data = new DataObject(DataFormats.FileDrop, new[] { path });
-        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path))
-        {
-            DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
-            return;
-        }
-        try
-        {
-            using var stream = File.OpenRead(path);
-            var bmp = BitmapFrame.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-            data.SetImage(bmp);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Drag image data failed", ex);
-        }
-        DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
     }
 
     private void CopyFile(string path)

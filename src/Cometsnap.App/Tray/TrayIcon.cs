@@ -18,6 +18,7 @@ public sealed class TrayIcon : IDisposable
     private readonly uint _taskbarCreatedMessage;
     private readonly IntPtr _icon;
     private IntPtr _override;
+    private IntPtr _season;
     private readonly bool _ownsIcon;
     private string _tooltip;
     private bool _added;
@@ -57,6 +58,19 @@ public sealed class TrayIcon : IDisposable
         if (!_added) return;
         var data = CreateData(Win32.NIF_ICON);
         Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, ref data);
+    }
+
+    /// <summary>Replaces the everyday icon with a seasonal one (we own it now). Zero restores the app icon.</summary>
+    public void SetSeasonIcon(IntPtr icon)
+    {
+        var old = _season;
+        _season = icon;
+        if (_added)
+        {
+            var data = CreateData(Win32.NIF_ICON);
+            Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, ref data);
+        }
+        if (old != IntPtr.Zero && old != icon) Win32.DestroyIcon(old);
     }
 
     /// <summary>Shows a Windows notification balloon from the tray icon.</summary>
@@ -102,7 +116,7 @@ public sealed class TrayIcon : IDisposable
         uID = IconId,
         uFlags = flags,
         uCallbackMessage = CallbackMessage,
-        hIcon = _override != IntPtr.Zero ? _override : _icon,
+        hIcon = _override != IntPtr.Zero ? _override : _season != IntPtr.Zero ? _season : _icon,
         szTip = _tooltip.Length > 127 ? _tooltip[..127] : _tooltip,
         szInfo = "",
         szInfoTitle = "",
@@ -166,5 +180,6 @@ public sealed class TrayIcon : IDisposable
         }
         _host.RemoveHook(WndProc);
         if (_ownsIcon) Win32.DestroyIcon(_icon);
+        if (_season != IntPtr.Zero) Win32.DestroyIcon(_season);
     }
 }
