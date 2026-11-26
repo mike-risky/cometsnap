@@ -14,9 +14,12 @@ namespace Cometsnap.Linux.Services;
 /// </summary>
 public sealed class ClipboardService
 {
-    private readonly Func<IClipboard?> _clipboard;
+    private readonly Func<TopLevel?> _owner;
 
-    public ClipboardService(Func<IClipboard?> clipboard) => _clipboard = clipboard;
+    /// <param name="owner">A window that lives as long as the app (its clipboard and file access are used).</param>
+    public ClipboardService(Func<TopLevel?> owner) => _owner = owner;
+
+    private IClipboard? Board => _owner()?.Clipboard;
 
     public async Task<bool> SetPngAsync(byte[] png)
     {
@@ -26,7 +29,7 @@ public sealed class ClipboardService
             {
                 if (await PipeAsync(wl, new[] { "--type", "image/png" }, png)) return true;
             }
-            var cb = _clipboard();
+            var cb = Board;
             if (cb is null) return false;
             var item = new DataTransferItem();
             item.Set(DataFormat.CreateBytesPlatformFormat("image/png"), png);
@@ -52,14 +55,28 @@ public sealed class ClipboardService
             {
                 if (await PipeAsync(wl, new[] { "--type", "text/uri-list" }, System.Text.Encoding.UTF8.GetBytes(uris + "\r\n"))) return true;
             }
-            var cb = _clipboard();
-            if (cb is null) return false;
-            var item = new DataTransferItem();
-            item.Set(DataFormat.CreateBytesPlatformFormat("text/uri-list"), System.Text.Encoding.UTF8.GetBytes(uris + "\r\n"));
-            item.Set(DataFormat.CreateBytesPlatformFormat("x-special/gnome-copied-files"), System.Text.Encoding.UTF8.GetBytes("copy\n" + uris.Replace("\r\n", "\n")));
-            item.SetText(string.Join("\n", paths));
+            if (Environment.GetEnvironmentVariable("DISPLAY") is { Length: > 0 }
+                && await XdndSource.CopyFilesAsync(paths)) return true;
+            var owner = _owner();
+            var cb = owner?.Clipboard;
+            if (owner is null || cb is null) return false;
+            // Avalonia serves text/uri-list itself from file items (a raw "text/uri-list" format is not offered).
             var data = new DataTransfer();
-            data.Add(item);
+            var first = true;
+            foreach (var path in paths)
+            {
+                if (await owner.StorageProvider.TryGetFileFromPathAsync(new Uri(path)) is not { } file) continue;
+                var item = new DataTransferItem();
+                item.Set(DataFormat.File, file);
+                if (first)
+                {
+                    item.Set(DataFormat.CreateBytesPlatformFormat("x-special/gnome-copied-files"), System.Text.Encoding.UTF8.GetBytes("copy\n" + uris.Replace("\r\n", "\n")));
+                    item.SetText(string.Join("\n", paths));
+                    first = false;
+                }
+                data.Add(item);
+            }
+            if (first) return false;
             await cb.SetDataAsync(data);
             return true;
         }
@@ -74,7 +91,7 @@ public sealed class ClipboardService
     {
         try
         {
-            if (_clipboard() is { } cb) await cb.SetTextAsync(text);
+            if (Board is { } cb) await cb.SetTextAsync(text);
         }
         catch (Exception ex)
         {

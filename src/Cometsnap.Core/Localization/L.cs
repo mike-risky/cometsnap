@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Cometsnap.Core.Localization;
 
 /// <summary>
-/// The app's texts in English, French, German and Italian. The English text is the key, so the
+/// The app's texts in English, French, German, Italian, Spanish, Simplified Chinese, Hindi and Portuguese. The English text is the key, so the
 /// code stays readable and a missing translation simply shows English.
 /// </summary>
 public static class L
@@ -12,11 +12,12 @@ public static class L
     public static readonly (string Code, string Name)[] Languages =
     {
         ("en", "English"), ("fr", "Français"), ("de", "Deutsch"), ("it", "Italiano"),
+        ("es", "Español"), ("pt", "Português"), ("zh", "简体中文"), ("hi", "हिन्दी"),
     };
 
     private static IReadOnlyDictionary<string, string>? _table;
 
-    /// <summary>The language in use: "en", "fr", "de" or "it".</summary>
+    /// <summary>The language in use: "en", "fr", "de", "it", "es", "pt", "zh" or "hi".</summary>
     public static string Language { get; private set; } = "en";
 
     /// <summary>Picks the language: the saved choice, or else Windows' display language, or else English.</summary>
@@ -28,7 +29,7 @@ public static class L
     }
 
     /// <summary>The culture of the language in use (month names and the like).</summary>
-    public static CultureInfo Culture => CultureInfo.GetCultureInfo(Language);
+    public static CultureInfo Culture => CultureInfo.GetCultureInfo(Language == "zh" ? "zh-Hans" : Language);
 
     /// <summary>"fr-CH" → "fr"; anything we don't speak → "en".</summary>
     public static string FromCulture(CultureInfo culture)
@@ -55,6 +56,10 @@ public static class L
         "fr" => Strings.French,
         "de" => Strings.German,
         "it" => Strings.Italian,
+        "es" => Strings.Spanish,
+        "pt" => Strings.Portuguese,
+        "zh" => Strings.Chinese,
+        "hi" => Strings.Hindi,
         _ => null,
     };
 }

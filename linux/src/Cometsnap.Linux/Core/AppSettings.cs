@@ -75,6 +75,29 @@ public sealed class AppSettings
     /// <summary>The desktop's own screenshot shortcuts before Cometsnap took Print Screen (to give them back).</summary>
     public string DesktopShortcutsBackup { get; set; } = "";
 
+    /// <summary>"en", "fr", "de" or "it"; empty follows the desktop's language.</summary>
+    public string Language { get; set; } = "";
+
+    // ---- Playful touches
+    /// <summary>Tiny meteor showers for snap milestones and the monthly recap.</summary>
+    public bool Celebrations { get; set; } = true;
+
+    /// <summary>The capture flies off on a comet after it is taken.</summary>
+    public bool ShowCometAnimation { get; set; } = true;
+
+    /// <summary>Snowy comet in December, pumpkin comet at Halloween.</summary>
+    public bool SeasonalSkins { get; set; } = true;
+
+    /// <summary>Editor: numbered steps joined by faint star lines.</summary>
+    public bool ConstellationSteps { get; set; }
+
+    public int SnapCount { get; set; }
+    public bool SnapCountSeeded { get; set; }
+
+    /// <summary>The month being counted ("2026-11") and its snaps so far.</summary>
+    public string SnapMonth { get; set; } = "";
+    public int SnapMonthCount { get; set; }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,

@@ -115,14 +115,14 @@ final class CaptureController {
 
 // MARK: - Edit card
 
-/// The small card in the corner after a capture: "COPIED!", with an Edit button. It never
+/// The small card in the corner after a capture: L.t("COPIED!"), with an Edit button. It never
 /// takes focus, so you can paste right away, and it fades out on its own.
 final class EditCard: NSPanel {
     var onEdit: ((URL?, CGImage, CGFloat) -> Void)?
     var onOpen: ((URL) -> Void)?
 
     private let thumb = NSImageView()
-    private let titleLabel = NSTextField(labelWithString: "COPIED!")
+    private let titleLabel = NSTextField(labelWithString: L.t("COPIED!"))
     private let detail = NSTextField(labelWithString: "")
     private let editButton: SpaceButton
     private var image: CGImage?
@@ -133,7 +133,7 @@ final class EditCard: NSPanel {
     private weak var root: HoverView?
 
     init() {
-        editButton = SpaceButton(title: "Edit", symbol: "pencil", fill: Theme.terracotta, tip: "Open in the editor")
+        editButton = SpaceButton(title: L.t("Edit"), symbol: "pencil", fill: Theme.terracotta, tip: L.t("Open in the editor"))
         super.init(contentRect: CGRect(x: 0, y: 0, width: 340, height: 84), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
@@ -155,7 +155,7 @@ final class EditCard: NSPanel {
         root.onHover = { [weak self] inside in self?.hover(inside) }
         // The whole card opens the editor: faster to hit than the button alone.
         root.onClick = { [weak self] in self?.edit() }
-        root.toolTip = "Click to edit"
+        root.toolTip = L.t("Click to edit · Drag into any app")
         // …or drag it straight into any app.
         root.onDrag = { [weak self] event in self?.drag(event) }
         self.root = root
@@ -175,7 +175,7 @@ final class EditCard: NSPanel {
         detail.lineBreakMode = .byTruncatingMiddle
 
         editButton.onClick = { [weak self] in self?.edit() }
-        let close = SpaceButton(title: "", symbol: "xmark", tip: "Dismiss")
+        let close = SpaceButton(title: "", symbol: "xmark", tip: L.t("Dismiss"))
         close.layer?.borderWidth = 0
         close.onClick = { [weak self] in self?.fadeOut() }
 
@@ -213,9 +213,11 @@ final class EditCard: NSPanel {
         self.url = nil
         fileOnly = false
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
-        titleLabel.stringValue = copied ? "COPIED!" : "SNAPPED!"
-        detail.stringValue = "\(image.width) × \(image.height) · saving…"
-        root?.toolTip = "Click to edit"
+        titleLabel.stringValue = copied ? L.t("COPIED!") : L.t("SNAPPED!")
+        detail.stringValue = "\(image.width) × \(image.height) · " + L.t("saving…")
+        root?.toolTip = L.t("Click to edit · Drag into any app")
+        editButton.update(title: L.t("Edit"), symbol: "pencil")
+        editButton.toolTip = L.t("Open in the editor")
         present()
     }
 
@@ -226,9 +228,11 @@ final class EditCard: NSPanel {
         fileOnly = true
         thumb.image = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
-        titleLabel.stringValue = url.pathExtension.lowercased() == "gif" ? "GIF SAVED!" : "VIDEO SAVED!"
-        detail.stringValue = url.lastPathComponent + " · copied"
-        root?.toolTip = "Click to play"
+        titleLabel.stringValue = url.pathExtension.lowercased() == "gif" ? L.t("GIF SAVED!") : L.t("VIDEO SAVED!")
+        detail.stringValue = url.lastPathComponent + " · " + L.t("copied")
+        root?.toolTip = L.t("Click to trim · Drag into any app")
+        editButton.update(title: L.t("Trim"), symbol: "scissors")
+        editButton.toolTip = L.t("Trim the start and end, or cut parts out")
         present()
     }
 

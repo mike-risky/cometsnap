@@ -239,7 +239,7 @@ final class CanvasView: NSView, NSTextFieldDelegate {
         f.cell?.wraps = false
         f.cell?.isScrollable = true
         f.delegate = self
-        f.placeholderString = "Type…"
+        f.placeholderString = L.t("Type…")
         f.frame = CGRect(x: origin.x - 2, y: origin.y - 1, width: max(160, f.intrinsicContentSize.width + 40), height: fontSize * 1.5 + 4)
         addSubview(f)
         textField = f

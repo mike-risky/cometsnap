@@ -136,7 +136,7 @@ public sealed class TrayFlyout : Window
         _status = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var footer = new DockPanel { Margin = new Thickness(12, 8, 12, 10), LastChildFill = false };
         var openFolder = LinkButton(L.T("Open folder"), () => { Hide(); _app.OpenCapturesFolder(); });
-        var settings = LinkButton(L.T("Settings"), () => { Hide(); _app.OpenSettingsFile(); });
+        var settings = LinkButton(L.T("Settings"), () => { Hide(); _app.OpenSettings(); });
         DockPanel.SetDock(openFolder, Dock.Left);
         DockPanel.SetDock(settings, Dock.Right);
         DockPanel.SetDock(_status, Dock.Left);

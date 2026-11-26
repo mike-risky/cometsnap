@@ -181,7 +181,7 @@ public sealed class OverlaySession
         if (Windows.Count == 0) return;
         WindowDetection = !WindowDetection;
         HoverWindow = WindowDetection ? WindowFinder.At(Windows, CursorX, CursorY) : null;
-        Flash = WindowDetection ? "Window detection on" : "Window detection off";
+        Flash = WindowDetection ? T("Window detection on") : T("Window detection off");
         Changed?.Invoke();
     }
 

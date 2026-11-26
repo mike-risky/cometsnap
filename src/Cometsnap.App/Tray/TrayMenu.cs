@@ -42,7 +42,7 @@ public sealed class TrayMenu
         _menu.Items.Add(Item(L.T("Open captures folder"), _app.OpenCapturesFolder));
         _menu.Items.Add(OptionsMenu());
         _menu.Items.Add(Item(L.T("Replace your old screen capture…"), Later(_app.OfferReplace)));
-        _menu.Items.Add(Item(L.T("Settings file…"), _app.OpenSettingsFile));
+        _menu.Items.Add(Item(L.T("Settings…"), _app.OpenSettings));
         _menu.Items.Add(Item(L.T("About Cometsnap"), ShowAbout));
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item(L.T("Quit"), _app.Quit));

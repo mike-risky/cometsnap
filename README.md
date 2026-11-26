@@ -59,6 +59,13 @@ Get it from the [Latest Linux build](https://github.com/mike-risky/cometsnap/rel
 On first start Cometsnap offers to take over Print Screen from your desktop's screenshot tool
 (automatic on GNOME, Cinnamon and Xfce; other desktops get the commands to bind).
 On Wayland, captures and recordings go through the desktop portal, so the first one asks for permission.
+Drag any capture out of the tray panel (or the Copied card) into a file manager, browser, chat or office app.
+The playful extras (comet flight, milestones, seasonal looks, Constellation, the tray-panel secret) are here too;
+the comet and meteor showers need a compositing desktop, which almost every desktop is.
+It speaks English, French, German and Italian, following your desktop's language (change it in *Settings*).
+Recordings open in a small trimmer (the **Trim** button on the Copied card, or double-click one in the tray panel):
+drag the yellow handles to cut the start and end, drag across the timeline and press Del to cut a part out.
+The untouched recording is kept, so every cut stays adjustable.
 
 ## Features
 
@@ -66,7 +73,8 @@ Described for Windows (keys use Print Screen). The macOS and Linux apps share th
 see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
-- Speaks **English, French, German and Italian**: it follows the Windows display language (English otherwise), and *Options > Language* switches it on the spot. The installer follows Windows too.
+- Speaks **English, Spanish, Portuguese, French, German, Italian, Simplified Chinese and Hindi**: it follows the Windows display language (English otherwise), and *Settings > Language* switches it on the spot. The installer follows Windows too.
+- A proper **Settings** window (tray panel > Settings): language, start with Windows, sounds, shortcuts (click and press the new keys), captures folder, recording and the playful extras. Every change applies right away
 - **Print Screen** (or Ctrl+Shift+S) freezes the screen instantly
 - Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows).
   The moment you let go it's copied and saved: no toolbar in the way

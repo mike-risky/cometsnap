@@ -57,9 +57,9 @@ public sealed class ScreenRecorder : IAsyncDisposable
 
     public static string? MissingToolMessage()
     {
-        if (Tools.Ffmpeg is null) return "Recording needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again.";
+        if (Tools.Ffmpeg is null) return T("Recording needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again.");
         if (DesktopSession.IsWayland && !ScreenGrabber.ForceX11 && !GStreamer.HasElement("pipewiresrc"))
-            return "Recording on Wayland needs the GStreamer PipeWire plugin (gstreamer1.0-pipewire / gst-plugin-pipewire).";
+            return T("Recording on Wayland needs the GStreamer PipeWire plugin (gstreamer1.0-pipewire / gst-plugin-pipewire).");
         return null;
     }
 
@@ -305,7 +305,7 @@ public sealed class ScreenRecorder : IAsyncDisposable
 
     private static readonly Dictionary<string, bool> EncoderCache = new();
 
-    private static IEnumerable<string> VideoEncoderArgs(string ffmpeg, bool forGif)
+    internal static IEnumerable<string> VideoEncoderArgs(string ffmpeg, bool forGif)
     {
         if (!EncoderCache.TryGetValue("x264", out var x264)) EncoderCache["x264"] = x264 = FfmpegSupports(ffmpeg, "-encoders", "libx264");
         if (x264)

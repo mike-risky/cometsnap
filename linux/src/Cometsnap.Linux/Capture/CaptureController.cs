@@ -66,7 +66,7 @@ public sealed class CaptureController
 
     private async Task DelayedAsync(int seconds)
     {
-        _app.Toast($"Capture in {seconds} s…", 1200);
+        _app.Toast(F("Capture in {0} s…", seconds), 1200);
         await Task.Delay(TimeSpan.FromSeconds(seconds));
         await CaptureAsync();
     }
@@ -82,7 +82,7 @@ public sealed class CaptureController
         {
             var monitors = Monitors();
             var screen = await _grabber.GrabAsync(Union(monitors));
-            if (screen is null) { _app.Toast("Could not grab the screen", 3000); return; }
+            if (screen is null) { _app.Toast(T("Could not grab the screen"), 3000); return; }
             var pointer = X11.PointerPosition();
             var monitor = monitors.FirstOrDefault(m => pointer is { } pt && m.Contains(pt.X, pt.Y), monitors[0]);
             Deliver(screen, monitor);
@@ -104,8 +104,8 @@ public sealed class CaptureController
             if (screen is null)
             {
                 _app.Toast(_grabber.UsesPortal
-                    ? "The desktop did not allow the screenshot. Allow Cometsnap in the screenshot permission dialog and try again."
-                    : "Could not grab the screen", 5000);
+                    ? T("The desktop did not allow the screenshot. Allow Cometsnap in the screenshot permission dialog and try again.")
+                    : T("Could not grab the screen"), 5000);
                 return null;
             }
             var windows = await windowsTask;
