@@ -12,8 +12,14 @@ public class LocalizationTests
     [InlineData("de-DE", "de")]
     [InlineData("it-IT", "it")]
     [InlineData("en-US", "en")]
-    [InlineData("es-ES", "en")]
+    [InlineData("es-MX", "es")]
+    [InlineData("pt-BR", "pt")]
+    [InlineData("pt-PT", "pt")]
+    [InlineData("zh-CN", "zh")]
+    [InlineData("zh-TW", "zh")]
+    [InlineData("hi-IN", "hi")]
     [InlineData("ja-JP", "en")]
+    [InlineData("ru-RU", "en")]
     public void System_language_falls_back_to_English(string culture, string expected) =>
         Assert.Equal(expected, L.FromCulture(CultureInfo.GetCultureInfo(culture)));
 
@@ -50,7 +56,7 @@ public class LocalizationTests
                 keys.Add(Regex.Unescape(m.Groups[1].Value));
         }
         Assert.NotEmpty(keys);
-        foreach (var code in new[] { "fr", "de", "it" })
+        foreach (var code in L.Languages.Select(l => l.Code).Where(c => c != "en"))
         {
             var table = L.Table(code)!;
             foreach (var key in keys)
