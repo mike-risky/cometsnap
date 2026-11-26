@@ -60,7 +60,7 @@ public sealed class Loupe : Border
         _centerShadow = centerShadow;
 
         _position = Text(SpaceTheme.StarWhiteBrush);
-        _size = Text(SpaceTheme.CometBlueBrush);
+        _size = Text(SpaceTheme.SunBrush);
         _hex = Text(SpaceTheme.StarWhiteBrush);
         _hint = Text(SpaceTheme.DustBrush);
         _swatch = new Border { BorderBrush = SpaceTheme.DustBrush, VerticalAlignment = VerticalAlignment.Center };

@@ -1,4 +1,6 @@
-# ☄️ Cometsnap
+<p align="center"><img src="assets/png/cometsnap-256.png" width="128" alt="Cometsnap"></p>
+
+<h1 align="center">Cometsnap</h1>
 
 **A free, fun and snappy screenshot tool for Windows.**
 Hotkey to overlay in under 100 ms, smart window detection, a pixel-perfect magnifier,
@@ -27,6 +29,9 @@ click **More info → Run anyway**.
 - Pixel-precise keyboard control: arrows = 1 px, Shift + arrows = 10 px, Enter to confirm, Esc to cancel
 - Quick bar to annotate right on the frozen screen: circle, arrow, text, rectangle
 - Copied to the clipboard and auto-saved to `Pictures\Cometsnap\yyyy-MM\`
+- Left-click the tray icon for the flyout: big capture buttons and your last 30 captures.
+  Click a thumbnail to copy it, double-click to open it, drag it straight into Word, Outlook, Teams or a browser
+- A comet flies into the tray with a little whoosh after every capture (both can be turned off in settings)
 - Fullscreen, active window and delayed captures, multi-monitor and mixed DPI
 
 ## Keys
@@ -81,6 +86,11 @@ src/Cometsnap.Editor   vector annotation model + rendering
 tests/                 unit tests
 assets/                icon, sounds
 ```
+
+## Brand
+
+Logo, colors and type rules are in [assets/BRAND.md](assets/BRAND.md).
+Fonts: Bungee and Bungee Shade by David Jonathan Ross, [SIL Open Font License](assets/fonts/OFL.txt).
 
 ## License
 

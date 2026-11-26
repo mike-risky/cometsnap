@@ -23,17 +23,22 @@ public sealed class CaptureController
     /// <summary>Raised on the UI thread with the path of every saved capture.</summary>
     public event Action<string>? CaptureSaved;
 
-    /// <summary>Raised on the UI thread right after a capture was taken (before saving).</summary>
-    public event Action<BitmapSource>? CaptureTaken;
+    /// <summary>
+    /// Raised on the UI thread right after a capture was taken (before saving), with the
+    /// virtual-screen rectangle it came from.
+    /// </summary>
+    public event Action<BitmapSource, PixelRect>? CaptureTaken;
+
+    /// <summary>Raised on the UI thread when a capture (and its in-memory image) reached the disk.</summary>
+    public event Action<string, BitmapSource>? CaptureStored;
 
     public CaptureController(CometApp app)
     {
         _app = app;
         _store = new CaptureStore(() => app.CapturesFolder);
-        _store.Saved += path => app.Dispatcher.BeginInvoke(() => CaptureSaved?.Invoke(path));
 
         _overlay = new CaptureOverlay();
-        _overlay.Confirmed += (image, _) => Deliver(image);
+        _overlay.Confirmed += (image, rect) => Deliver(image, rect);
         _overlay.SaveRequested += SaveAs;
         _overlay.Prewarm();
     }
@@ -70,7 +75,7 @@ public sealed class CaptureController
         {
             Win32.GetCursorPos(out var p);
             var monitor = Monitors.Containing(Monitors.All(), p.X, p.Y);
-            Deliver(FrozenScreen.Capture(monitor).CropAll());
+            Deliver(FrozenScreen.Capture(monitor).CropAll(), monitor);
         }
         catch (Exception ex)
         {
@@ -97,7 +102,7 @@ public sealed class CaptureController
                 CaptureFullscreen();
                 return;
             }
-            Deliver(FrozenScreen.Capture(bounds).CropAll());
+            Deliver(FrozenScreen.Capture(bounds).CropAll(), bounds);
         }
         catch (Exception ex)
         {
@@ -136,7 +141,7 @@ public sealed class CaptureController
     /// <summary>Copies like a normal capture, then asks where to save an extra copy.</summary>
     private void SaveAs(BitmapSource image)
     {
-        Deliver(image);
+        Deliver(image, null);
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Save capture",
@@ -168,7 +173,7 @@ public sealed class CaptureController
         }
     }
 
-    private void Deliver(BitmapSource image)
+    private void Deliver(BitmapSource image, PixelRect? from)
     {
         var settings = _app.Settings;
         var sw = Stopwatch.StartNew();
@@ -176,7 +181,18 @@ public sealed class CaptureController
             Log.Error("Could not copy the capture to the clipboard");
         Log.Info($"Capture {image.PixelWidth}×{image.PixelHeight} on clipboard in {sw.ElapsedMilliseconds} ms");
 
-        CaptureTaken?.Invoke(image);
-        if (settings.AutoSave) _ = _store.SaveAsync(image, DateTime.Now);
+        if (from is { } rect) CaptureTaken?.Invoke(image, rect);
+        if (settings.AutoSave) _ = SaveAndAnnounce(image);
+    }
+
+    private async Task SaveAndAnnounce(BitmapSource image)
+    {
+        var path = await _store.SaveAsync(image, DateTime.Now);
+        if (path is null) return;
+        await _app.Dispatcher.InvokeAsync(() =>
+        {
+            CaptureSaved?.Invoke(path);
+            CaptureStored?.Invoke(path, image);
+        });
     }
 }

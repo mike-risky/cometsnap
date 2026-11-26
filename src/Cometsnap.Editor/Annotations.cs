@@ -17,7 +17,7 @@ namespace Cometsnap.Editor;
 [JsonDerivedType(typeof(TextAnnotation), "text")]
 public abstract class Annotation
 {
-    private string _color = "#FF3B5C";
+    private string _color = "#E5484D";
     private SolidColorBrush? _brush;
 
     public string Color
