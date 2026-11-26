@@ -38,13 +38,39 @@ public sealed class CaptureController
         _store = new CaptureStore(() => app.CapturesFolder);
 
         _overlay = new CaptureOverlay();
-        _overlay.Confirmed += (image, rect) => Deliver(image, rect);
-        _overlay.SaveRequested += SaveAs;
-        _overlay.EditRequested += (image, doc) => _app.OpenInEditor(image, doc);
+        _overlay.Confirmed += (image, rect) =>
+        {
+            if (TakePick() is { } pick) pick(rect);
+            else Deliver(image, rect);
+        };
+        _overlay.Cancelled += () => _pick = null;
+        _overlay.SaveRequested += image => { _pick = null; SaveAs(image); };
+        _overlay.EditRequested += (image, doc) => { _pick = null; _app.OpenInEditor(image, doc); };
         _overlay.Prewarm();
     }
 
     public bool IsBusy => _overlay.IsCapturing;
+
+    private Action<PixelRect>? _pick;
+
+    private Action<PixelRect>? TakePick()
+    {
+        var pick = _pick;
+        _pick = null;
+        return pick;
+    }
+
+    /// <summary>
+    /// Opens the usual region / window overlay, but only reports the chosen rectangle
+    /// (nothing is copied or saved). Used to pick what to record.
+    /// </summary>
+    public void PickRegion(Action<PixelRect> picked)
+    {
+        if (_overlay.IsCapturing) return;
+        _pick = picked;
+        StartRegion();
+        if (!_overlay.IsCapturing) _pick = null;
+    }
 
     /// <summary>Region / window capture with the frozen-screen overlay.</summary>
     public void StartRegion()

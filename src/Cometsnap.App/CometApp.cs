@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using Cometsnap.App.Capture;
 using Cometsnap.App.Editing;
 using Cometsnap.App.Onboarding;
+using Cometsnap.App.Recording;
 using Cometsnap.App.Services;
 using Cometsnap.App.Tray;
 using Cometsnap.Core.Diagnostics;
@@ -14,6 +15,7 @@ using Cometsnap.Core.Settings;
 using Cometsnap.Core.Storage;
 using Cometsnap.Core.Takeover;
 using Cometsnap.Editor;
+using Cometsnap.Video;
 
 namespace Cometsnap.App;
 
@@ -40,6 +42,7 @@ public sealed class CometApp : Application
     public CaptureController Capture { get; private set; } = null!;
     public RecentCaptures Recent { get; private set; } = null!;
     public ThumbnailCache Thumbnails { get; private set; } = null!;
+    public RecordingController Recorder { get; private set; } = null!;
 
     /// <summary>Text of the hotkey that actually works for region capture (shown in menus).</summary>
     public string? RegionHotkeyText { get; private set; }
@@ -86,14 +89,23 @@ public sealed class CometApp : Application
         };
 
         _tray = new TrayIcon(_host, "Cometsnap");
+        Recorder = new RecordingController(this, _tray);
         _menu = new TrayMenu(this);
         _flyout = new TrayFlyout(this, Recent, Thumbnails);
         _flyout.Prewarm();
         _tray.ContextMenuRequested += (_, _) => ShowTrayMenu();
-        _tray.Activated += () => _flyout.Toggle(_tray.GetIconRect());
+        _tray.Activated += () =>
+        {
+            if (Recorder.IsRecording) Recorder.Stop(); // a click on the pulsing icon stops the recording
+            else _flyout.Toggle(_tray.GetIconRect());
+        };
 
         _hotkeys = new HotkeyManager(_host);
-        _printScreen = new PrintScreenHook(Dispatcher, Capture.StartRegion, Capture.CaptureFullscreen, Capture.CaptureActiveWindow);
+        _printScreen = new PrintScreenHook(Dispatcher, Capture.StartRegion, Capture.CaptureFullscreen, Capture.CaptureActiveWindow)
+        {
+            Shift = () => Recorder.ToggleRegion(RecordingFormat.Mp4),
+            CtrlShift = () => Recorder.ToggleRegion(RecordingFormat.Gif),
+        };
         var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
         ListenForOtherLaunches();
@@ -189,6 +201,8 @@ public sealed class CometApp : Application
         var fallback = _hotkeys.TryRegister(Settings.CaptureHotkeyFallback, Capture.StartRegion);
         Register(Settings.FullscreenHotkey, Capture.CaptureFullscreen);
         Register(Settings.ActiveWindowHotkey, Capture.CaptureActiveWindow);
+        Register(Settings.RecordHotkey, () => Recorder.ToggleRegion(RecordingFormat.Mp4));
+        Register(Settings.RecordGifHotkey, () => Recorder.ToggleRegion(RecordingFormat.Gif));
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
         _menu?.Rebuild();
@@ -208,7 +222,9 @@ public sealed class CometApp : Application
         gesture.Replace(" ", "", StringComparison.Ordinal) is var g
         && (g.Equals("PrintScreen", StringComparison.OrdinalIgnoreCase)
             || g.Equals("Ctrl+PrintScreen", StringComparison.OrdinalIgnoreCase)
-            || g.Equals("Alt+PrintScreen", StringComparison.OrdinalIgnoreCase));
+            || g.Equals("Alt+PrintScreen", StringComparison.OrdinalIgnoreCase)
+            || g.Equals("Shift+PrintScreen", StringComparison.OrdinalIgnoreCase)
+            || g.Equals("Ctrl+Shift+PrintScreen", StringComparison.OrdinalIgnoreCase));
 
     // ------------------------------------------------------------------ replace the old tool
 
@@ -328,6 +344,7 @@ public sealed class CometApp : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Recorder?.Dispose(); // finishes a running recording so the file is not lost
         _hotkeys?.Dispose();
         _printScreen?.Dispose();
         _sounds?.Dispose();

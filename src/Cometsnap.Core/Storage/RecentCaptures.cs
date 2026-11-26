@@ -21,7 +21,7 @@ public sealed class RecentCaptures
         lock (_gate) return _paths.ToArray();
     }
 
-    /// <summary>Scans month folders from newest to oldest until enough images are found.</summary>
+    /// <summary>Scans month folders from newest to oldest until enough captures and recordings are found.</summary>
     public void Load(string root)
     {
         var found = new List<string>(_capacity);
@@ -35,7 +35,8 @@ public sealed class RecentCaptures
                     .Prepend(root);
                 foreach (var folder in folders)
                 {
-                    var files = Directory.EnumerateFiles(folder, "*.png")
+                    var files = Directory.EnumerateFiles(folder)
+                        .Where(MediaKinds.IsListed)
                         .Select(f => new FileInfo(f))
                         .OrderByDescending(f => f.LastWriteTimeUtc)
                         .Select(f => f.FullName);

@@ -70,7 +70,7 @@ public sealed class TrayFlyout : Window
         _sky = header;
 
         // ---- big capture buttons
-        var buttons = new UniformGrid { Columns = 3, Margin = new Thickness(12, 0, 12, 10) };
+        var buttons = new UniformGrid { Columns = 4, Margin = new Thickness(12, 0, 12, 10) };
         buttons.Children.Add(BigButton("Region / Window", "M2,5 V2 H5 M11,2 H14 V5 M14,11 V14 H11 M5,14 H2 V11", primary: true,
             () => HideThen(_app.Capture.StartRegion)));
         buttons.Children.Add(BigButton("Fullscreen", "M2,3 H14 V11 H2 Z M6,14 H10", primary: false,
@@ -85,6 +85,11 @@ public sealed class TrayFlyout : Window
             delayed.ContextMenu.IsOpen = true;
         };
         buttons.Children.Add(delayed);
+        // Record: click = region video, right-click = fullscreen / GIF.
+        var record = BigButton("Record", "M8,3 A5,5 0 1 1 7.99,3 Z M8,6 A2,2 0 1 1 7.99,6 Z", primary: false,
+            () => HideThen(() => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4)));
+        record.ContextMenu = RecordMenu();
+        buttons.Children.Add(record);
 
         // ---- search
         _search = new TextBox
@@ -251,6 +256,21 @@ public sealed class TrayFlyout : Window
         });
     }
 
+    private ContextMenu RecordMenu()
+    {
+        var menu = new ContextMenu();
+        void Add(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => HideThen(action);
+            menu.Items.Add(item);
+        }
+        Add("Region / window (MP4)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Mp4));
+        Add("Fullscreen (MP4)", () => _app.Recorder.ToggleFullscreen(Cometsnap.Video.RecordingFormat.Mp4));
+        Add("Region / window (GIF)", () => _app.Recorder.ToggleRegion(Cometsnap.Video.RecordingFormat.Gif));
+        return menu;
+    }
+
     private ContextMenu DelayMenu()
     {
         var menu = new ContextMenu();
@@ -281,6 +301,7 @@ public sealed class TrayFlyout : Window
 
     private FrameworkElement Tile(string path)
     {
+        var isRecording = Cometsnap.Core.Storage.MediaKinds.IsRecording(path);
         var image = new Image { Stretch = Stretch.UniformToFill };
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
         var cached = _thumbs.TryGet(path);
@@ -292,7 +313,8 @@ public sealed class TrayFlyout : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), Visibility = Visibility.Collapsed,
         };
-        actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Edit (circle, arrow, text…)", () => Open(path)));
+        if (isRecording) actions.Children.Add(MiniButton("M5,3 L13,8 L5,13 Z", "Play", () => Open(path)));
+        else actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Edit (circle, arrow, text…)", () => Open(path)));
         actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy", () => CopyFile(path)));
         actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", "Show in folder", () => ShowInFolder(path)));
         actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete (to Recycle Bin)", () => Delete(path)));
@@ -302,10 +324,13 @@ public sealed class TrayFlyout : Window
             Width = TileWidth, Height = TileHeight, Margin = new Thickness(0, 0, 8, 8), CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
             ClipToBounds = true, Cursor = Cursors.Hand,
-            ToolTip = $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag: drop into any app",
+            ToolTip = isRecording
+                ? $"{Path.GetFileName(path)}\nClick: copy · Double-click: play · Drag: drop into any app"
+                : $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag: drop into any app",
         };
         var inner = new Grid { ClipToBounds = true };
         inner.Children.Add(image);
+        if (isRecording) inner.Children.Add(RecordingBadge(Cometsnap.Core.Storage.MediaKinds.IsGif(path)));
         inner.Children.Add(actions);
         frame.Child = new Border { CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = inner };
 
@@ -346,6 +371,41 @@ public sealed class TrayFlyout : Window
         return frame;
     }
 
+    /// <summary>Bottom-left tag on recordings: a play triangle and "MP4" or "GIF".</summary>
+    private static FrameworkElement RecordingBadge(bool gif)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse("M0,0 L7,4 L0,8 Z"),
+            Fill = SpaceTheme.StarWhiteBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0),
+        });
+        row.Children.Add(new TextBlock
+        {
+            Text = gif ? "GIF" : "MP4",
+            Foreground = SpaceTheme.StarWhiteBrush,
+            FontFamily = SpaceTheme.UiFont,
+            FontSize = 10,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        return new Border
+        {
+            Child = row,
+            Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xD0),
+            BorderBrush = SpaceTheme.WithAlpha(SpaceTheme.RecordRed, 0xE0),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(5, 2, 6, 2),
+            Margin = new Thickness(5),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            IsHitTestVisible = false,
+        };
+    }
+
     private async Task LoadThumbAsync(Image target, string path)
     {
         var thumb = await _thumbs.GetAsync(path);
@@ -357,6 +417,11 @@ public sealed class TrayFlyout : Window
         if (!File.Exists(path)) return;
         // A file drop works with Word, Outlook, Teams, browsers, Explorer...
         var data = new DataObject(DataFormats.FileDrop, new[] { path });
+        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path))
+        {
+            DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
+            return;
+        }
         try
         {
             using var stream = File.OpenRead(path);
@@ -372,6 +437,21 @@ public sealed class TrayFlyout : Window
 
     private void CopyFile(string path)
     {
+        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path))
+        {
+            // Videos and GIFs go on the clipboard as the file: paste into Teams, Slack, mail, Explorer.
+            try
+            {
+                Clipboard.SetFileDropList(new System.Collections.Specialized.StringCollection { path });
+                Flash("Copied the file ✓");
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Copy recording from flyout failed", ex);
+                Flash("Could not copy");
+            }
+            return;
+        }
         try
         {
             using var stream = File.OpenRead(path);
@@ -385,10 +465,16 @@ public sealed class TrayFlyout : Window
         }
     }
 
-    /// <summary>Opens the capture in Cometsnap's editor.</summary>
+    /// <summary>Opens the capture in Cometsnap's editor (recordings: in the default player).</summary>
     private void Open(string path)
     {
         HideFlyout();
+        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path))
+        {
+            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+            catch (Exception ex) { Log.Error("Could not play the recording", ex); }
+            return;
+        }
         _app.OpenInEditor(path);
     }
 

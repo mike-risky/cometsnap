@@ -51,6 +51,24 @@ public sealed class AppSettings
     public bool AutoSave { get; set; } = true;
     public int RecentCount { get; set; } = 30;
 
+    // ---- Recording ("Transmissions")
+
+    /// <summary>Start recording a region (pick it like a capture). Pressed again while recording: stop.</summary>
+    public string RecordHotkey { get; set; } = "Shift+PrintScreen";
+
+    /// <summary>Same as <see cref="RecordHotkey"/>, but records an animated GIF.</summary>
+    public string RecordGifHotkey { get; set; } = "Ctrl+Shift+PrintScreen";
+
+    public int RecordFramesPerSecond { get; set; } = 30;
+    public int RecordGifFramesPerSecond { get; set; } = 15;
+    /// <summary>Record the sound playing on the PC.</summary>
+    public bool RecordSystemAudio { get; set; } = true;
+    /// <summary>Record the default microphone. Off by default.</summary>
+    public bool RecordMicrophone { get; set; }
+    public bool RecordShowCursor { get; set; } = true;
+    /// <summary>After a recording, put the video file on the clipboard (paste it in Teams, Slack, mail...).</summary>
+    public bool RecordCopyToClipboard { get; set; } = true;
+
     /// <summary>
     /// Own Print Screen with a low-level keyboard hook, so it works even when Windows'
     /// Snipping Tool or another screenshot tool registered it first.
