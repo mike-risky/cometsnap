@@ -3,8 +3,9 @@
 ## Cut a release
 
 1. Make sure `main` is green and the `nightly` build works on a real PC.
-2. Create a tag `vX.Y.Z` on `main` (for example on GitHub: *Releases > Draft a new release > Choose a tag > v0.2.0 > Create new tag*,
-   then **only save the tag**: the workflow creates the release itself), or from a terminal: `git tag v0.2.0 && git push origin v0.2.0`.
+2. Open <https://github.com/mike-risky/cometsnap/releases/new?tag=v1.0.0&target=main> (change the version),
+   pick **Create new tag on publish**, and click **Publish release**. Title and notes can stay empty: the workflow fills them.
+   (Or from a terminal: `git tag v1.0.0 && git push origin v1.0.0`.)
 3. The `build` workflow builds, signs (two approvals on signpath.io once SignPath is set up) and publishes
    the release **Cometsnap v0.2.0** with the installers, the portable exes and `SHA256SUMS.txt`.
 4. The `winget` job then writes the winget manifests and, if `WINGET_TOKEN` exists, opens the pull request on winget-pkgs.
