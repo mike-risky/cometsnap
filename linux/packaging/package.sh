@@ -49,24 +49,27 @@ done
 cp "$PKG/icons/cometsnap-256.png" "$APPDIR/cometsnap.png"
 ln -sf cometsnap.png "$APPDIR/.DirIcon"
 
-TOOL="$OUT/appimagetool-$(uname -m).AppImage"
+mkdir -p "$OUT/tools"
+TOOL="$OUT/tools/appimagetool-$(uname -m).AppImage"
 if [ ! -x "$TOOL" ]; then
   curl -fsSL --retry 4 -o "$TOOL" \
     "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(uname -m).AppImage"
   chmod +x "$TOOL"
 fi
-RUNTIME="$OUT/runtime-$ARCH"
+RUNTIME="$OUT/tools/runtime-$ARCH"
 if [ ! -f "$RUNTIME" ]; then
   curl -fsSL --retry 4 -o "$RUNTIME" "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-$ARCH"
 fi
 ARCH="$ARCH" APPIMAGE_EXTRACT_AND_RUN=1 "$TOOL" --no-appstream --runtime-file "$RUNTIME" \
-  "$APPDIR" "$OUT/Cometsnap-$ARCH.AppImage"
+  --comp zstd "$APPDIR" "$OUT/Cometsnap-$ARCH.AppImage"
 
 # ---------------------------------------------------------------- .deb
 echo "== .deb"
 DEB="$WORK/deb"
 mkdir -p "$DEB/DEBIAN" "$DEB/usr/lib" "$DEB/usr/bin" "$DEB/usr/share/applications"
 cp -a "$WORK/app" "$DEB/usr/lib/cometsnap"
+# The .deb uses the distro's ffmpeg (a dependency) instead of the bundled one: much smaller.
+rm -rf "$DEB/usr/lib/cometsnap/libexec"
 install -m 755 "$PKG/launcher.sh" "$DEB/usr/bin/cometsnap"
 cp "$PKG/cometsnap.desktop" "$DEB/usr/share/applications/cometsnap.desktop"
 for s in 16 24 32 48 64 128 256 512; do
@@ -85,7 +88,7 @@ Architecture: $DEBARCH
 Installed-Size: $SIZE
 Maintainer: Michael Solioz <260403229+mike-risky@users.noreply.github.com>
 Homepage: https://github.com/mike-risky/cometsnap
-Depends: libx11-6, libice6, libsm6, libfontconfig1, libc6
+Depends: libx11-6, libice6, libsm6, libfontconfig1, libc6, ffmpeg
 Recommends: xdg-desktop-portal, gstreamer1.0-pipewire, wl-clipboard, pulseaudio-utils | pipewire-bin
 Description: Snappy screenshots, annotations and screen recordings
  Cometsnap lives in the tray. Press Print Screen, pick a window or drag an
