@@ -24,14 +24,20 @@ click **More info → Run anyway**.
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
 - **Print Screen** (or Ctrl+Shift+S) freezes the screen instantly
-- Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows)
+- Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows).
+  The moment you let go it's copied and saved: no toolbar in the way
+- First run offers to **replace your old screen capture**: Cometsnap takes over Print Screen from
+  Windows' Snipping Tool (or Greenshot, ShareX, Lightshot, Snagit...) and can start with Windows
 - Magnifier loupe with pixel grid, X/Y, selection size and hex color; it sits in a corner and dodges your cursor
 - Pixel-precise keyboard control: arrows = 1 px, Shift + arrows = 10 px, Enter to confirm, Esc to cancel
-- Quick bar to annotate right on the frozen screen: circle, arrow, text, rectangle
+- A small **Edit** card pops up after each capture (it never steals focus). Click it, or double-click
+  a capture in the tray, to open the editor: circle, arrow, text, rectangle, colors, undo, zoom.
+  Shapes stay editable: re-open a capture later and keep going
+- Prefer annotating on the frozen screen? Turn off *Options > Instant capture* to get the quick bar back
 - Copied to the clipboard and auto-saved to `Pictures\Cometsnap\yyyy-MM\`
 - Left-click the tray icon for the flyout: big capture buttons and your last 30 captures.
-  Click a thumbnail to copy it, double-click to open it, drag it straight into Word, Outlook, Teams or a browser
-- A comet flies into the tray with a little whoosh after every capture (both can be turned off in settings)
+  Click a thumbnail to copy it, double-click to edit it, drag it straight into Word, Outlook, Teams or a browser
+- A comet flies into the tray after every capture, with an optional soft click (both in *Options*)
 - Fullscreen, active window and delayed captures, multi-monitor and mixed DPI
 
 ## Keys
@@ -41,20 +47,23 @@ click **More info → Run anyway**.
 | Anywhere | **Print Screen** (or **Ctrl+Shift+S**) | Region / window capture |
 | Anywhere | **Ctrl+Print Screen** | Fullscreen of the monitor under the mouse |
 | Anywhere | **Alt+Print Screen** | Active window |
-| Overlay | click | Grab the highlighted window |
-| Overlay | drag | Free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
+| Overlay | click | Capture the highlighted window |
+| Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
 | Overlay | arrows / **Shift**+arrows | Move the cursor 1 px / 10 px |
-| Overlay | **Enter** | Copy (in hover mode: copies the highlighted window right away) |
-| Overlay | **Esc** / right click | Drop the selection, press again to close |
-| Overlay | **F** | Whole monitor |
+| Overlay | **Enter** | Capture the highlighted window |
+| Overlay | **Esc** / right click | Close |
+| Overlay | **F** | Capture the whole monitor |
 | Overlay | **W** | Toggle window detection |
 | Overlay | **C** | Copy the hex color under the cursor |
-| Selection | arrows / **Ctrl**+arrows | Move / resize the selection |
-| Selection | double click | Copy |
-| Selection | **E** / **A** / **T** / **R** | Circle / arrow / text / rectangle (Shift = perfect circle, square, 45° arrow) |
-| Selection | **1**–**6** | Pick a color |
-| Selection | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
-| Selection | **Ctrl+S** | Save as… |
+| Editor | **E** / **A** / **T** / **R** | Circle / arrow / text / rectangle (Shift = perfect circle, square, 45° arrow) |
+| Editor | **1**–**6** | Pick a color |
+| Editor | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
+| Editor | **Ctrl+C** / **Ctrl+S** / **Ctrl+Shift+S** | Copy / save / save a copy as… |
+| Editor | **Ctrl+Enter** | Copy, save and close |
+| Editor | **Ctrl+wheel**, **Ctrl+0**, **Ctrl+1** | Zoom, fit, 100% |
+
+With *Instant capture* off, the same tool keys work on the frozen screen once a region is selected,
+and **Ctrl+E** opens the selection in the editor.
 
 ## Roadmap
 

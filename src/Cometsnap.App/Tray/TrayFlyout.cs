@@ -293,6 +293,7 @@ public sealed class TrayFlyout : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), Visibility = Visibility.Collapsed,
         };
+        actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Edit (circle, arrow, text…)", () => Open(path)));
         actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", "Copy", () => CopyFile(path)));
         actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", "Show in folder", () => ShowInFolder(path)));
         actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", "Delete (to Recycle Bin)", () => Delete(path)));
@@ -302,7 +303,7 @@ public sealed class TrayFlyout : Window
             Width = TileWidth, Height = TileHeight, Margin = new Thickness(0, 0, 8, 8), CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
             ClipToBounds = true, Cursor = Cursors.Hand,
-            ToolTip = $"{Path.GetFileName(path)}\nClick: copy · Double-click: open · Drag: drop into any app",
+            ToolTip = $"{Path.GetFileName(path)}\nClick: copy · Double-click: edit · Drag: drop into any app",
         };
         var inner = new Grid { ClipToBounds = true };
         inner.Children.Add(image);
@@ -376,11 +377,11 @@ public sealed class TrayFlyout : Window
         }
     }
 
+    /// <summary>Opens the capture in Cometsnap's editor.</summary>
     private void Open(string path)
     {
         HideFlyout();
-        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-        catch (Exception ex) { Log.Error("Open failed", ex); }
+        _app.OpenInEditor(path);
     }
 
     private void ShowInFolder(string path)
@@ -398,6 +399,7 @@ public sealed class TrayFlyout : Window
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path,
                     Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
                     Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            Cometsnap.Core.Storage.EditSidecar.DeleteFor(path);
             _thumbs.Forget(path);
             _recent.Remove(path);
             Flash("Moved to the Recycle Bin");

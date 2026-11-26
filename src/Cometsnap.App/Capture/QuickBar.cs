@@ -28,9 +28,11 @@ public sealed class QuickBar : Border
     public event Action? UndoClicked;
     public event Action? CopyClicked;
     public event Action? SaveClicked;
+    public event Action? EditClicked;
     public event Action? CloseClicked;
 
-    public QuickBar()
+    /// <param name="inEditor">The editor window's bar: no "open in editor", and Save saves the file.</param>
+    public QuickBar(bool inEditor = false)
     {
         LayoutTransform = _scale;
         Background = new SolidColorBrush(Color.FromArgb(0xF2, SpaceTheme.Void.R, SpaceTheme.Void.G, SpaceTheme.Void.B));
@@ -55,9 +57,11 @@ public sealed class QuickBar : Border
         row.Children.Add(Divider());
 
         row.Children.Add(Button(Icon("M5.5,4 L2.5,7 L5.5,10 M2.5,7 H10 A3.5,3.5 0 0 1 10,14 H7"), "Undo (Ctrl+Z)", () => UndoClicked?.Invoke()));
+        if (!inEditor)
+            row.Children.Add(Button(Icon("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5"), "Open in editor (Ctrl+E)", () => EditClicked?.Invoke()));
         row.Children.Add(Divider());
-        row.Children.Add(Button(Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5"), "Copy (Enter)", () => CopyClicked?.Invoke(), accent: true));
-        row.Children.Add(Button(Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5"), "Save as… (Ctrl+S)", () => SaveClicked?.Invoke()));
+        row.Children.Add(Button(Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5"), inEditor ? "Copy (Ctrl+C)" : "Copy (Enter)", () => CopyClicked?.Invoke(), accent: true));
+        row.Children.Add(Button(Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5"), inEditor ? "Save (Ctrl+S) · Save as: Ctrl+Shift+S" : "Save as… (Ctrl+S)", () => SaveClicked?.Invoke()));
         row.Children.Add(Button(Icon("M4,4 L12,12 M12,4 L4,12"), "Close (Esc)", () => CloseClicked?.Invoke()));
 
         Child = row;

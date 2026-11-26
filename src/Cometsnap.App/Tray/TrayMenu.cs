@@ -35,10 +35,35 @@ public sealed class TrayMenu
         _menu.Items.Add(RecentMenu());
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Open captures folder", _app.OpenCapturesFolder));
-        _menu.Items.Add(Item("Settings…", _app.OpenSettingsFile));
+        _menu.Items.Add(OptionsMenu());
+        _menu.Items.Add(Item("Replace your old screen capture…", Later(_app.OfferReplace)));
+        _menu.Items.Add(Item("Settings file…", _app.OpenSettingsFile));
         _menu.Items.Add(Item("About Cometsnap", ShowAbout));
         _menu.Items.Add(new Separator());
         _menu.Items.Add(Item("Quit", _app.Quit));
+    }
+
+    private MenuItem OptionsMenu()
+    {
+        var s = _app.Settings;
+        var options = new MenuItem { Header = "Options" };
+        options.Items.Add(Toggle("Instant capture (no toolbar)", s.InstantCapture, v => s.InstantCapture = v));
+        options.Items.Add(Toggle("Show the Edit card after a capture", s.ShowEditCard, v => s.ShowEditCard = v));
+        options.Items.Add(Toggle("Comet animation", s.ShowCometAnimation, v => s.ShowCometAnimation = v));
+        options.Items.Add(Toggle("Sound on capture", s.PlaySounds, v => s.PlaySounds = v));
+        options.Items.Add(Toggle("Detect windows under the mouse", s.WindowDetection, v => s.WindowDetection = v));
+        return options;
+    }
+
+    private MenuItem Toggle(string header, bool value, Action<bool> set)
+    {
+        var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = value };
+        item.Click += (_, _) =>
+        {
+            set(item.IsChecked);
+            _app.TrySaveSettings();
+        };
+        return item;
     }
 
     private MenuItem RecentMenu()
@@ -53,26 +78,11 @@ public sealed class TrayMenu
         foreach (var path in items)
         {
             var p = path;
-            var item = Item(System.IO.Path.GetFileNameWithoutExtension(p), () => CopyFile(p));
-            item.ToolTip = "Click to copy";
+            var item = Item(System.IO.Path.GetFileNameWithoutExtension(p), () => _app.OpenInEditor(p));
+            item.ToolTip = "Click to edit";
             recent.Items.Add(item);
         }
         return recent;
-    }
-
-    private static void CopyFile(string path)
-    {
-        try
-        {
-            using var stream = System.IO.File.OpenRead(path);
-            var bmp = System.Windows.Media.Imaging.BitmapFrame.Create(stream,
-                System.Windows.Media.Imaging.BitmapCreateOptions.None, System.Windows.Media.Imaging.BitmapCacheOption.OnLoad);
-            Services.ClipboardService.SetImage(bmp);
-        }
-        catch (Exception ex)
-        {
-            Cometsnap.Core.Diagnostics.Log.Error("Copy recent failed", ex);
-        }
     }
 
     public void Open()

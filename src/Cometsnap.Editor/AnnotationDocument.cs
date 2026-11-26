@@ -47,6 +47,14 @@ public sealed class AnnotationDocument
         Changed?.Invoke();
     }
 
+    /// <summary>An independent copy, moved by (dx, dy): e.g. from screen to image coordinates.</summary>
+    public AnnotationDocument CopyOffset(double dx, double dy)
+    {
+        var copy = FromJson(ToJson());
+        foreach (var a in copy._items) a.Offset(dx, dy);
+        return copy;
+    }
+
     public void Render(DrawingContext dc, Annotation? inProgress = null)
     {
         foreach (var a in _items) a.Render(dc);

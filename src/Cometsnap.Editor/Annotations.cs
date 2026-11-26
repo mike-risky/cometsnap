@@ -33,6 +33,9 @@ public abstract class Annotation
 
     public abstract void Render(DrawingContext dc);
 
+    /// <summary>Moves the shape by the given amount of pixels.</summary>
+    public abstract void Offset(double dx, double dy);
+
     /// <summary>True when the shape is too small to be intentional (a stray click).</summary>
     [JsonIgnore]
     public abstract bool IsDegenerate { get; }
@@ -67,6 +70,12 @@ public abstract class BoxAnnotation : Annotation
     public Rect Box => new(new Point(X1, Y1), new Point(X2, Y2));
 
     public override bool IsDegenerate => Math.Abs(X2 - X1) < 3 && Math.Abs(Y2 - Y1) < 3;
+
+    public override void Offset(double dx, double dy)
+    {
+        X1 += dx; X2 += dx;
+        Y1 += dy; Y2 += dy;
+    }
 
     /// <summary>Updates the moving corner. <paramref name="constrain"/> (Shift) makes it square / round.</summary>
     public void DragTo(double x, double y, bool constrain)
@@ -168,6 +177,12 @@ public sealed class TextAnnotation : Annotation
     public bool Bubble { get; set; }
 
     public override bool IsDegenerate => string.IsNullOrWhiteSpace(Text);
+
+    public override void Offset(double dx, double dy)
+    {
+        X += dx;
+        Y += dy;
+    }
 
     public FormattedText Format(Brush brush) => new(
         Text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, Face, FontSize, brush, pixelsPerDip: 1.0);
