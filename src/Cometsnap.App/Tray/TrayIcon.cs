@@ -49,6 +49,17 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
+    /// <summary>Shows a Windows notification balloon from the tray icon.</summary>
+    public void ShowBalloon(string title, string text)
+    {
+        if (!_added) return;
+        var data = CreateData(Win32.NIF_INFO);
+        data.szInfoTitle = title.Length > 63 ? title[..63] : title;
+        data.szInfo = text.Length > 255 ? text[..255] : text;
+        data.dwInfoFlags = Win32.NIIF_INFO;
+        Win32.Shell_NotifyIcon(Win32.NIM_MODIFY, ref data);
+    }
+
     /// <summary>Screen rectangle of the icon in physical pixels, if Windows can tell us.</summary>
     public RECT? GetIconRect()
     {

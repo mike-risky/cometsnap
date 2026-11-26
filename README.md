@@ -29,6 +29,24 @@ click **More info → Run anyway**.
 - Copied to the clipboard and auto-saved to `Pictures\Cometsnap\yyyy-MM\`
 - Fullscreen, active window and delayed captures, multi-monitor and mixed DPI
 
+## Keys
+
+| Where | Key | Action |
+|---|---|---|
+| Anywhere | **Print Screen** (or **Ctrl+Shift+S**) | Region / window capture |
+| Anywhere | **Ctrl+Print Screen** | Fullscreen of the monitor under the mouse |
+| Anywhere | **Alt+Print Screen** | Active window |
+| Overlay | click | Grab the highlighted window |
+| Overlay | drag | Free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
+| Overlay | arrows / **Shift**+arrows | Move the cursor 1 px / 10 px |
+| Overlay | **Enter** | Copy (in hover mode: copies the highlighted window right away) |
+| Overlay | **Esc** / right click | Drop the selection, press again to close |
+| Overlay | **F** | Whole monitor |
+| Overlay | **W** | Toggle window detection |
+| Overlay | **C** | Copy the hex color under the cursor |
+| Selection | arrows / **Ctrl**+arrows | Move / resize the selection |
+| Selection | double click | Copy |
+
 ## Roadmap
 
 1. **Snappy core**: tray, hotkeys, capture overlay, loupe, quick annotations
