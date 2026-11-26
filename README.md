@@ -2,14 +2,22 @@
 
 <h1 align="center">Cometsnap</h1>
 
-**A free, fun and snappy screenshot tool for Windows.**
-Hotkey to overlay in under 100 ms, smart window detection, a pixel-perfect magnifier,
-instant annotations and a tray flyout of your recent shots.
-No paywall, no branding, no forced updates.
+**A free, fun and snappy screenshot and screen recording tool for Windows, macOS and Linux.**
+Press Print Screen and it's instant: smart window detection, a pixel-perfect magnifier,
+annotations, MP4 and GIF recording, and a panel of your recent shots you can drag into any app.
+No paywall, no branding, no forced updates. 🌐 **[cometsnap.com](https://cometsnap.com)**
 
-> 🚧 Early days: Phase 1 ("snappy core") is being built. See the roadmap below.
+| | Download | Notes |
+|---|---|---|
+| **Windows** 10 and 11 | [Installer (x64)](https://github.com/mike-risky/cometsnap/releases/download/nightly/Cometsnap-Setup-x64.exe) · [ARM64](https://github.com/mike-risky/cometsnap/releases/download/nightly/Cometsnap-Setup-arm64.exe) | Portable exe also available |
+| **macOS** 14+ | [Cometsnap-macOS.dmg](https://github.com/mike-risky/cometsnap/releases/download/macos-nightly/Cometsnap-macOS.dmg) | Universal: Apple Silicon and Intel |
+| **Linux** | [AppImage (x86_64)](https://github.com/mike-risky/cometsnap/releases/download/linux-nightly/Cometsnap-x86_64.AppImage) · [.deb](https://github.com/mike-risky/cometsnap/releases/download/linux-nightly/cometsnap_amd64.deb) | X11 and Wayland, ARM64 builds too |
+
+> 🚀 Early days and moving fast: these are the latest builds, updated with every change.
 
 ## Download
+
+### Windows
 
 Get the installer from the [Latest build](https://github.com/mike-risky/cometsnap/releases/tag/nightly) pre-release:
 **`Cometsnap-Setup-x64.exe`** (most PCs) or `Cometsnap-Setup-arm64.exe` (Snapdragon / Surface Pro X).
@@ -52,7 +60,10 @@ On first start Cometsnap offers to take over Print Screen from your desktop's sc
 (automatic on GNOME, Cinnamon and Xfce; other desktops get the commands to bind).
 On Wayland, captures and recordings go through the desktop portal, so the first one asks for permission.
 
-## Features (Phase 1)
+## Features
+
+Described for Windows (keys use Print Screen). The macOS and Linux apps share the same ideas and look;
+see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
 - Speaks **English, French, German and Italian**: it follows the Windows display language (English otherwise), and *Options > Language* switches it on the spot. The installer follows Windows too.
@@ -80,7 +91,8 @@ On Wayland, captures and recordings go through the desktop portal, so the first 
   "You captured N snaps" card, a snowy comet in December and a pumpkin comet at Halloween (*Options* to turn off),
   **Constellation** mode in the editor that joins numbered steps with faint star lines, and a secret in the tray
   panel for anyone who knows ↑ ↑ ↓ ↓ ← → ← → B A
-- Fullscreen, active window and delayed captures, multi-monitor and mixed DPI
+- Fullscreen, active window and delayed captures (3, 5 or 10 s), multi-monitor and mixed DPI
+- **Screen recording**: MP4 with PC sound and microphone, or an animated GIF, of any area or the whole screen
 
 ## Keys
 
@@ -115,16 +127,17 @@ and **Ctrl+E** opens the selection in the editor.
 
 ## Roadmap
 
-1. **Snappy core**: tray, hotkeys, capture overlay, loupe, quick annotations
-2. **Full editor + docs mode**: all tools, re-editable captures, effects, doc sessions with PDF/DOCX/Markdown export
-3. **Smart tools**: OCR, color picker, QR reader, scrolling capture
-4. **Video**: MP4/GIF recording with sound
-5. **Share**: Imgur, SFTP, S3, OneDrive, Google Drive
-6. **Extras**: auto-blur of sensitive data, subtitles, Android capture
+1. ✅ **Snappy core**: tray, hotkeys, capture overlay, loupe, quick annotations
+2. ✅ **Full editor**: all tools, re-editable captures (docs mode with PDF/DOCX/Markdown export comes later)
+3. ✅ **Video**: MP4/GIF recording with sound
+4. ✅ **Everywhere**: Windows, macOS and Linux apps, in English, French, German and Italian
+5. **Smart tools**: OCR, QR reader, scrolling capture
+6. **Share**: Imgur, SFTP, S3, OneDrive, Google Drive
 
 ## Building
 
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download) on Windows.
+Windows: requires the [.NET 8 SDK](https://dotnet.microsoft.com/download) on Windows.
+macOS and Linux: see [`macos/README.md`](macos/README.md) and [`linux/`](linux/).
 
 ```powershell
 dotnet build Cometsnap.sln
