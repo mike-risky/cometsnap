@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SignPath artifact configuration "installer" (slug: installer).
+     Signs the two Windows installers, built around the files already signed with "app". -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+  <zip-file>
+    <pe-file-set product-name="Cometsnap" product-version="${version}">
+      <include path="Cometsnap-Setup-x64.exe" />
+      <include path="Cometsnap-Setup-arm64.exe" />
+      <for-each>
+        <authenticode-sign description="Cometsnap Setup" description-url="https://github.com/mike-risky/cometsnap" />
+      </for-each>
+    </pe-file-set>
+  </zip-file>
+</artifact-configuration>

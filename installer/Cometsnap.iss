@@ -30,6 +30,10 @@ AppSupportURL=https://github.com/mike-risky/cometsnap/issues
 VersionInfoVersion={#AppVersion}
 VersionInfoProductName=Cometsnap
 VersionInfoDescription=Cometsnap Setup
+VersionInfoProductVersion={#AppVersion}
+VersionInfoProductTextVersion={#AppVersion}
+VersionInfoCompany=Michael Solioz
+VersionInfoCopyright=Copyright (c) 2026 Michael Solioz
 DefaultDirName={autopf}\Cometsnap
 DisableDirPage=yes
 DisableProgramGroupPage=yes
@@ -46,6 +50,12 @@ WizardSmallImageFile=..\assets\installer\small-100.bmp,..\assets\installer\small
 Compression=lzma2/max
 SolidCompression=yes
 CloseApplications=force
+#ifdef SignedUninstallerDir
+; Code signing (CI "sign" job): the uninstaller is signed by SignPath between two compiles.
+; The first compile writes uninst-*.e32 here and stops; the second embeds the signed copy.
+SignedUninstaller=yes
+SignedUninstallerDir={#SignedUninstallerDir}
+#endif
 RestartApplications=no
 #if Arch == "arm64"
 ArchitecturesAllowed=arm64
@@ -308,7 +318,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Cometsnap"; Tasks: not autostart; Flags: deletevalue
 
 [Run]
-Filename: "{app}\Cometsnap.exe"; Parameters: "--after-install"; Description: "{cm:RunAfter}"; Flags: nowait postinstall
+Filename: "{app}\Cometsnap.exe"; Parameters: "--after-install"; Description: "{cm:RunAfter}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 const

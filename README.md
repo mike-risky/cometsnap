@@ -31,7 +31,8 @@ Prefer no install? `Cometsnap-x64.exe` / `Cometsnap-arm64.exe` are portable sing
 - Put a file named `portable.txt` next to the exe to keep settings and captures beside it (USB-friendly).
 
 Windows may show a SmartScreen warning the first time because the exe is not code-signed yet:
-click **More info → Run anyway**.
+click **More info → Run anyway**. Signed releases are on the way (see the code signing policy below).
+Uninstall the portable exe by quitting it from the tray and deleting the file.
 
 ### macOS
 
@@ -188,6 +189,18 @@ linux/                 Linux app (Avalonia): X11 + Wayland portal capture, edito
 
 Logo, colors and type rules are in [assets/BRAND.md](assets/BRAND.md).
 Fonts: Bungee and Bungee Shade by David Jonathan Ross, [SIL Open Font License](assets/fonts/OFL.txt).
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers, reviewers and approvers: [Michael Solioz](https://github.com/mike-risky). Every signing request is approved by hand.
+- Only files built from this repository by its GitHub Actions workflow are signed. Full policy: [CODE_SIGNING.md](CODE_SIGNING.md).
+
+## Privacy
+
+This program will not transfer any information to other networked systems unless specifically requested
+by the user or the person installing or operating it. See [PRIVACY.md](PRIVACY.md).
 
 ## License
 
