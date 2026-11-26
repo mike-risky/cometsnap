@@ -28,7 +28,7 @@ public sealed class EditCard : Window
     private BitmapSource? _image;
     private string? _path;
 
-    /// <summary>Raised with the saved path (if known yet) and the image when Edit is clicked.</summary>
+    /// <summary>Raised with the saved path (if known yet) and the image when the card or Edit is clicked.</summary>
     public event Action<string?, BitmapSource>? EditRequested;
 
     public EditCard()
@@ -82,13 +82,26 @@ public sealed class EditCard : Window
         row.Children.Add(edit);
         row.Children.Add(close);
 
-        Content = new Border
+        // The whole card opens the editor: one big target, faster than aiming for the button.
+        var card = new Border
         {
             Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12), Padding = new Thickness(10), Margin = new Thickness(12),
             Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black },
-            Child = row,
+            Child = row, Cursor = Cursors.Hand, ToolTip = "Click to edit",
         };
+        card.MouseEnter += (_, _) =>
+        {
+            card.BorderBrush = SpaceTheme.CometBlueBrush;
+            card.Background = SpaceTheme.WithAlpha(SpaceTheme.Navy, 0xF6);
+        };
+        card.MouseLeave += (_, _) =>
+        {
+            card.BorderBrush = SpaceTheme.NavyLightBrush;
+            card.Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2);
+        };
+        card.MouseLeftButtonUp += (_, e) => { e.Handled = true; OnEdit(); };
+        Content = card;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
         _timer.Tick += (_, _) => FadeOut();
