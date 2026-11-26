@@ -11,6 +11,7 @@ using Cometsnap.Core.Capture;
 using Cometsnap.Core.Geometry;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
+using Cometsnap.Editor;
 
 namespace Cometsnap.App.Capture;
 
@@ -24,7 +25,7 @@ namespace Cometsnap.App.Capture;
 /// </summary>
 public sealed class CaptureOverlay : Window
 {
-    private enum Mode { Idle, Hover, Pressed, Dragging, Selected, Moving, Resizing }
+    private enum Mode { Idle, Hover, Pressed, Dragging, Selected, Moving, Resizing, Drawing }
 
     [Flags]
     private enum Edges { None = 0, Left = 1, Top = 2, Right = 4, Bottom = 8 }
@@ -47,9 +48,18 @@ public sealed class CaptureOverlay : Window
     private readonly Line _guideV;
     private readonly Border _label;
     private readonly TextBlock _labelText;
-    private readonly Border _hint;
-    private readonly TextBlock _hintText;
     private readonly Loupe _loupe;
+    private readonly AnnotationLayer _layer;
+    private readonly RectangleGeometry _layerClip = new();
+    private readonly QuickBar _bar;
+    private readonly AnnotationDocument _doc = new();
+
+    private AnnotationTool _tool = AnnotationTool.None;
+    private string _color = QuickBar.Palette[0];
+    private BoxAnnotation? _drawing;
+    private TextBox? _textBox;
+    private Point _textAt;
+    private double _px, _py;         // precise cursor position (local), for smooth shapes
 
     private IntPtr _hwnd;
     private FrozenScreen? _screen;
@@ -78,6 +88,9 @@ public sealed class CaptureOverlay : Window
     /// <summary>Raised with the captured image and its virtual-screen rectangle.</summary>
     public event Action<BitmapSource, PixelRect>? Confirmed;
     public event Action? Cancelled;
+
+    /// <summary>Raised with the (annotated) capture when the user picks "Save as…".</summary>
+    public event Action<BitmapSource>? SaveRequested;
 
     public bool IsCapturing => _mode != Mode.Idle;
 
@@ -115,21 +128,28 @@ public sealed class CaptureOverlay : Window
         _labelText = new TextBlock { Foreground = SpaceTheme.StarWhiteBrush, FontFamily = new FontFamily("Segoe UI Semibold") };
         _label = new Border { Child = _labelText, Background = SpaceTheme.NavyBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
 
-        _hintText = new TextBlock { Foreground = SpaceTheme.DustBrush, FontFamily = new FontFamily("Segoe UI") };
-        _hint = new Border { Child = _hintText, Background = SpaceTheme.NavyBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
-
         _loupe = new Loupe();
+        _layer = new AnnotationLayer { Document = _doc, Clip = _layerClip };
+
+        _bar = new QuickBar { Visibility = Visibility.Collapsed };
+        _bar.ToolSelected += SetTool;
+        _bar.ColorSelected += SetColor;
+        _bar.UndoClicked += () => { CommitText(); _doc.Undo(); };
+        _bar.CopyClicked += Confirm;
+        _bar.SaveClicked += Save;
+        _bar.CloseClicked += Cancel;
 
         _root = new Canvas { RenderTransform = _scale, ClipToBounds = false };
         _root.Children.Add(_image);
         _root.Children.Add(dim);
+        _root.Children.Add(_layer);
         _root.Children.Add(_guideH);
         _root.Children.Add(_guideV);
         _root.Children.Add(_glow);
         _root.Children.Add(_border);
         _root.Children.Add(_label);
-        _root.Children.Add(_hint);
         _root.Children.Add(_loupe);
+        _root.Children.Add(_bar);
         Content = _root;
 
         MouseMove += OnMouseMove;
@@ -169,6 +189,12 @@ public sealed class CaptureOverlay : Window
         _hover = null;
         _selection = default;
         _spaceHeld = false;
+        _doc.Clear();
+        _drawing = null;
+        _layer.InProgress = null;
+        RemoveTextBox();
+        _tool = AnnotationTool.None;
+        _bar.SetActive(_tool, _color);
 
         _image.Source = screen.Image;
         _image.Width = _full.Width;
@@ -189,6 +215,7 @@ public sealed class CaptureOverlay : Window
         _scale.ScaleY = 1 / VisualTreeHelper.GetDpi(this).DpiScaleY;
         ApplyDpiSizes();
         _loupe.Configure(screen.Image, _dpi);
+        _bar.Configure(_dpi);
 
         Win32.GetCursorPos(out var p);
         _cx = p.X - screen.Bounds.X;
@@ -217,6 +244,7 @@ public sealed class CaptureOverlay : Window
     {
         CompositionTarget.Rendering -= OnRendering;
         _mode = Mode.Idle;
+        RemoveTextBox();
         SetDwm(Win32.DWMWA_CLOAK, 1);
         if (IsMouseCaptured) ReleaseMouseCapture();
         Hide();
@@ -235,16 +263,41 @@ public sealed class CaptureOverlay : Window
 
     private void Confirm()
     {
-        if (_screen is null || _selection.IsEmpty) return;
-        var image = _screen.Crop(_selection);
-        var rect = _screen.ToVirtual(_selection);
+        if (Render() is not { } image) return;
+        var rect = _screen!.ToVirtual(_selection);
         End();
         Confirmed?.Invoke(image, rect);
+    }
+
+    private void Save()
+    {
+        if (Render() is not { } image) return;
+        End();
+        SaveRequested?.Invoke(image);
+    }
+
+    /// <summary>The selected pixels with the annotations burnt in.</summary>
+    private BitmapSource? Render()
+    {
+        if (_screen is null || _selection.IsEmpty) return null;
+        CommitText();
+        var image = _screen.Crop(_selection);
+        return _doc.Flatten(image, new Point(_selection.X, _selection.Y));
     }
 
     /// <summary>Esc / right click: drop the selection first, close on the second press.</summary>
     private void Back()
     {
+        if (_textBox is not null)
+        {
+            CommitText();
+            return;
+        }
+        if (_tool != AnnotationTool.None && _mode == Mode.Selected)
+        {
+            SetTool(AnnotationTool.None);
+            return;
+        }
         if (_mode is Mode.Selected or Mode.Moving or Mode.Resizing or Mode.Dragging)
         {
             if (IsMouseCaptured) ReleaseMouseCapture();
@@ -267,6 +320,8 @@ public sealed class CaptureOverlay : Window
         var pos = e.GetPosition(_root);
         _cx = Math.Clamp((int)Math.Floor(pos.X), 0, _full.Width - 1);
         _cy = Math.Clamp((int)Math.Floor(pos.Y), 0, _full.Height - 1);
+        _px = pos.X;
+        _py = pos.Y;
         var snap = !_skipSnapOnce && (Keyboard.Modifiers & ModifierKeys.Alt) == 0;
         _skipSnapOnce = false;
 
@@ -308,8 +363,15 @@ public sealed class CaptureOverlay : Window
                 Resize(snap);
                 break;
 
+            case Mode.Drawing when _drawing is not null:
+                var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+                if (_drawing is ArrowAnnotation arrow) arrow.DragArrowTo(_px, _py, shift);
+                else _drawing.DragTo(_px, _py, shift);
+                _layer.InProgress = _drawing;
+                break;
+
             case Mode.Selected:
-                Cursor = CursorFor(EdgesAt(_cx, _cy), _selection.Contains(_cx, _cy));
+                Cursor = SelectedCursor();
                 break;
         }
 
@@ -325,6 +387,13 @@ public sealed class CaptureOverlay : Window
 
         if (_mode == Mode.Selected)
         {
+            CommitText();
+            if (_tool != AnnotationTool.None && _selection.Contains(_cx, _cy))
+            {
+                StartAnnotation();
+                return;
+            }
+
             if (e.ClickCount >= 2 && _selection.Contains(_cx, _cy))
             {
                 Confirm();
@@ -380,6 +449,13 @@ public sealed class CaptureOverlay : Window
                 }
                 break;
 
+            case Mode.Drawing:
+                if (_drawing is { IsDegenerate: false } done) _doc.Add(done);
+                _drawing = null;
+                _layer.InProgress = null;
+                _mode = Mode.Selected;
+                break;
+
             case Mode.Dragging:
             case Mode.Moving:
             case Mode.Resizing:
@@ -388,7 +464,7 @@ public sealed class CaptureOverlay : Window
                 break;
         }
 
-        Cursor = _mode == Mode.Selected ? CursorFor(EdgesAt(_cx, _cy), _selection.Contains(_cx, _cy)) : Cursors.Cross;
+        Cursor = _mode == Mode.Selected ? SelectedCursor() : Cursors.Cross;
         Refresh();
     }
 
@@ -428,6 +504,11 @@ public sealed class CaptureOverlay : Window
         return edges;
     }
 
+    private Cursor SelectedCursor() =>
+        _tool != AnnotationTool.None && _selection.Contains(_cx, _cy)
+            ? (_tool == AnnotationTool.Text ? Cursors.IBeam : Cursors.Cross)
+            : CursorFor(EdgesAt(_cx, _cy), _selection.Contains(_cx, _cy));
+
     private static Cursor CursorFor(Edges edges, bool inside) => edges switch
     {
         Edges.Left or Edges.Right => Cursors.SizeWE,
@@ -453,6 +534,7 @@ public sealed class CaptureOverlay : Window
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
         if (_mode == Mode.Idle) return;
+        if (_textBox is not null && _textBox.IsKeyboardFocusWithin) return; // typing text
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
@@ -463,6 +545,31 @@ public sealed class CaptureOverlay : Window
         {
             case Key.Escape:
                 Back();
+                return;
+
+            case Key.Z when ctrl:
+                _doc.Undo();
+                return;
+
+            case Key.Y when ctrl:
+                _doc.Redo();
+                return;
+
+            case Key.S when ctrl && _mode == Mode.Selected:
+                Save();
+                return;
+
+            case Key.E when _mode == Mode.Selected: ToggleTool(AnnotationTool.Ellipse); return;
+            case Key.A when _mode == Mode.Selected: ToggleTool(AnnotationTool.Arrow); return;
+            case Key.T when _mode == Mode.Selected: ToggleTool(AnnotationTool.Text); return;
+            case Key.R when _mode == Mode.Selected: ToggleTool(AnnotationTool.Rectangle); return;
+
+            case >= Key.D1 and <= Key.D6 when _mode == Mode.Selected:
+                SetColor(QuickBar.Palette[key - Key.D1]);
+                return;
+
+            case >= Key.NumPad1 and <= Key.NumPad6 when _mode == Mode.Selected:
+                SetColor(QuickBar.Palette[key - Key.NumPad1]);
                 return;
 
             case Key.Enter:
@@ -547,10 +654,6 @@ public sealed class CaptureOverlay : Window
         _labelText.FontSize = 12 * _dpi;
         _label.Padding = new Thickness(6 * _dpi, 2 * _dpi, 6 * _dpi, 2 * _dpi);
         _label.CornerRadius = new CornerRadius(4 * _dpi);
-        _hintText.FontSize = 12 * _dpi;
-        _hint.Padding = new Thickness(8 * _dpi, 4 * _dpi, 8 * _dpi, 4 * _dpi);
-        _hint.CornerRadius = new CornerRadius(6 * _dpi);
-        _hintText.Text = "Enter copy  ·  Esc back  ·  drag to adjust  ·  arrows move  ·  Ctrl+arrows resize";
     }
 
     private void Refresh()
@@ -589,23 +692,136 @@ public sealed class CaptureOverlay : Window
             _guideV.X1 = _guideV.X2 = _cx + 0.5;
         }
 
-        if (_mode == Mode.Selected && target is { } sel)
-        {
-            _hint.Visibility = Visibility.Visible;
-            _hint.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            var hw = _hint.DesiredSize.Width;
-            var hh = _hint.DesiredSize.Height;
-            var hy = sel.Bottom + 8 * _dpi;
-            if (hy + hh > _full.Height) hy = Math.Max(0, sel.Bottom - hh - 8 * _dpi);
-            Canvas.SetLeft(_hint, Math.Clamp(sel.CenterX - hw / 2, 0, Math.Max(0, _full.Width - hw)));
-            Canvas.SetTop(_hint, hy);
-        }
-        else
-        {
-            _hint.Visibility = Visibility.Collapsed;
-        }
+        _layerClip.Rect = _selection.IsEmpty
+            ? new Rect(0, 0, _full.Width, _full.Height)
+            : new Rect(_selection.X, _selection.Y, _selection.Width, _selection.Height);
+
+        if (_mode is Mode.Selected or Mode.Drawing && target is { } sel) PlaceBar(sel);
+        else _bar.Visibility = Visibility.Collapsed;
 
         UpdateLoupe(target);
+    }
+
+    /// <summary>Quick bar under the selection (right-aligned), or above it, or inside it.</summary>
+    private void PlaceBar(PixelRect sel)
+    {
+        _bar.Visibility = Visibility.Visible;
+        _bar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var bw = _bar.DesiredSize.Width;
+        var bh = _bar.DesiredSize.Height;
+        var gap = 8 * _dpi;
+        var monitor = Monitors.Containing(_monitors, sel.Right - 1, sel.Bottom - 1);
+
+        var y = sel.Bottom + gap;
+        if (y + bh > monitor.Bottom) y = sel.Y - gap - bh;
+        if (y < monitor.Y) y = sel.Bottom - gap - bh;
+        var x = Math.Clamp(sel.Right - bw, monitor.X, Math.Max(monitor.X, monitor.Right - bw));
+
+        Canvas.SetLeft(_bar, x);
+        Canvas.SetTop(_bar, y);
+    }
+
+    // ------------------------------------------------------------------ annotations
+
+    private double ShapeThickness => Math.Max(2, Math.Round(3 * _dpi));
+    private double TextSize => Math.Round(18 * _dpi);
+
+    private void ToggleTool(AnnotationTool tool) => SetTool(_tool == tool ? AnnotationTool.None : tool);
+
+    private void SetTool(AnnotationTool tool)
+    {
+        CommitText();
+        _tool = tool;
+        _bar.SetActive(_tool, _color);
+        if (_mode == Mode.Selected) Cursor = SelectedCursor();
+    }
+
+    private void SetColor(string color)
+    {
+        _color = color;
+        _bar.SetActive(_tool, _color);
+        if (_textBox is not null) _textBox.Foreground = Annotation.CreateBrush(color);
+    }
+
+    private void StartAnnotation()
+    {
+        if (_tool == AnnotationTool.Text)
+        {
+            StartText(_px, _py);
+            return;
+        }
+
+        _drawing = _tool switch
+        {
+            AnnotationTool.Ellipse => new EllipseAnnotation(),
+            AnnotationTool.Arrow => new ArrowAnnotation(),
+            _ => new RectangleAnnotation(),
+        };
+        _drawing.Color = _color;
+        _drawing.Thickness = ShapeThickness;
+        _drawing.X1 = _drawing.X2 = _px;
+        _drawing.Y1 = _drawing.Y2 = _py;
+        _mode = Mode.Drawing;
+        CaptureMouse();
+    }
+
+    private void StartText(double x, double y)
+    {
+        RemoveTextBox();
+        _textAt = new Point(x, y);
+        _textBox = new TextBox
+        {
+            FontFamily = new FontFamily("Segoe UI"),
+            FontWeight = FontWeights.SemiBold,
+            FontSize = TextSize,
+            Foreground = Annotation.CreateBrush(_color),
+            Background = new SolidColorBrush(Color.FromArgb(0x66, 0x07, 0x0A, 0x1C)),
+            CaretBrush = SpaceTheme.StarWhiteBrush,
+            BorderBrush = SpaceTheme.CometBlueBrush,
+            BorderThickness = new Thickness(Math.Max(1, Math.Round(_dpi))),
+            Padding = new Thickness(0),
+            MinWidth = 40 * _dpi,
+            AcceptsReturn = true,
+        };
+        _textBox.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape || (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Shift) == 0))
+            {
+                e.Handled = true;
+                CommitText();
+            }
+        };
+        // TextBox has a 1-2 px internal inset; shift it so the committed text lands where it was typed.
+        var inset = _textBox.BorderThickness.Left + 2;
+        Canvas.SetLeft(_textBox, x - inset);
+        Canvas.SetTop(_textBox, y - inset);
+        _root.Children.Add(_textBox);
+        _textBox.Focus();
+        Keyboard.Focus(_textBox);
+    }
+
+    private void CommitText()
+    {
+        if (_textBox is null) return;
+        var text = _textBox.Text;
+        RemoveTextBox();
+        if (string.IsNullOrWhiteSpace(text)) return;
+        _doc.Add(new TextAnnotation
+        {
+            X = _textAt.X,
+            Y = _textAt.Y,
+            Text = text,
+            FontSize = TextSize,
+            Color = _color,
+        });
+        Keyboard.Focus(this);
+    }
+
+    private void RemoveTextBox()
+    {
+        if (_textBox is null) return;
+        _root.Children.Remove(_textBox);
+        _textBox = null;
     }
 
     private static void PlaceFrame(Rectangle frame, PixelRect r, double outset)

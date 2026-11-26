@@ -46,6 +46,10 @@ click **More info → Run anyway**.
 | Overlay | **C** | Copy the hex color under the cursor |
 | Selection | arrows / **Ctrl**+arrows | Move / resize the selection |
 | Selection | double click | Copy |
+| Selection | **E** / **A** / **T** / **R** | Circle / arrow / text / rectangle (Shift = perfect circle, square, 45° arrow) |
+| Selection | **1**–**6** | Pick a color |
+| Selection | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
+| Selection | **Ctrl+S** | Save as… |
 
 ## Roadmap
 
