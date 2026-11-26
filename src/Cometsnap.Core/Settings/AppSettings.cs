@@ -84,6 +84,9 @@ public sealed class AppSettings
     /// <summary>The "Replace your old screen capture" offer was answered (either way).</summary>
     public bool ReplaceOfferAnswered { get; set; }
 
+    /// <summary>App language: "en", "fr", "de", "it", or empty to follow Windows (English otherwise).</summary>
+    public string Language { get; set; } = "";
+
     // ---- playful touches (all discreet, none of them ever delays a capture)
 
     /// <summary>A tiny meteor shower for snap milestones, and a monthly "you captured N snaps" card.</summary>

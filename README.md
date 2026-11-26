@@ -55,6 +55,7 @@ On Wayland, captures and recordings go through the desktop portal, so the first 
 ## Features (Phase 1)
 
 - Lives in the tray: left click opens a flyout with your last 30 captures, right click gives the full menu
+- Speaks **English, French, German and Italian**: it follows the Windows display language (English otherwise), and *Options > Language* switches it on the spot. The installer follows Windows too.
 - **Print Screen** (or Ctrl+Shift+S) freezes the screen instantly
 - Hover to detect the window under the cursor, click to grab it, or drag any area (edges snap to windows).
   The moment you let go it's copied and saved: no toolbar in the way

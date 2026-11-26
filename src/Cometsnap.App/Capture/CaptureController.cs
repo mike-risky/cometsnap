@@ -8,6 +8,7 @@ using Cometsnap.Core.Diagnostics;
 using Cometsnap.Core.Geometry;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Storage;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Capture;
 
@@ -142,13 +143,13 @@ public sealed class CaptureController
     {
         CancelDelay();
         var remaining = seconds;
-        _app.SetTrayStatus($"Cometsnap: capture in {remaining} s");
+        _app.SetTrayStatus(L.F("Cometsnap: capture in {0} s", remaining));
         _delayTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal, (_, _) =>
         {
             remaining--;
             if (remaining > 0)
             {
-                _app.SetTrayStatus($"Cometsnap: capture in {remaining} s");
+                _app.SetTrayStatus(L.F("Cometsnap: capture in {0} s", remaining));
                 return;
             }
             CancelDelay();
@@ -171,10 +172,10 @@ public sealed class CaptureController
         Deliver(image, null);
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Save capture",
+            Title = L.T("Save capture"),
             FileName = SnapNaming.BaseName(DateTime.Now),
             DefaultExt = ".png",
-            Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg",
+            Filter = L.T("PNG image") + " (*.png)|*.png|" + L.T("JPEG image") + " (*.jpg)|*.jpg",
             InitialDirectory = _app.CapturesFolder,
         };
         if (dialog.ShowDialog() != true) return;
@@ -196,7 +197,7 @@ public sealed class CaptureController
         catch (Exception ex)
         {
             Log.Error("Save as failed", ex);
-            System.Windows.MessageBox.Show($"Could not save the capture:\n{ex.Message}", "Cometsnap");
+            System.Windows.MessageBox.Show(L.T("Could not save the capture:") + "\n" + ex.Message, "Cometsnap");
         }
     }
 

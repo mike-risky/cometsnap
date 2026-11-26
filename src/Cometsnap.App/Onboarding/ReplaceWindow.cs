@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using Cometsnap.App.Theme;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Takeover;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Onboarding;
 
@@ -68,27 +69,27 @@ public sealed class ReplaceWindow : Window
 
         stack.Children.Add(new TextBlock
         {
-            Text = "REPLACE YOUR OLD SCREEN CAPTURE", FontFamily = SpaceTheme.DisplayFont, FontSize = 30,
+            Text = L.T("REPLACE YOUR OLD SCREEN CAPTURE"), FontFamily = SpaceTheme.DisplayFont, FontSize = 30,
             Foreground = SpaceTheme.SunBrush, TextWrapping = TextWrapping.Wrap, LineHeight = 34,
         });
         stack.Children.Add(new TextBlock
         {
-            Text = "Make Print Screen open Cometsnap: freeze, pick, annotate, done.",
+            Text = L.T("Make Print Screen open Cometsnap: freeze, pick, annotate, done."),
             Foreground = SpaceTheme.DustBrush, Margin = new Thickness(0, 8, 0, 18), TextWrapping = TextWrapping.Wrap,
         });
 
         if (report.SnippingToolOwnsPrintScreen)
         {
-            _snippingBox = Check("Take Print Screen back from Windows' Snipping Tool",
-                "You can turn it back on in Settings > Accessibility > Keyboard.");
+            _snippingBox = Check(L.T("Take Print Screen back from Windows' Snipping Tool"),
+                L.T("You can turn it back on in Settings > Accessibility > Keyboard."));
             stack.Children.Add(_snippingBox);
         }
         foreach (var tool in report.Tools)
         {
-            var what = tool.IsRunning && tool.StartupEntries.Count > 0 ? "Close it and stop it starting with Windows"
-                : tool.IsRunning ? "Close it now"
-                : "Stop it starting with Windows";
-            var box = Check($"Replace {tool.Name}", what + ". You can turn it back on in Task Manager > Startup apps.");
+            var what = tool.IsRunning && tool.StartupEntries.Count > 0 ? L.T("Close it and stop it starting with Windows")
+                : tool.IsRunning ? L.T("Close it now")
+                : L.T("Stop it starting with Windows");
+            var box = Check(L.F("Replace {0}", tool.Name), what + ". " + L.T("You can turn it back on in Task Manager > Startup apps."));
             _toolBoxes.Add((box, tool));
             stack.Children.Add(box);
         }
@@ -96,18 +97,18 @@ public sealed class ReplaceWindow : Window
         {
             stack.Children.Add(new TextBlock
             {
-                Text = "No other screenshot tool found. Cometsnap will make sure Print Screen stays its own.",
+                Text = L.T("No other screenshot tool found. Cometsnap will make sure Print Screen stays its own."),
                 Foreground = SpaceTheme.StarWhiteBrush, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
             });
         }
 
-        _startupBox = Check("Start Cometsnap with Windows", "So Print Screen always works, right after you log in.");
+        _startupBox = Check(L.T("Start Cometsnap with Windows"), L.T("So Print Screen always works, right after you log in."));
         _startupBox.IsChecked = startsWithWindows;
         stack.Children.Add(_startupBox);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
-        buttons.Children.Add(Button("Not now", SpaceTheme.NavyBrush, () => { Choice = null; Close(); }));
-        buttons.Children.Add(Button("Replace it", SpaceTheme.TerracottaBrush, Accept, primary: true));
+        buttons.Children.Add(Button(L.T("Not now"), SpaceTheme.NavyBrush, () => { Choice = null; Close(); }));
+        buttons.Children.Add(Button(L.T("Replace it"), SpaceTheme.TerracottaBrush, Accept, primary: true));
         stack.Children.Add(buttons);
 
         Content = stack;

@@ -11,6 +11,7 @@ using Cometsnap.Core.Diagnostics;
 using Cometsnap.Core.Geometry;
 using Cometsnap.Core.Native;
 using Cometsnap.Video;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Recording;
 
@@ -77,7 +78,7 @@ public sealed class RecordingController : IDisposable
         var min = format == RecordingFormat.Gif ? 16 : 32;
         if (rect.Width < min || rect.Height < min)
         {
-            _tray.ShowBalloon("Too small to record", $"Pick an area of at least {min} × {min} pixels.");
+            _tray.ShowBalloon(L.T("Too small to record"), L.F("Pick an area of at least {0} × {0} pixels.", min));
             return;
         }
         // Picked a whole monitor (F key, or a maximized window filling it): no frame around it.
@@ -106,14 +107,14 @@ public sealed class RecordingController : IDisposable
                 _recorder = await Task.Run(() => ScreenRecorder.Start(options));
                 _recorder.Failed += ex => _app.Dispatcher.InvokeAsync(() =>
                 {
-                    _tray.ShowBalloon("Recording stopped", "Something went wrong while recording. What was recorded so far is being saved.");
+                    _tray.ShowBalloon(L.T("Recording stopped"), L.T("Something went wrong while recording. What was recorded so far is being saved."));
                     Stop();
                 });
             }
             catch (Exception ex)
             {
-                Log.Error("Could not start recording", ex);
-                _tray.ShowBalloon("Could not start recording", ex.Message);
+                Log.Error(L.T("Could not start recording"), ex);
+                _tray.ShowBalloon(L.T("Could not start recording"), ex.Message);
                 _starting = false;
                 return;
             }
@@ -143,7 +144,7 @@ public sealed class RecordingController : IDisposable
         var kind = format == RecordingFormat.Gif ? "GIF"
             : _app.Settings.RecordMicrophone ? "MIC" : "";
         _pill.ShowFor(rect, kind);
-        _app.SetTrayStatus($"Cometsnap: recording. Click to stop ({_app.Settings.RecordHotkey})");
+        _app.SetTrayStatus(L.F("Cometsnap: recording. Click to stop ({0})", _app.Settings.RecordHotkey));
     }
 
     private void Tick()
@@ -179,7 +180,7 @@ public sealed class RecordingController : IDisposable
         catch (Exception ex)
         {
             Log.Error("Could not finish the recording", ex);
-            _tray.ShowBalloon("Recording failed", ex.InnerException?.Message ?? ex.Message);
+            _tray.ShowBalloon(L.T("Recording failed"), ex.InnerException?.Message ?? ex.Message);
         }
     }
 
@@ -210,9 +211,9 @@ public sealed class RecordingController : IDisposable
         var size = result.Bytes >= 1 << 20
             ? (result.Bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB"
             : Math.Max(1, result.Bytes / 1024) + " KB";
-        var what = result.Format == RecordingFormat.Gif ? "GIF" : "Video";
-        _tray.ShowBalloon($"{what} saved ({length}, {size})",
-            (copied ? "Copied: paste it anywhere. " : "") + Path.GetFileName(result.Path));
+        var what = result.Format == RecordingFormat.Gif ? "GIF" : L.T("Video");
+        _tray.ShowBalloon(L.F("{0} saved ({1}, {2})", what, length, size),
+            (copied ? L.T("Copied: paste it anywhere.") + " " : "") + Path.GetFileName(result.Path));
         Log.Info($"Recording saved to {result.Path}");
     }
 

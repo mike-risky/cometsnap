@@ -1,5 +1,6 @@
-; Cometsnap Setup (Inno Setup 6.3+).
-; Per-user install, no admin rights. Says plainly whether it installs, updates or reinstalls,
+﻿; Cometsnap Setup (Inno Setup 6.3+).
+; Per-user install, no admin rights, in the Windows display language (English, French, German or
+; Italian, English otherwise). Says plainly whether it installs, updates or reinstalls,
 ; closes any running Cometsnap first, and hands over to Cometsnap's own
 ; "Replace your old screen capture" step when it finishes.
 ;
@@ -53,15 +54,131 @@ ArchitecturesInstallIn64BitMode=arm64
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 #endif
+; Speak the Windows display language without asking.
+ShowLanguageDialog=no
+LanguageDetectionMethod=uilanguage
+
+[Languages]
+Name: "en"; MessagesFile: "compiler:Default.isl"
+Name: "fr"; MessagesFile: "compiler:Languages\French.isl"
+Name: "de"; MessagesFile: "compiler:Languages\German.isl"
+Name: "it"; MessagesFile: "compiler:Languages\Italian.isl"
 
 [Messages]
 SetupWindowTitle=Cometsnap Setup
-ConfirmUninstall=Remove Cometsnap from this PC?%n%nCometsnap will be closed and removed from the Start menu and from startup, and the Print Screen key goes back to Windows.%n%nYour captures (Pictures\Cometsnap) are kept.
-UninstalledAll=Cometsnap was removed. Your captures are still in Pictures\Cometsnap.
+fr.SetupWindowTitle=Installation de Cometsnap
+de.SetupWindowTitle=Cometsnap Setup
+it.SetupWindowTitle=Installazione di Cometsnap
+en.ConfirmUninstall=Remove Cometsnap from this PC?%n%nCometsnap will be closed and removed from the Start menu and from startup, and the Print Screen key goes back to Windows.%n%nYour captures (Pictures\Cometsnap) are kept.
+fr.ConfirmUninstall=Retirer Cometsnap de ce PC ?%n%nCometsnap sera fermé et retiré du menu Démarrer et du démarrage, et la touche Impr. écran revient à Windows.%n%nVos captures (Images\Cometsnap) sont conservées.
+de.ConfirmUninstall=Cometsnap von diesem PC entfernen?%n%nCometsnap wird geschlossen und aus dem Startmenü und dem Autostart entfernt, und die Druck-Taste geht an Windows zurück.%n%nIhre Aufnahmen (Bilder\Cometsnap) bleiben erhalten.
+it.ConfirmUninstall=Rimuovere Cometsnap da questo PC?%n%nCometsnap verrà chiuso e rimosso dal menu Start e dall’avvio, e il tasto Stamp torna a Windows.%n%nLe tue catture (Immagini\Cometsnap) restano al loro posto.
+en.UninstalledAll=Cometsnap was removed. Your captures are still in Pictures\Cometsnap.
+fr.UninstalledAll=Cometsnap a été retiré. Vos captures sont toujours dans Images\Cometsnap.
+de.UninstalledAll=Cometsnap wurde entfernt. Ihre Aufnahmen liegen weiterhin in Bilder\Cometsnap.
+it.UninstalledAll=Cometsnap è stato rimosso. Le tue catture sono ancora in Immagini\Cometsnap.
+
+[CustomMessages]
+en.TaskAutostart=Start Cometsnap with Windows (recommended, so Print Screen always works)
+fr.TaskAutostart=Démarrer Cometsnap avec Windows (recommandé, pour qu’Impr. écran marche toujours)
+de.TaskAutostart=Cometsnap mit Windows starten (empfohlen, damit die Druck-Taste immer funktioniert)
+it.TaskAutostart=Avvia Cometsnap con Windows (consigliato, così il tasto Stamp funziona sempre)
+en.TaskDesktop=Create a desktop shortcut
+fr.TaskDesktop=Créer un raccourci sur le Bureau
+de.TaskDesktop=Desktop-Verknüpfung erstellen
+it.TaskDesktop=Crea un collegamento sul desktop
+en.RunAfter=Start Cometsnap and replace my old screen capture tool
+fr.RunAfter=Lancer Cometsnap et remplacer mon vieil outil de capture
+de.RunAfter=Cometsnap starten und mein altes Screenshot-Tool ersetzen
+it.RunAfter=Avvia Cometsnap e sostituisci il mio vecchio strumento di cattura
+en.FreshTitle=Install Cometsnap %1
+fr.FreshTitle=Installer Cometsnap %1
+de.FreshTitle=Cometsnap %1 installieren
+it.FreshTitle=Installa Cometsnap %1
+en.FreshText=Cometsnap is a fast screenshot tool that lives in your tray.%n%nSetup installs it just for you, no admin rights needed. When it finishes, Cometsnap takes over the Print Screen key and offers to replace your old screen capture tool (Snipping Tool, Greenshot, ShareX, Lightshot...).%n%nClick Next to continue.
+fr.FreshText=Cometsnap est un outil de capture d’écran rapide comme une comète, qui vit dans votre barre des tâches.%n%nL’installation se fait juste pour vous, sans droits d’administrateur. À la fin, Cometsnap prend la touche Impr. écran et propose de remplacer votre vieil outil de capture (Outil Capture, Greenshot, ShareX, Lightshot...).%n%nCliquez sur Suivant pour continuer.
+de.FreshText=Cometsnap ist ein blitzschnelles Screenshot-Tool, das in Ihrem Infobereich wohnt.%n%nSetup installiert es nur für Sie, ganz ohne Administratorrechte. Danach übernimmt Cometsnap die Druck-Taste und bietet an, Ihr altes Screenshot-Tool zu ersetzen (Snipping Tool, Greenshot, ShareX, Lightshot...).%n%nKlicken Sie auf Weiter, um fortzufahren.
+it.FreshText=Cometsnap è uno strumento di cattura veloce come una cometa, che abita nell’area di notifica.%n%nL’installazione è solo per te, senza diritti di amministratore. Alla fine, Cometsnap prende il tasto Stamp e propone di sostituire il tuo vecchio strumento di cattura (Strumento di cattura, Greenshot, ShareX, Lightshot...).%n%nFai clic su Avanti per continuare.
+en.UpdateTitle=Update Cometsnap
+fr.UpdateTitle=Mettre à jour Cometsnap
+de.UpdateTitle=Cometsnap aktualisieren
+it.UpdateTitle=Aggiorna Cometsnap
+en.UpdateText=Cometsnap %1 is installed on this PC.%n%nSetup will close it and replace it with version %2.%nYour settings and captures are kept.%n%nClick Next to continue.
+fr.UpdateText=Cometsnap %1 est installé sur ce PC.%n%nL’installation va le fermer et le remplacer par la version %2.%nVos réglages et vos captures sont conservés.%n%nCliquez sur Suivant pour continuer.
+de.UpdateText=Cometsnap %1 ist auf diesem PC installiert.%n%nSetup schließt es und ersetzt es durch Version %2.%nIhre Einstellungen und Aufnahmen bleiben erhalten.%n%nKlicken Sie auf Weiter, um fortzufahren.
+it.UpdateText=Cometsnap %1 è installato su questo PC.%n%nL’installazione lo chiuderà e lo sostituirà con la versione %2.%nLe tue impostazioni e catture restano al loro posto.%n%nFai clic su Avanti per continuare.
+en.ReinstallTitle=Reinstall Cometsnap %1
+fr.ReinstallTitle=Réinstaller Cometsnap %1
+de.ReinstallTitle=Cometsnap %1 neu installieren
+it.ReinstallTitle=Reinstalla Cometsnap %1
+en.ReinstallText=This version of Cometsnap is already installed.%n%nSetup will close it and install it again, which repairs it.%nYour settings and captures are kept.%n%nClick Next to continue.
+fr.ReinstallText=Cette version de Cometsnap est déjà installée.%n%nL’installation va le fermer et le réinstaller, ce qui le répare.%nVos réglages et vos captures sont conservés.%n%nCliquez sur Suivant pour continuer.
+de.ReinstallText=Diese Version von Cometsnap ist bereits installiert.%n%nSetup schließt es und installiert es erneut, was es repariert.%nIhre Einstellungen und Aufnahmen bleiben erhalten.%n%nKlicken Sie auf Weiter, um fortzufahren.
+it.ReinstallText=Questa versione di Cometsnap è già installata.%n%nL’installazione lo chiuderà e lo installerà di nuovo, riparandolo.%nLe tue impostazioni e catture restano al loro posto.%n%nFai clic su Avanti per continuare.
+en.MemoFresh=New install: Cometsnap %1
+fr.MemoFresh=Nouvelle installation : Cometsnap %1
+de.MemoFresh=Neuinstallation: Cometsnap %1
+it.MemoFresh=Nuova installazione: Cometsnap %1
+en.MemoUpdate=Update: Cometsnap %1 will be replaced by %2
+fr.MemoUpdate=Mise à jour : Cometsnap %1 sera remplacé par %2
+de.MemoUpdate=Update: Cometsnap %1 wird durch %2 ersetzt
+it.MemoUpdate=Aggiornamento: Cometsnap %1 sarà sostituito da %2
+en.MemoReinstall=Reinstall: Cometsnap %1 will be installed again
+fr.MemoReinstall=Réinstallation : Cometsnap %1 sera installé à nouveau
+de.MemoReinstall=Neuinstallation: Cometsnap %1 wird erneut installiert
+it.MemoReinstall=Reinstallazione: Cometsnap %1 sarà installato di nuovo
+en.MemoWhat=What Setup does:
+fr.MemoWhat=Ce que fait l’installation :
+de.MemoWhat=Was Setup macht:
+it.MemoWhat=Cosa fa l’installazione:
+en.MemoClose=Closes any running Cometsnap (also a downloaded Cometsnap-x64.exe)
+fr.MemoClose=Ferme tout Cometsnap en cours (aussi un Cometsnap-x64.exe téléchargé)
+de.MemoClose=Schließt jedes laufende Cometsnap (auch ein heruntergeladenes Cometsnap-x64.exe)
+it.MemoClose=Chiude ogni Cometsnap in esecuzione (anche un Cometsnap-x64.exe scaricato)
+en.MemoInstallIn=Installs Cometsnap in %1
+fr.MemoInstallIn=Installe Cometsnap dans %1
+de.MemoInstallIn=Installiert Cometsnap in %1
+it.MemoInstallIn=Installa Cometsnap in %1
+en.MemoStart=Adds it to the Start menu and to Apps (so you can uninstall it)
+fr.MemoStart=L’ajoute au menu Démarrer et aux Applications (pour pouvoir le désinstaller)
+de.MemoStart=Fügt es dem Startmenü und den Apps hinzu (damit Sie es deinstallieren können)
+it.MemoStart=Lo aggiunge al menu Start e alle App (così puoi disinstallarlo)
+en.MemoKeep=Keeps your settings and captures
+fr.MemoKeep=Conserve vos réglages et vos captures
+de.MemoKeep=Behält Ihre Einstellungen und Aufnahmen
+it.MemoKeep=Mantiene le tue impostazioni e catture
+en.MemoThen=Then Cometsnap offers to replace your old screen capture tool
+fr.MemoThen=Puis Cometsnap propose de remplacer votre vieil outil de capture
+de.MemoThen=Danach bietet Cometsnap an, Ihr altes Screenshot-Tool zu ersetzen
+it.MemoThen=Poi Cometsnap propone di sostituire il tuo vecchio strumento di cattura
+en.ButtonUpdate=Update
+fr.ButtonUpdate=Mettre à jour
+de.ButtonUpdate=Aktualisieren
+it.ButtonUpdate=Aggiorna
+en.ButtonReinstall=Reinstall
+fr.ButtonReinstall=Réinstaller
+de.ButtonReinstall=Neu installieren
+it.ButtonReinstall=Reinstalla
+en.DoneFresh=Cometsnap is installed
+fr.DoneFresh=Cometsnap est installé
+de.DoneFresh=Cometsnap ist installiert
+it.DoneFresh=Cometsnap è installato
+en.DoneUpdate=Cometsnap is updated to %1
+fr.DoneUpdate=Cometsnap est à jour en %1
+de.DoneUpdate=Cometsnap ist jetzt auf %1
+it.DoneUpdate=Cometsnap è aggiornato alla %1
+en.DoneReinstall=Cometsnap is reinstalled
+fr.DoneReinstall=Cometsnap est réinstallé
+de.DoneReinstall=Cometsnap ist neu installiert
+it.DoneReinstall=Cometsnap è reinstallato
+en.DoneText=Cometsnap lives in your tray, next to the clock, and in the Start menu.%n%nLeave the box below ticked to start it now and choose which screen capture tool it replaces.
+fr.DoneText=Cometsnap vit dans votre barre des tâches, près de l’horloge, et dans le menu Démarrer.%n%nLaissez la case ci-dessous cochée pour le lancer maintenant et choisir quel outil de capture il remplace.
+de.DoneText=Cometsnap wohnt im Infobereich neben der Uhr und im Startmenü.%n%nLassen Sie das Häkchen unten gesetzt, um es jetzt zu starten und zu wählen, welches Screenshot-Tool es ersetzt.
+it.DoneText=Cometsnap abita nell’area di notifica, vicino all’orologio, e nel menu Start.%n%nLascia selezionata la casella qui sotto per avviarlo ora e scegliere quale strumento di cattura sostituisce.
 
 [Tasks]
-Name: autostart; Description: "Start Cometsnap with Windows (recommended, so Print Screen always works)"
-Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
+Name: autostart; Description: "{cm:TaskAutostart}"
+Name: desktopicon; Description: "{cm:TaskDesktop}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "Cometsnap.exe"; Flags: ignoreversion
@@ -78,7 +195,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Cometsnap"; Tasks: not autostart; Flags: deletevalue
 
 [Run]
-Filename: "{app}\Cometsnap.exe"; Parameters: "--after-install"; Description: "Start Cometsnap and replace my old screen capture tool"; Flags: nowait postinstall
+Filename: "{app}\Cometsnap.exe"; Parameters: "--after-install"; Description: "{cm:RunAfter}"; Flags: nowait postinstall
 
 [Code]
 const
@@ -155,31 +272,18 @@ begin
   case Mode of
     ModeFresh:
       begin
-        WizardForm.WelcomeLabel1.Caption := 'Install Cometsnap {#AppVersion}';
-        WizardForm.WelcomeLabel2.Caption :=
-          'Cometsnap is a fast screenshot tool that lives in your tray.' + #13#10#13#10 +
-          'Setup installs it just for you, no admin rights needed. When it finishes, Cometsnap takes over ' +
-          'the Print Screen key and offers to replace your old screen capture tool ' +
-          '(Snipping Tool, Greenshot, ShareX, Lightshot...).' + #13#10#13#10 +
-          'Click Next to continue.';
+        WizardForm.WelcomeLabel1.Caption := FmtMessage(CustomMessage('FreshTitle'), ['{#AppVersion}']);
+        WizardForm.WelcomeLabel2.Caption := CustomMessage('FreshText');
       end;
     ModeUpdate:
       begin
-        WizardForm.WelcomeLabel1.Caption := 'Update Cometsnap';
-        WizardForm.WelcomeLabel2.Caption :=
-          'Cometsnap ' + PreviousVersion + ' is installed on this PC.' + #13#10#13#10 +
-          'Setup will close it and replace it with version {#AppVersion}.' + #13#10 +
-          'Your settings and captures are kept.' + #13#10#13#10 +
-          'Click Next to continue.';
+        WizardForm.WelcomeLabel1.Caption := CustomMessage('UpdateTitle');
+        WizardForm.WelcomeLabel2.Caption := FmtMessage(CustomMessage('UpdateText'), [PreviousVersion, '{#AppVersion}']);
       end;
     ModeReinstall:
       begin
-        WizardForm.WelcomeLabel1.Caption := 'Reinstall Cometsnap {#AppVersion}';
-        WizardForm.WelcomeLabel2.Caption :=
-          'This version of Cometsnap is already installed.' + #13#10#13#10 +
-          'Setup will close it and install it again, which repairs it.' + #13#10 +
-          'Your settings and captures are kept.' + #13#10#13#10 +
-          'Click Next to continue.';
+        WizardForm.WelcomeLabel1.Caption := FmtMessage(CustomMessage('ReinstallTitle'), ['{#AppVersion}']);
+        WizardForm.WelcomeLabel2.Caption := CustomMessage('ReinstallText');
       end;
   end;
 end;
@@ -188,18 +292,18 @@ function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoType
   MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
   case Mode of
-    ModeFresh: Result := 'New install: Cometsnap {#AppVersion}';
-    ModeUpdate: Result := 'Update: Cometsnap ' + PreviousVersion + ' will be replaced by {#AppVersion}';
+    ModeFresh: Result := FmtMessage(CustomMessage('MemoFresh'), ['{#AppVersion}']);
+    ModeUpdate: Result := FmtMessage(CustomMessage('MemoUpdate'), [PreviousVersion, '{#AppVersion}']);
   else
-    Result := 'Reinstall: Cometsnap {#AppVersion} will be installed again';
+    Result := FmtMessage(CustomMessage('MemoReinstall'), ['{#AppVersion}']);
   end;
-  Result := Result + NewLine + NewLine + 'What Setup does:' + NewLine +
-    Space + 'Closes any running Cometsnap (also a downloaded Cometsnap-x64.exe)' + NewLine +
-    Space + 'Installs Cometsnap in ' + ExpandConstant('{app}') + NewLine +
-    Space + 'Adds it to the Start menu and to Apps (so you can uninstall it)' + NewLine;
+  Result := Result + NewLine + NewLine + CustomMessage('MemoWhat') + NewLine +
+    Space + CustomMessage('MemoClose') + NewLine +
+    Space + FmtMessage(CustomMessage('MemoInstallIn'), [ExpandConstant('{app}')]) + NewLine +
+    Space + CustomMessage('MemoStart') + NewLine;
   if Mode <> ModeFresh then
-    Result := Result + Space + 'Keeps your settings and captures' + NewLine;
-  Result := Result + Space + 'Then Cometsnap offers to replace your old screen capture tool' + NewLine;
+    Result := Result + Space + CustomMessage('MemoKeep') + NewLine;
+  Result := Result + Space + CustomMessage('MemoThen') + NewLine;
   if MemoTasksInfo <> '' then
     Result := Result + NewLine + MemoTasksInfo;
 end;
@@ -208,20 +312,18 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpReady then
   begin
-    if Mode = ModeUpdate then WizardForm.NextButton.Caption := 'Update'
-    else if Mode = ModeReinstall then WizardForm.NextButton.Caption := 'Reinstall';
+    if Mode = ModeUpdate then WizardForm.NextButton.Caption := CustomMessage('ButtonUpdate')
+    else if Mode = ModeReinstall then WizardForm.NextButton.Caption := CustomMessage('ButtonReinstall');
   end
   else if CurPageID = wpFinished then
   begin
     case Mode of
-      ModeFresh: WizardForm.FinishedHeadingLabel.Caption := 'Cometsnap is installed';
-      ModeUpdate: WizardForm.FinishedHeadingLabel.Caption := 'Cometsnap is updated to {#AppVersion}';
+      ModeFresh: WizardForm.FinishedHeadingLabel.Caption := CustomMessage('DoneFresh');
+      ModeUpdate: WizardForm.FinishedHeadingLabel.Caption := FmtMessage(CustomMessage('DoneUpdate'), ['{#AppVersion}']);
     else
-      WizardForm.FinishedHeadingLabel.Caption := 'Cometsnap is reinstalled';
+      WizardForm.FinishedHeadingLabel.Caption := CustomMessage('DoneReinstall');
     end;
-    WizardForm.FinishedLabel.Caption :=
-      'Cometsnap lives in your tray, next to the clock, and in the Start menu.' + #13#10#13#10 +
-      'Leave the box below ticked to start it now and choose which screen capture tool it replaces.';
+    WizardForm.FinishedLabel.Caption := CustomMessage('DoneText');
   end;
 end;
 
