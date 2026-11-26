@@ -71,19 +71,6 @@ jobs:
             "/DSourceExe=$PWD\out\${{ matrix.arch }}\Cometsnap.exe" "/O$PWD\out\${{ matrix.arch }}" installer\Cometsnap.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem out/${{ matrix.arch }}
-      - name: TEMP check uninstaller extraction for signing
-        shell: pwsh
-        run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          $dir = "$PWD\uninst-check"
-          & $iscc "/DAppVersion=$env:VERSION" "/DArch=${{ matrix.arch }}" "/DSignedUninstallerDir=$dir" `
-            "/DSourceExe=$PWD\out\${{ matrix.arch }}\Cometsnap.exe" "/O$PWD\scratch" installer\Cometsnap.iss
-          "ISCC exit code: $LASTEXITCODE"
-          & $iscc 2>&1 | Select-Object -First 3
-          Get-ChildItem $dir | Format-Table Name, Length
-          $files = @(Get-ChildItem $dir -Filter "uninst-*.e*")
-          if ($files.Count -ne 1) { throw "expected one uninstaller" }
-          $global:LASTEXITCODE = 0
       - uses: actions/upload-artifact@v4
         with:
           name: Cometsnap-${{ matrix.arch }}
