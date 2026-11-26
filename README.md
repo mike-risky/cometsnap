@@ -63,6 +63,9 @@ Drag any capture out of the tray panel (or the Copied card) into a file manager,
 The playful extras (comet flight, milestones, seasonal looks, Constellation, the tray-panel secret) are here too;
 the comet and meteor showers need a compositing desktop, which almost every desktop is.
 It speaks English, French, German and Italian, following your desktop's language (change it in *Settings*).
+Recordings open in a small trimmer (the **Trim** button on the Copied card, or double-click one in the tray panel):
+drag the yellow handles to cut the start and end, drag across the timeline and press Del to cut a part out.
+The untouched recording is kept, so every cut stays adjustable.
 
 ## Features
 

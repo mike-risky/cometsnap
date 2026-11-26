@@ -321,7 +321,11 @@ public sealed class FlyoutWindow : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), IsVisible = false, Spacing = 2,
         };
-        if (isRecording) actions.Children.Add(Mini("M5,3 L13,8 L5,13 Z", T("Play"), () => Open(path)));
+        if (isRecording)
+        {
+            actions.Children.Add(Mini("M5,3 L13,8 L5,13 Z", T("Play"), () => { HideFlyout(); Tools.Open(path); }));
+            actions.Children.Add(Mini(Editing.EditCard.ScissorsIcon, T("Trim or cut"), () => Open(path)));
+        }
         else actions.Children.Add(Mini("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", T("Edit (circle, arrow, text…)"), () => Open(path)));
         actions.Children.Add(Mini("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", T("Copy"), () => _ = CopyAsync(path)));
         actions.Children.Add(Mini("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", T("Show in folder"), () => { HideFlyout(); Tools.ShowInFolder(path); }));
@@ -342,7 +346,7 @@ public sealed class FlyoutWindow : Window
             RenderTransform = scale, RenderTransformOrigin = RelativePoint.Center,
         };
         ToolTip.SetTip(frame, isRecording
-            ? Path.GetFileName(path) + "\n" + T("Click: copy · Double-click: play · Drag: drop into any app")
+            ? Path.GetFileName(path) + "\n" + T("Click: copy · Double-click: trim · Drag: drop into any app")
             : Path.GetFileName(path) + "\n" + T("Click: copy · Double-click: edit · Drag: drop into any app"));
         frame.PointerEntered += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.IsVisible = true; scale.ScaleX = scale.ScaleY = 1.04; };
         frame.PointerExited += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.IsVisible = false; scale.ScaleX = scale.ScaleY = 1; };
@@ -449,7 +453,7 @@ public sealed class FlyoutWindow : Window
     private void Open(string path)
     {
         HideFlyout();
-        if (MediaKinds.IsRecording(path)) Tools.Open(path);
+        if (MediaKinds.IsRecording(path)) _app.OpenTrimmer(path);
         else _app.OpenInEditor(path);
     }
 

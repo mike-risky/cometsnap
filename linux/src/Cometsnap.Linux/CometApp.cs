@@ -91,7 +91,7 @@ public sealed class CometApp : Application
         Capture = new CaptureController(this);
         Recorder = new RecordingController(this);
         Flyout = new FlyoutWindow(this);
-        Clipboard = new ClipboardService(() => Flyout.Clipboard);
+        Clipboard = new ClipboardService(() => Flyout);
         Task.Run(() => Recent.Load(CapturesFolder));
 
         try { _tray = new TrayController(this); }
@@ -155,6 +155,7 @@ public sealed class CometApp : Application
             case "flyout" or "show": Flyout.Toggle(); break;
             case "settings": OpenSettings(); break;
             case "edit" when parts.Length > 1: OpenInEditor(parts[1]); break;
+            case "trim" when parts.Length > 1: OpenTrimmer(parts[1]); break;
             case "quit": Quit(); break;
             case "background": break;
             default: Log.Info($"Unknown command '{command}'"); break;
@@ -193,23 +194,49 @@ public sealed class CometApp : Application
 
     private void ShowCard(Bitmap image, PixelRect rect, bool copied)
     {
-        if (_card is null)
-        {
-            _card = new EditCard();
-            _card.EditRequested += (path, img) =>
-            {
-                if (path is not null) OpenInEditor(path);
-                else new EditorWindow(this, img, new AnnotationDocument(), null).Show();
-            };
-        }
         var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
-        _card.ShowFor(image, work, scale, copied);
+        EnsureCard().ShowFor(image, work, scale, copied);
+    }
+
+    private EditCard EnsureCard()
+    {
+        if (_card is not null) return _card;
+        _card = new EditCard();
+        _card.EditRequested += (path, img) =>
+        {
+            if (path is not null) OpenInEditor(path);
+            else new EditorWindow(this, img, new AnnotationDocument(), null).Show();
+        };
+        _card.TrimRequested += OpenTrimmer;
+        return _card;
+    }
+
+    /// <summary>
+    /// Shows the "Copied" card for a finished recording, with a Trim button. False when the card
+    /// is turned off (the caller then shows a toast instead).
+    /// </summary>
+    public bool ShowRecordingCard(string path, Bitmap? poster, string detail, bool copied)
+    {
+        if (!Settings.ShowEditCard) return false;
+        var p = X11.PointerPosition() ?? (0, 0);
+        var (work, scale) = WorkAreaAt(p.X, p.Y);
+        EnsureCard().ShowForRecording(path, poster, detail, copied, work, scale);
+        return true;
+    }
+
+    /// <summary>Opens a recording (MP4 or GIF) in the trimmer.</summary>
+    public void OpenTrimmer(string path)
+    {
+        var trimmer = Cometsnap.Linux.Trimming.TrimWindow.Open(this, path);
+        if (trimmer is null) return;
+        trimmer.Show();
+        trimmer.Activate();
     }
 
     // ------------------------------------------------------------------ playful touches
 
     /// <summary>Sends the comet, carrying the capture, from the captured area towards the tray.</summary>
-    private void LaunchComet(PixelRect rect, Bitmap image)
+    public void LaunchComet(PixelRect rect, Bitmap image)
     {
         if (!Settings.ShowCometAnimation) return;
         try
