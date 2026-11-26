@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Cometsnap.App.Services;
 using Cometsnap.App.Theme;
+using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Editing;
 
@@ -50,7 +51,7 @@ public sealed class EditCard : Window
         RenderOptions.SetBitmapScalingMode(_thumb, BitmapScalingMode.HighQuality);
         var thumbFrame = new Border { CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = _thumb, BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1) };
 
-        _title = new TextBlock { Text = "COPIED!", FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush };
+        _title = new TextBlock { Text = L.T("COPIED!"), FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush };
         _detail = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(0, 2, 0, 0), MaxWidth = 150, TextTrimming = TextTrimming.CharacterEllipsis };
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
         text.Children.Add(_title);
@@ -59,7 +60,7 @@ public sealed class EditCard : Window
         var edit = new Border
         {
             Background = SpaceTheme.TerracottaBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 7, 14, 7),
-            VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand, ToolTip = "Open in the editor",
+            VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand, ToolTip = L.T("Open in the editor"),
         };
         var editRow = new StackPanel { Orientation = Orientation.Horizontal };
         editRow.Children.Add(new System.Windows.Shapes.Path
@@ -68,14 +69,14 @@ public sealed class EditCard : Window
             Stroke = SpaceTheme.StarWhiteBrush, StrokeThickness = 1.6, StrokeLineJoin = PenLineJoin.Round,
             Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0),
         });
-        editRow.Children.Add(new TextBlock { Text = "Edit", Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 14 });
+        editRow.Children.Add(new TextBlock { Text = L.T("Edit"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 14 });
         edit.Child = editRow;
         edit.MouseLeftButtonUp += (_, e) => { e.Handled = true; _pressAt = null; if (!_dragged) OnEdit(); };
 
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Top, Cursor = Cursors.Hand, ToolTip = "Dismiss",
+            VerticalAlignment = VerticalAlignment.Top, Cursor = Cursors.Hand, ToolTip = L.T("Dismiss"),
         };
         close.MouseLeftButtonUp += (_, e) => { e.Handled = true; FadeOut(); };
 
@@ -91,7 +92,7 @@ public sealed class EditCard : Window
             Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12), Padding = new Thickness(10), Margin = new Thickness(12),
             Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black },
-            Child = row, Cursor = Cursors.Hand, ToolTip = "Click to edit · Drag into any app",
+            Child = row, Cursor = Cursors.Hand, ToolTip = L.T("Click to edit · Drag into any app"),
         };
         card.MouseEnter += (_, _) =>
         {
@@ -144,8 +145,8 @@ public sealed class EditCard : Window
         _image = image;
         _path = null;
         _thumb.Source = image;
-        _title.Text = copied ? "COPIED!" : "SNAPPED!";
-        _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · saving…";
+        _title.Text = copied ? L.T("COPIED!") : L.T("SNAPPED!");
+        _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · " + L.T("saving…");
 
         BeginAnimation(OpacityProperty, null);
         Opacity = 1;
