@@ -26,6 +26,11 @@ public sealed class EditCard : Window
     private readonly Image _thumb;
     private readonly TextBlock _title;
     private readonly TextBlock _detail;
+    private readonly System.Windows.Shapes.Path _editIcon;
+    private readonly TextBlock _editLabel;
+    private readonly Border _editButton;
+    private readonly Border _cardBorder;
+    private string? _recording;           // set while the card shows a recording
     private readonly DispatcherTimer _timer;
     private BitmapSource? _image;
     private string? _path;
@@ -34,6 +39,12 @@ public sealed class EditCard : Window
 
     /// <summary>Raised with the saved path (if known yet) and the image when the card or Edit is clicked.</summary>
     public event Action<string?, BitmapSource>? EditRequested;
+
+    /// <summary>Raised with the recording's path when the card of a recording is clicked (opens the trimmer).</summary>
+    public event Action<string>? TrimRequested;
+
+    private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
+    private const string ScissorsIcon = "M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4";
 
     public EditCard()
     {
@@ -63,14 +74,17 @@ public sealed class EditCard : Window
             VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand, ToolTip = L.T("Open in the editor"),
         };
         var editRow = new StackPanel { Orientation = Orientation.Horizontal };
-        editRow.Children.Add(new System.Windows.Shapes.Path
+        _editIcon = new System.Windows.Shapes.Path
         {
-            Data = Geometry.Parse("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5"),
+            Data = Geometry.Parse(PenIcon),
             Stroke = SpaceTheme.StarWhiteBrush, StrokeThickness = 1.6, StrokeLineJoin = PenLineJoin.Round,
             Width = 16, Height = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0),
-        });
-        editRow.Children.Add(new TextBlock { Text = L.T("Edit"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 14 });
+        };
+        editRow.Children.Add(_editIcon);
+        _editLabel = new TextBlock { Text = L.T("Edit"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 14 };
+        editRow.Children.Add(_editLabel);
         edit.Child = editRow;
+        _editButton = edit;
         edit.MouseLeftButtonUp += (_, e) => { e.Handled = true; _pressAt = null; if (!_dragged) OnEdit(); };
 
         var close = new TextBlock
@@ -94,6 +108,7 @@ public sealed class EditCard : Window
             Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black },
             Child = row, Cursor = Cursors.Hand, ToolTip = L.T("Click to edit · Drag into any app"),
         };
+        _cardBorder = card;
         card.MouseEnter += (_, _) =>
         {
             card.BorderBrush = SpaceTheme.CometBlueBrush;
@@ -108,13 +123,13 @@ public sealed class EditCard : Window
         card.PreviewMouseLeftButtonDown += (_, e) => { _pressAt = e.GetPosition(this); _dragged = false; };
         card.PreviewMouseMove += (_, e) =>
         {
-            if (e.LeftButton != MouseButtonState.Pressed || _pressAt is not { } start || _image is null) return;
+            if (e.LeftButton != MouseButtonState.Pressed || _pressAt is not { } start || (_image is null && _recording is null)) return;
             var d = e.GetPosition(this) - start;
             if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
             _pressAt = null;
             _dragged = true;
             _timer.Stop();
-            var effect = DragOut.Start(card, _path, _image, _image);
+            var effect = DragOut.Start(card, _recording ?? _path, _recording is null ? _image : null, _image);
             if (effect != DragDropEffects.None) FadeOut();
             else _timer.Start();
         };
@@ -142,6 +157,7 @@ public sealed class EditCard : Window
     /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area.</summary>
     public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied)
     {
+        SetMode(recording: null);
         _image = image;
         _path = null;
         _thumb.Source = image;
@@ -159,10 +175,43 @@ public sealed class EditCard : Window
         _timer.Start();
     }
 
+    /// <summary>
+    /// Shows the card for a finished recording: its poster frame, length and size, and a Trim button
+    /// that opens the trimmer. Dragging the card drops the video file into any app.
+    /// </summary>
+    public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied, Rect workAreaDip)
+    {
+        SetMode(path);
+        _image = poster;
+        _path = path;
+        _thumb.Source = poster;
+        _title.Text = copied ? L.T("COPIED!") : L.T("SAVED!");
+        _detail.Text = detail;
+        BeginAnimation(OpacityProperty, null);
+        Opacity = 1;
+        if (!IsVisible) Show();
+        if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
+        UpdateLayout();
+        Left = workAreaDip.Right - ActualWidth - 4;
+        Top = workAreaDip.Bottom - ActualHeight - 4;
+        _timer.Stop();
+        _timer.Start();
+    }
+
+    private void SetMode(string? recording)
+    {
+        _recording = recording;
+        var video = recording is not null;
+        _editIcon.Data = Geometry.Parse(video ? ScissorsIcon : PenIcon);
+        _editLabel.Text = video ? L.T("Trim") : L.T("Edit");
+        _editButton.ToolTip = video ? L.T("Trim the start and end, or cut parts out") : L.T("Open in the editor");
+        _cardBorder.ToolTip = video ? L.T("Click to trim · Drag into any app") : L.T("Click to edit · Drag into any app");
+    }
+
     /// <summary>The capture reached the disk: Edit will now open the file.</summary>
     public void SetSaved(string path, BitmapSource image)
     {
-        if (!ReferenceEquals(image, _image) || !IsVisible) return;
+        if (_recording is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
         _path = path;
         _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · {Path.GetFileName(path)}";
     }
@@ -171,7 +220,8 @@ public sealed class EditCard : Window
     {
         _timer.Stop();
         Hide();
-        if (_image is { } image) EditRequested?.Invoke(_path, image);
+        if (_recording is { } recording) TrimRequested?.Invoke(recording);
+        else if (_image is { } image) EditRequested?.Invoke(_path, image);
     }
 
     private void FadeOut()

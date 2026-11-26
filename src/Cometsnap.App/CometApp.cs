@@ -325,6 +325,25 @@ public sealed class CometApp : Application
         editor?.Activate();
     }
 
+    /// <summary>Opens a recording (MP4 or GIF) in the trimmer.</summary>
+    public void OpenTrimmer(string path)
+    {
+        var trimmer = Cometsnap.App.Trimming.TrimWindow.Open(this, path);
+        trimmer?.Show();
+        trimmer?.Activate();
+    }
+
+    /// <summary>
+    /// Shows the "Copied" card for a finished recording. False when the card is turned off
+    /// (the caller then shows a notification instead).
+    /// </summary>
+    public bool ShowRecordingCard(string path, System.Windows.Media.Imaging.BitmapSource? poster, string detail, bool copied)
+    {
+        if (!Settings.ShowEditCard || _card is null) return false;
+        _card.ShowForRecording(path, poster, detail, copied, SystemParameters.WorkArea);
+        return true;
+    }
+
     public void OpenInEditor(System.Windows.Media.Imaging.BitmapSource image, AnnotationDocument doc)
     {
         var editor = new EditorWindow(this, image, doc, null);
@@ -438,6 +457,7 @@ public sealed class CometApp : Application
             if (path is not null) OpenInEditor(path);
             else OpenInEditor(image, new AnnotationDocument());
         };
+        card.TrimRequested += OpenTrimmer;
         return card;
     }
 

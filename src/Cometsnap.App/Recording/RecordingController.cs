@@ -174,8 +174,8 @@ public sealed class RecordingController : IDisposable
         try
         {
             var result = await recorder.StopAsync();
-            AddToRecent(result.Path, recorder);
-            Delivered(result);
+            var poster = AddToRecent(result.Path, recorder);
+            Delivered(result, poster);
         }
         catch (Exception ex)
         {
@@ -185,8 +185,9 @@ public sealed class RecordingController : IDisposable
     }
 
     /// <summary>Shows the recording in the flyout grid, with its poster frame as thumbnail.</summary>
-    private void AddToRecent(string path, ScreenRecorder recorder)
+    private BitmapSource? AddToRecent(string path, ScreenRecorder recorder)
     {
+        BitmapSource? poster = null;
         try
         {
             if (recorder.PosterFrame is { } bgra)
@@ -195,6 +196,7 @@ public sealed class RecordingController : IDisposable
                 var image = BitmapSource.Create(r.Width, r.Height, 96, 96, PixelFormats.Bgr32, null, bgra, r.Width * 4);
                 image.Freeze();
                 _app.Thumbnails.Prime(path, image);
+                poster = image;
             }
         }
         catch (Exception ex)
@@ -202,9 +204,10 @@ public sealed class RecordingController : IDisposable
             Log.Error("Could not make the recording thumbnail", ex);
         }
         _app.Recent.Add(path);
+        return poster;
     }
 
-    private void Delivered(RecordingResult result)
+    private void Delivered(RecordingResult result, BitmapSource? poster)
     {
         var copied = _app.Settings.RecordCopyToClipboard && CopyFile(result.Path);
         var length = result.Duration.TotalHours >= 1 ? result.Duration.ToString(@"h\:mm\:ss") : result.Duration.ToString(@"m\:ss");
@@ -212,6 +215,11 @@ public sealed class RecordingController : IDisposable
             ? (result.Bytes / 1048576.0).ToString("0.0", CultureInfo.InvariantCulture) + " MB"
             : Math.Max(1, result.Bytes / 1024) + " KB";
         var what = result.Format == RecordingFormat.Gif ? "GIF" : L.T("Video");
+        if (_app.ShowRecordingCard(result.Path, poster, $"{what} · {length} · {size}", copied))
+        {
+            Log.Info($"Recording saved to {result.Path}");
+            return;
+        }
         _tray.ShowBalloon(L.F("{0} saved ({1}, {2})", what, length, size),
             (copied ? L.T("Copied: paste it anywhere.") + " " : "") + Path.GetFileName(result.Path));
         Log.Info($"Recording saved to {result.Path}");

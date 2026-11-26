@@ -380,7 +380,11 @@ public sealed class TrayFlyout : Window
             Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(3), Visibility = Visibility.Collapsed,
         };
-        if (isRecording) actions.Children.Add(MiniButton("M5,3 L13,8 L5,13 Z", L.T("Play"), () => Open(path)));
+        if (isRecording)
+        {
+            actions.Children.Add(MiniButton("M5,3 L13,8 L5,13 Z", L.T("Play"), () => Play(path)));
+            actions.Children.Add(MiniButton("M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4", L.T("Trim or cut"), () => Open(path)));
+        }
         else actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", L.T("Edit (circle, arrow, text…)"), () => Open(path)));
         actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", L.T("Copy"), () => CopyFile(path)));
         actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", L.T("Show in folder"), () => ShowInFolder(path)));
@@ -392,7 +396,7 @@ public sealed class TrayFlyout : Window
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
             ClipToBounds = true, Cursor = Cursors.Hand,
             ToolTip = isRecording
-                ? Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: play · Drag: drop into any app")
+                ? Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: trim · Drag: drop into any app")
                 : Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: edit · Drag: drop into any app"),
         };
         var inner = new Grid { ClipToBounds = true };
@@ -516,17 +520,20 @@ public sealed class TrayFlyout : Window
         }
     }
 
-    /// <summary>Opens the capture in Cometsnap's editor (recordings: in the default player).</summary>
+    /// <summary>Opens the capture in Cometsnap's editor (recordings: in the trimmer).</summary>
     private void Open(string path)
     {
         HideFlyout();
-        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path))
-        {
-            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
-            catch (Exception ex) { Log.Error("Could not play the recording", ex); }
-            return;
-        }
-        _app.OpenInEditor(path);
+        if (Cometsnap.Core.Storage.MediaKinds.IsRecording(path)) _app.OpenTrimmer(path);
+        else _app.OpenInEditor(path);
+    }
+
+    /// <summary>Plays a recording in the default player.</summary>
+    private void Play(string path)
+    {
+        HideFlyout();
+        try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); }
+        catch (Exception ex) { Log.Error("Could not play the recording", ex); }
     }
 
     private void ShowInFolder(string path)
