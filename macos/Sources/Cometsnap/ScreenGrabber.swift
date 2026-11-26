@@ -1,4 +1,5 @@
 import AppKit
+import CometsnapCore
 import ScreenCaptureKit
 
 /// A frozen copy of one screen, taken the instant the hotkey fires.
@@ -22,7 +23,7 @@ enum CaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noPermission: return "Cometsnap needs the Screen Recording permission."
+        case .noPermission: return L.t("Cometsnap needs the Screen Recording permission.")
         case .failed(let s): return s
         }
     }

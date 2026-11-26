@@ -4,7 +4,9 @@ import Foundation
 public enum LoupeCorner: String, Codable, CaseIterable {
     case topLeft, topRight, bottomLeft, bottomRight, followCursor
 
-    public var title: String {
+    public var title: String { L.t(englishTitle) }
+
+    public var englishTitle: String {
         switch self {
         case .topLeft: return "Top left"
         case .topRight: return "Top right"

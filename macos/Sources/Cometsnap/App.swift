@@ -28,7 +28,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     private(set) var flyout: FlyoutPanel!
     private(set) var capture: CaptureController!
     private(set) var recorder: Recorder!
-    private(set) lazy var editCard = EditCard()
+    private(set) var editCard: EditCard!
     private var editors: [EditorWindow] = []
     private var settingsWindow: SettingsWindow?
     private var welcome: WelcomeWindow?
@@ -43,6 +43,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(at: paths.dataDirectory, withIntermediateDirectories: true)
         Log.file = paths.logFile
         settings = AppSettings.load(from: paths.settingsFile)
+        L.use(settings.language)
         Theme.registerFonts()
         NSApp.appearance = NSAppearance(named: .darkAqua)
         buildMainMenu()
@@ -51,8 +52,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         recorder = Recorder(app: self)
         statusItem = StatusItemController(app: self)
         flyout = FlyoutPanel(app: self)
-        editCard.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
-        editCard.onOpen = { url in NSWorkspace.shared.open(url) }
+        editCard = makeEditCard()
 
         try? FileManager.default.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
         refreshRecent()
@@ -91,6 +91,34 @@ final class AppController: NSObject, NSApplicationDelegate {
             try? FileManager.default.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
             capturesChanged()
         }
+    }
+
+    private func makeEditCard() -> EditCard {
+        let card = EditCard()
+        card.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
+        card.onOpen = { url in NSWorkspace.shared.open(url) }
+        return card
+    }
+
+    /// A new language applies right away: the panel, the card and Settings are rebuilt.
+    /// Open editors keep theirs until they close.
+    func languageChanged() {
+        L.use(settings.language)
+        Log.info("language: \(L.language)")
+        flyout.hide()
+        flyout = FlyoutPanel(app: self)
+        editCard.orderOut(nil)
+        editCard = makeEditCard()
+        if let old = settingsWindow {
+            let origin = old.frame.origin
+            settingsWindow = SettingsWindow(app: self)
+            settingsWindow?.setFrameOrigin(origin)
+            settingsWindow?.reload()
+            settingsWindow?.makeKeyAndOrderFront(nil)
+            old.orderOut(nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { _ = old } // let its last event finish
+        }
+        statusItem.refreshIcon()
     }
 
     func registerHotkeys() {
@@ -141,12 +169,12 @@ final class AppController: NSObject, NSApplicationDelegate {
         var delay: TimeInterval = 0.9 // after the comet has landed
         if let month = event.finishedMonth {
             let n = SnapMilestones.formatted(month.count)
-            celebrate(after: delay, meteors: 14, title: "You captured \(n) snap\(month.count == 1 ? "" : "s")",
-                      subtitle: "in \(month.title). New month, new snaps!")
+            celebrate(after: delay, meteors: 14, title: month.count == 1 ? L.t("You captured 1 snap") : L.f("You captured {0} snaps", n),
+                      subtitle: L.f("in {0}. New month, new snaps!", month.title))
             delay += 3.4
         }
         if let n = event.milestone {
-            celebrate(after: delay, meteors: 22, title: "✦ " + SnapMilestones.title(n), subtitle: "Thanks for snapping with Cometsnap.")
+            celebrate(after: delay, meteors: 22, title: "✦ " + SnapMilestones.title(n), subtitle: L.t("Thanks for snapping with Cometsnap."))
         }
     }
 
@@ -169,8 +197,8 @@ final class AppController: NSObject, NSApplicationDelegate {
         guard !capture.isBusy else { return }
         Log.info("Konami code: meteor shower")
         let vf = NSScreen.underMouse.visibleFrame
-        MeteorShower.play(over: vf, meteors: 70, duration: 3.6, title: "☄ METEOR SHOWER ☄",
-                          subtitle: "You found the secret. Make a wish!", captionAtBottom: false)
+        MeteorShower.play(over: vf, meteors: 70, duration: 3.6, title: "☄ " + L.t("METEOR SHOWER") + " ☄",
+                          subtitle: L.t("You found the secret. Make a wish!"), captionAtBottom: false)
     }
 
     /// First run with milestones: start from the snaps already in the captures folder, silently.
@@ -247,7 +275,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     func showAbout() {
         hidePanels()
         NSApp.activate()
-        let credits = NSAttributedString(string: "Free, fun and snappy screenshots and recordings.\nMIT licensed · github.com/mike-risky/cometsnap",
+        let credits = NSAttributedString(string: L.t("Free, fun and snappy screenshots and recordings.") + "\n" + L.t("MIT licensed") + " · github.com/mike-risky/cometsnap",
                                          attributes: [.font: Theme.ui(11), .foregroundColor: NSColor.secondaryLabelColor])
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits, .applicationIcon: Theme.logo])
     }
@@ -259,7 +287,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         Log.info("error: \(error.localizedDescription)")
         NSApp.activate()
         let a = NSAlert()
-        a.messageText = "Cometsnap hit a snag"
+        a.messageText = L.t("Cometsnap hit a snag")
         a.informativeText = error.localizedDescription
         a.runModal()
     }
@@ -269,13 +297,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         NSApp.activate()
         let a = NSAlert()
         a.icon = Theme.logo
-        a.messageText = "Allow Cometsnap to see your screen"
-        a.informativeText = """
-        macOS asks once. In System Settings › Privacy & Security › Screen & System Audio Recording, \
-        turn on Cometsnap. macOS then asks to quit and reopen it: click "Quit & Reopen".
-        """
-        a.addButton(withTitle: "Open System Settings")
-        a.addButton(withTitle: "Later")
+        a.messageText = L.t("Allow Cometsnap to see your screen")
+        a.informativeText = L.t("macOS asks once. In System Settings › Privacy & Security › Screen & System Audio Recording, turn on Cometsnap. macOS then asks to quit and reopen it: click “Quit & Reopen”.")
+        a.addButton(withTitle: L.t("Open System Settings"))
+        a.addButton(withTitle: L.t("Later"))
         if a.runModal() == .alertFirstButtonReturn { ScreenGrabber.requestPermission() }
     }
 

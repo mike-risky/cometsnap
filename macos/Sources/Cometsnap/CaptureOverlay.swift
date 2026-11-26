@@ -187,7 +187,7 @@ final class CaptureOverlay {
     func copyColorUnderCursor() {
         guard let f = frozenScreen(containing: mouse), let c = PixelProbe.color(in: f, at: mouse) else { return }
         Clipboard.copyText(c.hex)
-        for w in windows { w.overlayView.flash("Copied \(c.hex)") }
+        for w in windows { w.overlayView.flash(L.f("Copied {0}", c.hex)) }
     }
 
     private func finish(_ rect: CGRect, near p: CGPoint) {
@@ -310,8 +310,8 @@ final class OverlayView: NSView {
         addSubview(loupe)
         hint.style = .hint
         hint.text = overlay.purpose == .recording
-            ? "Pick what to record: click a window or drag an area · F whole screen · Esc cancel"
-            : "Click a window or drag an area · F whole screen · W window detection · Esc cancel"
+            ? L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
+            : L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")
         addSubview(hint)
         hint.sizeToFitText()
         hint.setFrameOrigin(CGPoint(x: (bounds.width - hint.frame.width) / 2, y: bounds.height - hint.frame.height - 40))
@@ -587,7 +587,7 @@ final class LoupeView: NSView {
             NSColor.white.withAlphaComponent(0.5).setStroke()
             NSBezierPath(roundedRect: sw, xRadius: 3, yRadius: 3).stroke()
             (color.hex as NSString).draw(at: CGPoint(x: 28, y: y), withAttributes: white)
-            let hintText = "C copies" as NSString
+            let hintText = L.t("C copy") as NSString
             let w = hintText.size(withAttributes: muted).width
             hintText.draw(at: CGPoint(x: bounds.width - 10 - w, y: y), withAttributes: muted)
         }

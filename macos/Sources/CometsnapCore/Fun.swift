@@ -49,13 +49,14 @@ public struct MonthSummary: Equatable {
     public let month: String // yyyy-MM
     public let count: Int
 
-    /// "October 2026".
+    /// "October 2026" (in the app's language).
     public var title: String {
         let parts = month.split(separator: "-")
         guard parts.count == 2, let y = Int(parts[0]), let m = Int(parts[1]), (1...12).contains(m) else { return month }
         let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return "\(f.standaloneMonthSymbols[m - 1]) \(y)"
+        f.locale = L.language == "en" ? Locale(identifier: "en_US_POSIX") : L.locale
+        // Mid-sentence: "in October 2026", "en octobre 2026", "im Oktober 2026".
+        return "\(f.monthSymbols[m - 1]) \(y)"
     }
 }
 
@@ -74,13 +75,16 @@ public enum SnapMilestones {
     }
 
     /// "1,000th snap!"
-    public static func title(_ n: Int) -> String { "\(formatted(n))\(suffix(n)) snap!" }
+    public static func title(_ n: Int) -> String {
+        if L.language == "en" { return "\(formatted(n))\(suffix(n)) snap!" }
+        return L.f("{0}th snap!", formatted(n))
+    }
 
-    /// "1,000".
+    /// "1,000" ("1 000" in French, "1.000" in German and Italian).
     public static func formatted(_ n: Int) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
-        f.locale = Locale(identifier: "en_US")
+        f.locale = L.language == "en" ? Locale(identifier: "en_US") : L.locale
         return f.string(from: NSNumber(value: n)) ?? "\(n)"
     }
 

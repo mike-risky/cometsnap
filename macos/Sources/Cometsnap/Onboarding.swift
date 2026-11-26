@@ -6,13 +6,13 @@ final class WelcomeWindow: NSWindow {
     private unowned let app: AppController
     private let permissionStatus = NSTextField(labelWithString: "")
     private let permissionButton: SpaceButton
-    private let takeOver = NSButton(checkboxWithTitle: "Use ⌘⇧4 for Cometsnap (replaces the built-in macOS shortcut, switch back any time in Settings)", target: nil, action: nil)
-    private let login = NSButton(checkboxWithTitle: "Start Cometsnap when I log in", target: nil, action: nil)
+    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧4 for Cometsnap (replaces the built-in macOS shortcut, switch back any time in Settings)"), target: nil, action: nil)
+    private let login = NSButton(checkboxWithTitle: L.t("Start Cometsnap when I log in"), target: nil, action: nil)
     private var poll: Timer?
 
     init(app: AppController) {
         self.app = app
-        permissionButton = SpaceButton(title: "Allow screen access", symbol: "lock.open", fill: Theme.blue)
+        permissionButton = SpaceButton(title: L.t("Allow screen access"), symbol: "lock.open", fill: Theme.blue)
         super.init(contentRect: CGRect(x: 0, y: 0, width: 560, height: 560), styleMask: [.titled, .closable, .fullSizeContentView],
                    backing: .buffered, defer: false)
         titlebarAppearsTransparent = true
@@ -27,29 +27,29 @@ final class WelcomeWindow: NSWindow {
 
     private func build() {
         let header = StarHeaderView(frame: CGRect(x: 0, y: 0, width: 560, height: 110))
-        let welcome = NSTextField(labelWithString: "Welcome aboard! Three quick things and you're ready to snap.")
+        let welcome = NSTextField(labelWithString: L.t("Welcome aboard! Three quick things and you're ready to snap."))
         welcome.font = Theme.ui(15, .semibold)
         welcome.textColor = .white
 
-        let step1 = stepLabel("1", "Let Cometsnap see your screen", "macOS needs your OK once. After you switch it on, macOS asks to quit and reopen Cometsnap.")
+        let step1 = stepLabel("1", L.t("Let Cometsnap see your screen"), L.t("macOS needs your OK once. After you switch it on, macOS asks to quit and reopen Cometsnap."))
         permissionButton.onClick = { [weak self] in
             if ScreenGrabber.hasPermission { self?.app.relaunch() } else { ScreenGrabber.requestPermission() }
         }
         permissionStatus.font = Theme.ui(12, .medium)
 
-        let step2 = stepLabel("2", "Replace your old screenshot shortcut", "Snap with ⌘⇧4 like before, but with window detection, a loupe and instant copy.")
+        let step2 = stepLabel("2", L.t("Replace your old screenshot shortcut"), L.t("Snap with ⌘⇧4 like before, but with window detection, a loupe and instant copy."))
         takeOver.state = .on
         styleCheckbox(takeOver)
 
-        let step3 = stepLabel("3", "Always ready", "Cometsnap lives in the menu bar and uses almost nothing while idle.")
+        let step3 = stepLabel("3", L.t("Always ready"), L.t("Cometsnap lives in the menu bar and uses almost nothing while idle."))
         login.state = .on
         styleCheckbox(login)
 
-        let keys = NSTextField(wrappingLabelWithString: "Shortcuts: ⌘⇧2 (or ⌘⇧4) capture · ⌘⇧7 record video · ⌘⇧8 record GIF · Print Screen / F13 on PC keyboards. Release the mouse and it's copied and saved.")
+        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 (or ⌘⇧4) capture · ⌘⇧7 record video · ⌘⇧8 record GIF · Print Screen / F13 on PC keyboards. Release the mouse and it's copied and saved."))
         keys.font = Theme.ui(12)
         keys.textColor = Theme.muted
 
-        let go = SpaceButton(title: "Let's go ☄️", symbol: nil, fill: Theme.terracotta, fontSize: 15)
+        let go = SpaceButton(title: L.t("Let's go ☄️"), symbol: nil, fill: Theme.terracotta, fontSize: 15)
         go.onClick = { [weak self] in self?.finish() }
 
         let permRow = NSStackView(views: [permissionButton, permissionStatus])
@@ -116,11 +116,11 @@ final class WelcomeWindow: NSWindow {
 
     private func updatePermission() {
         if ScreenGrabber.hasPermission {
-            permissionStatus.stringValue = "✓ Screen access is on"
+            permissionStatus.stringValue = L.t("✓ Screen access is on")
             permissionStatus.textColor = NSColor(hex: 0x2ED573)
             permissionButton.isHidden = true
         } else {
-            permissionStatus.stringValue = "Not allowed yet"
+            permissionStatus.stringValue = L.t("Not allowed yet")
             permissionStatus.textColor = Theme.yellow
         }
     }
@@ -146,23 +146,24 @@ final class WelcomeWindow: NSWindow {
 /// Settings: plain and short.
 final class SettingsWindow: NSWindow {
     private unowned let app: AppController
-    private let login = NSButton(checkboxWithTitle: "Start at login", target: nil, action: nil)
-    private let takeOver = NSButton(checkboxWithTitle: "Use ⌘⇧4 for Cometsnap (turns off the built-in macOS ⌘⇧4)", target: nil, action: nil)
-    private let copyBox = NSButton(checkboxWithTitle: "Copy every capture to the clipboard", target: nil, action: nil)
-    private let card = NSButton(checkboxWithTitle: "Show the small Edit card after a capture", target: nil, action: nil)
-    private let comet = NSButton(checkboxWithTitle: "Comet animation into the menu bar", target: nil, action: nil)
-    private let sound = NSButton(checkboxWithTitle: "Play a sound", target: nil, action: nil)
-    private let audio = NSButton(checkboxWithTitle: "Record the Mac's sound in videos", target: nil, action: nil)
-    private let celebrations = NSButton(checkboxWithTitle: "Little celebrations (a tiny meteor shower at 100, 1,000… snaps, and a monthly recap)", target: nil, action: nil)
-    private let seasonal = NSButton(checkboxWithTitle: "Seasonal looks (a pumpkin comet for Halloween, a snowy one in December)", target: nil, action: nil)
+    private let login = NSButton(checkboxWithTitle: L.t("Start at login"), target: nil, action: nil)
+    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧4 for Cometsnap (turns off the built-in macOS ⌘⇧4)"), target: nil, action: nil)
+    private let copyBox = NSButton(checkboxWithTitle: L.t("Copy every capture to the clipboard"), target: nil, action: nil)
+    private let card = NSButton(checkboxWithTitle: L.t("Show the small Edit card after a capture"), target: nil, action: nil)
+    private let comet = NSButton(checkboxWithTitle: L.t("Comet animation into the menu bar"), target: nil, action: nil)
+    private let sound = NSButton(checkboxWithTitle: L.t("Play a sound"), target: nil, action: nil)
+    private let audio = NSButton(checkboxWithTitle: L.t("Record the Mac's sound in videos"), target: nil, action: nil)
+    private let celebrations = NSButton(checkboxWithTitle: L.t("Little celebrations (a tiny meteor shower at 100, 1,000… snaps, and a monthly recap)"), target: nil, action: nil)
+    private let seasonal = NSButton(checkboxWithTitle: L.t("Seasonal looks (a pumpkin comet for Halloween, a snowy one in December)"), target: nil, action: nil)
     private let loupe = NSPopUpButton()
     private let gifFps = NSPopUpButton()
+    private let language = NSPopUpButton()
     private let folder = NSTextField(labelWithString: "")
 
     init(app: AppController) {
         self.app = app
         super.init(contentRect: CGRect(x: 0, y: 0, width: 560, height: 530), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        title = "Cometsnap Settings"
+        title = L.t("Cometsnap Settings")
         appearance = NSAppearance(named: .darkAqua)
         backgroundColor = Theme.night
         isReleasedWhenClosed = false
@@ -181,11 +182,15 @@ final class SettingsWindow: NSWindow {
         [8, 10, 12, 15, 20, 25].forEach { gifFps.addItem(withTitle: "\($0) fps") }
         gifFps.target = self
         gifFps.action = #selector(changed)
+        language.addItem(withTitle: L.f("Same as macOS ({0})", L.systemLanguageName))
+        L.languages.forEach { language.addItem(withTitle: $0.name) }
+        language.target = self
+        language.action = #selector(languageChanged)
         folder.textColor = Theme.muted
         folder.lineBreakMode = .byTruncatingMiddle
         folder.font = Theme.ui(12)
-        let change = NSButton(title: "Change…", target: self, action: #selector(chooseFolder))
-        let reveal = NSButton(title: "Open", target: self, action: #selector(openFolder))
+        let change = NSButton(title: L.t("Change…"), target: self, action: #selector(chooseFolder))
+        let reveal = NSButton(title: L.t("Open"), target: self, action: #selector(openFolder))
 
         let title = NSTextField(labelWithAttributedString: Theme.wordmark(28))
         func row(_ label: String, _ v: NSView) -> NSView {
@@ -200,13 +205,13 @@ final class SettingsWindow: NSWindow {
         let folderRow = NSStackView(views: [folder, change, reveal])
         folderRow.spacing = 8
         folder.widthAnchor.constraint(equalToConstant: 250).isActive = true
-        let keys = NSTextField(wrappingLabelWithString: "Shortcuts: ⌘⇧2 capture (also ⌘⇧4 when enabled above, and Print Screen / F13) · ⌘⇧7 video · ⌘⇧8 GIF · press again to stop.\nIn the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels.")
+        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 capture (also ⌘⇧4 when enabled above, and Print Screen / F13) · ⌘⇧7 video · ⌘⇧8 GIF · press again to stop.") + "\n" + L.t("In the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels."))
         keys.font = Theme.ui(11)
         keys.textColor = Theme.muted
         keys.preferredMaxLayoutWidth = 460
 
         let stack = NSStackView(views: [title, login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal,
-                                        row("Loupe corner", loupe), row("GIF smoothness", gifFps), row("Captures folder", folderRow), keys])
+                                        row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), row(L.t("Captures folder"), folderRow), keys])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 9
@@ -222,6 +227,10 @@ final class SettingsWindow: NSWindow {
             stack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -24),
             keys.widthAnchor.constraint(equalToConstant: 470),
         ])
+        // Fit the longest line (French and German run longer).
+        let fit = stack.fittingSize
+        setContentSize(NSSize(width: max(560, fit.width + 48), height: max(470, fit.height + 36)))
+        center()
     }
 
     func reload() {
@@ -238,6 +247,7 @@ final class SettingsWindow: NSWindow {
         loupe.selectItem(at: LoupeCorner.allCases.firstIndex(of: s.loupeCorner) ?? 2)
         let fpsValues = [8, 10, 12, 15, 20, 25]
         gifFps.selectItem(at: fpsValues.firstIndex(of: s.gifFramesPerSecond) ?? 3)
+        language.selectItem(at: (L.languages.firstIndex { $0.code == s.language }).map { $0 + 1 } ?? 0)
         folder.stringValue = app.capturesDirectory.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
@@ -257,6 +267,15 @@ final class SettingsWindow: NSWindow {
             s.gifFramesPerSecond = fpsValues[max(0, gifFps.indexOfSelectedItem)]
         }
         if sound.state == .on { Sound.snap() }
+    }
+
+    /// Applies right away: the panel, cards and this window are rebuilt in the new language.
+    @objc private func languageChanged() {
+        let i = language.indexOfSelectedItem
+        let code = i <= 0 ? "" : L.languages[i - 1].code
+        guard code != app.settings.language else { return }
+        app.update { $0.language = code }
+        DispatchQueue.main.async { [app] in app.languageChanged() }
     }
 
     @objc private func chooseFolder() {

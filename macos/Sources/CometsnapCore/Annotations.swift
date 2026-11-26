@@ -23,7 +23,9 @@ public enum EditorTool: String, CaseIterable, Codable {
         }
     }
 
-    public var label: String {
+    public var label: String { L.t(englishLabel) }
+
+    public var englishLabel: String {
         switch self {
         case .select: return "Select"
         case .arrow: return "Arrow"
@@ -41,7 +43,9 @@ public enum EditorTool: String, CaseIterable, Codable {
         }
     }
 
-    public var tip: String {
+    public var tip: String { L.t(englishTip) }
+
+    public var englishTip: String {
         switch self {
         case .select: return "Select (V): click a shape to move, recolor or delete it"
         case .arrow: return "Arrow (A) · Shift = 45° steps"

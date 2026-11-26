@@ -204,3 +204,38 @@ final class FunTests: XCTestCase {
         XCTAssertFalse(s.snapCountSeeded)
     }
 }
+
+final class LocalizationTests: XCTestCase {
+    override func tearDown() { L.use("en") }
+
+    func testPicksSystemLanguage() {
+        XCTAssertEqual(L.fromPreferred(["de-CH", "en-US"]), "de")
+        XCTAssertEqual(L.fromPreferred(["es-ES", "it-IT"]), "it")
+        XCTAssertEqual(L.fromPreferred(["ja-JP"]), "en")
+        L.use("", preferred: ["fr-CH"])
+        XCTAssertEqual(L.language, "fr")
+        L.use("xx")
+        XCTAssertEqual(L.language, "en")
+    }
+
+    func testTranslatesWithFallback() {
+        L.use("fr")
+        XCTAssertEqual(L.t("COPIED!"), "COPIÉ !")
+        XCTAssertEqual(L.t("Delayed"), "Retardateur")
+        XCTAssertEqual(L.t("not a known text"), "not a known text")
+        XCTAssertEqual(L.f("Press {0} and grab something!", "⌘⇧2"), "Appuyez sur ⌘⇧2 et attrapez quelque chose !")
+        XCTAssertEqual(EditorTool.step.label, "Étapes")
+        L.use("de")
+        XCTAssertEqual(L.t("Constellation"), "Sternbild")
+        XCTAssertEqual(SnapMilestones.title(1000), "1.000. Screenshot!")
+        L.use("it")
+        XCTAssertEqual(L.t("Delayed"), "Autoscatto")
+    }
+
+    func testEveryLanguageHasEveryText() {
+        let fr = Set(Strings.french.keys), de = Set(Strings.german.keys), it = Set(Strings.italian.keys)
+        XCTAssertEqual(fr, de)
+        XCTAssertEqual(fr, it)
+        for (k, v) in Strings.french where k.contains("{0}") { XCTAssertTrue(v.contains("{0}"), k) }
+    }
+}
