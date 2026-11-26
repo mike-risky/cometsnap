@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Cometsnap
+GenericName=Screenshot tool
+Comment=Snappy screenshots, annotations and screen recordings
+Exec=cometsnap %F
+Icon=cometsnap
+Terminal=false
+Categories=Utility;Graphics;
+Keywords=screenshot;capture;screen;record;gif;annotate;
+StartupNotify=false
+Actions=Capture;Record;
+
+[Desktop Action Capture]
+Name=Capture a region
+Exec=cometsnap --capture
+
+[Desktop Action Record]
+Name=Record a video
+Exec=cometsnap --record

@@ -1,0 +1,19 @@
+<Project>
+  <!-- Linux build of Cometsnap. Independent of the Windows solution in ../src (own copies of the portable logic). -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>0.1.0</Version>
+    <Product>Cometsnap</Product>
+    <Authors>Michael Solioz</Authors>
+    <Company>Michael Solioz</Company>
+    <Copyright>Copyright (c) 2026 Michael Solioz</Copyright>
+    <Description>A free, fun and snappy screenshot and screen recording tool for Linux.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/mike-risky/cometsnap</RepositoryUrl>
+    <AvaloniaVersion>11.3.20</AvaloniaVersion>
+  </PropertyGroup>
+</Project>

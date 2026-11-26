@@ -1,0 +1,151 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
+using Cometsnap.Linux.Theme;
+
+namespace Cometsnap.Linux.Editing;
+
+/// <summary>
+/// The small card that appears in the corner after a capture: "Copied", with an Edit button.
+/// It never takes the focus, so you can keep typing or paste right away, and it fades out on its own.
+/// </summary>
+public sealed class EditCard : Window
+{
+    private readonly Image _thumb;
+    private readonly TextBlock _title;
+    private readonly TextBlock _detail;
+    private readonly DispatcherTimer _timer;
+    private readonly Border _card;
+    private Bitmap? _image;
+    private string? _path;
+
+    /// <summary>Raised with the saved path (if known yet) and the image when Edit is clicked.</summary>
+    public event Action<string?, Bitmap>? EditRequested;
+
+    public EditCard()
+    {
+        Title = "Cometsnap";
+        SystemDecorations = SystemDecorations.None;
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent, WindowTransparencyLevel.None };
+        Background = Brushes.Transparent;
+        CanResize = false;
+        ShowInTaskbar = false;
+        ShowActivated = false;
+        Topmost = true;
+        SizeToContent = SizeToContent.WidthAndHeight;
+        FontFamily = SpaceTheme.UiFont;
+
+        _thumb = new Image { Width = 88, Height = 56, Stretch = Stretch.UniformToFill };
+        var thumbFrame = new Border
+        {
+            CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = _thumb,
+            BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+        };
+        _title = new TextBlock { Text = "COPIED!", FontFamily = SpaceTheme.HeadingFont, FontSize = 16, Foreground = SpaceTheme.SunBrush };
+        _detail = new TextBlock
+        {
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(0, 2, 0, 0), MaxWidth = 170,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 12, 0) };
+        text.Children.Add(_title);
+        text.Children.Add(_detail);
+
+        var edit = Ui.ActionButton("Edit", "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", "Open in the editor", OnEdit, primary: true);
+        edit.VerticalAlignment = VerticalAlignment.Center;
+        var close = new TextBlock
+        {
+            Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Top, Cursor = new Cursor(StandardCursorType.Hand),
+        };
+        ToolTip.SetTip(close, "Dismiss");
+        close.PointerReleased += (_, e) => { e.Handled = true; FadeOut(); };
+
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(thumbFrame);
+        row.Children.Add(text);
+        row.Children.Add(edit);
+        row.Children.Add(close);
+        _card = new Border
+        {
+            Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12), Padding = new Thickness(10), Margin = new Thickness(12),
+            BoxShadow = new BoxShadows(new BoxShadow { Blur = 18, Color = Color.FromArgb(0x80, 0, 0, 0) }),
+            Child = row,
+        };
+        Content = _card;
+        // Without a compositor there is no transparency: blend the margin with the card instead of black.
+        Opened += (_, _) =>
+        {
+            if (ActualTransparencyLevel == WindowTransparencyLevel.None)
+            {
+                Background = _card.Background;
+                _card.Margin = new Thickness(0);
+            }
+        };
+
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
+        _timer.Tick += (_, _) => FadeOut();
+        PointerEntered += (_, _) => { _timer.Stop(); Opacity = 1; };
+        PointerExited += (_, _) => _timer.Start();
+    }
+
+    /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area (desktop pixels).</summary>
+    public void ShowFor(Bitmap image, PixelRect workArea, double scaling, bool copied, string? title = null)
+    {
+        _image = image;
+        _path = null;
+        _thumb.Source = image;
+        _title.Text = title ?? (copied ? "COPIED!" : "SNAPPED!");
+        _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · saving…";
+        Opacity = 1;
+        if (!IsVisible) Show();
+        Ui.Entrance(_card, lift: 14, ms: 180);
+        var size = _card.DesiredSize.Width > 0 ? _card.DesiredSize + new Size(24, 24) : new Size(420, 100);
+        Position = new PixelPoint(
+            workArea.Right - (int)(size.Width * scaling) - 4,
+            workArea.Bottom - (int)(size.Height * scaling) - 4);
+        Dispatcher.UIThread.Post(() =>
+        {
+            Position = new PixelPoint(
+                workArea.Right - (int)(Bounds.Width * scaling) - 4,
+                workArea.Bottom - (int)(Bounds.Height * scaling) - 4);
+        }, DispatcherPriority.Loaded);
+        _timer.Stop();
+        _timer.Start();
+    }
+
+    /// <summary>The capture reached the disk: Edit will now open the file.</summary>
+    public void SetSaved(string path, Bitmap image)
+    {
+        if (!ReferenceEquals(image, _image) || !IsVisible) return;
+        _path = path;
+        _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · {System.IO.Path.GetFileName(path)}";
+    }
+
+    public void SetDetail(string text) => _detail.Text = text;
+
+    private void OnEdit()
+    {
+        _timer.Stop();
+        Hide();
+        if (_image is not null) EditRequested?.Invoke(_path, _image);
+    }
+
+    private async void FadeOut()
+    {
+        _timer.Stop();
+        for (var i = 10; i >= 0; i--)
+        {
+            Opacity = i / 10.0;
+            await Task.Delay(18);
+            if (IsPointerOver) { Opacity = 1; return; }
+        }
+        Hide();
+        Opacity = 1;
+    }
+}
