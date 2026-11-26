@@ -196,9 +196,13 @@ public sealed class CometApp : Application
     {
         if (Settings.PlaySounds) _sounds?.Snap();
         if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
-        if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
+        LaunchComet(new Point(from.CenterX, from.CenterY));
+    }
 
-        var start = new Point(from.CenterX, from.CenterY);
+    /// <summary>Sends the comet from a screen point (physical pixels) into the tray.</summary>
+    public void LaunchComet(Point start)
+    {
+        if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
         Point end;
         if (_tray.GetIconRect() is { } icon)
         {
@@ -206,7 +210,9 @@ public sealed class CometApp : Application
         }
         else
         {
-            var work = Win32.GetWorkArea(from.CenterX, from.CenterY, out _, out _) ?? default;
+            var cx = (int)start.X;
+            var cy = (int)start.Y;
+            var work = Win32.GetWorkArea(cx, cy, out _, out _) ?? default;
             end = new Point(work.Right - 40, work.Bottom - 10);
         }
         _comet.Launch(start, end);

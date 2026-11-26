@@ -31,7 +31,9 @@ click **More info → Run anyway**.
 - Magnifier loupe with pixel grid, X/Y, selection size and hex color; it sits in a corner and dodges your cursor
 - Pixel-precise keyboard control: arrows = 1 px, Shift + arrows = 10 px, Enter to confirm, Esc to cancel
 - A small **Edit** card pops up after each capture (it never steals focus). Click it, or double-click
-  a capture in the tray, to open the editor: circle, arrow, text, rectangle, colors, undo, zoom.
+  a capture in the tray, to open the editor. Big labeled tools: select/move, arrow, line, box, circle,
+  text, speech bubble, highlighter, pen, numbered steps, blur, spotlight (greys out the rest) and crop.
+  8 colors, 3 sizes, undo/redo, zoom. **Copy & close** or **Save** finishes and closes the editor.
   Shapes stay editable: re-open a capture later and keep going
 - Prefer annotating on the frozen screen? Turn off *Options > Instant capture* to get the quick bar back
 - Copied to the clipboard and auto-saved to `Pictures\Cometsnap\yyyy-MM\`
@@ -55,11 +57,15 @@ click **More info → Run anyway**.
 | Overlay | **F** | Capture the whole monitor |
 | Overlay | **W** | Toggle window detection |
 | Overlay | **C** | Copy the hex color under the cursor |
-| Editor | **E** / **A** / **T** / **R** | Circle / arrow / text / rectangle (Shift = perfect circle, square, 45° arrow) |
-| Editor | **1**–**6** | Pick a color |
-| Editor | **Ctrl+Z** / **Ctrl+Y** | Undo / redo |
-| Editor | **Ctrl+C** / **Ctrl+S** / **Ctrl+Shift+S** | Copy / save / save a copy as… |
-| Editor | **Ctrl+Enter** | Copy, save and close |
+| Editor | **V** | Select: drag to move, arrows to nudge, **Del** to delete, pick a color or size to change it |
+| Editor | **A** / **L** / **R** / **E** | Arrow / line / box / circle (Shift = 45°, square, perfect circle) |
+| Editor | **T** / **K** | Text / speech bubble (drag from the target to where the bubble goes) |
+| Editor | **H** / **P** / **N** | Highlighter / pen / numbered steps |
+| Editor | **B** / **S** / **C** | Blur / spotlight / crop |
+| Editor | **1**–**8**, **[** / **]** | Color, size |
+| Editor | **Ctrl+Z** / **Ctrl+Y** | Undo / redo (moves, colors and deletes too) |
+| Editor | **Ctrl+C** or **Ctrl+Enter** | Copy, save and close |
+| Editor | **Ctrl+S** / **Ctrl+Shift+S** | Save and close / save a copy as… |
 | Editor | **Ctrl+wheel**, **Ctrl+0**, **Ctrl+1** | Zoom, fit, 100% |
 
 With *Instant capture* off, the same tool keys work on the frozen screen once a region is selected,

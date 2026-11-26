@@ -15,6 +15,14 @@ namespace Cometsnap.Editor;
 [JsonDerivedType(typeof(RectangleAnnotation), "rectangle")]
 [JsonDerivedType(typeof(ArrowAnnotation), "arrow")]
 [JsonDerivedType(typeof(TextAnnotation), "text")]
+[JsonDerivedType(typeof(LineAnnotation), "line")]
+[JsonDerivedType(typeof(PenAnnotation), "pen")]
+[JsonDerivedType(typeof(HighlighterAnnotation), "highlighter")]
+[JsonDerivedType(typeof(StepAnnotation), "step")]
+[JsonDerivedType(typeof(CalloutAnnotation), "callout")]
+[JsonDerivedType(typeof(BlurAnnotation), "blur")]
+[JsonDerivedType(typeof(SpotlightAnnotation), "spotlight")]
+[JsonDerivedType(typeof(CropAnnotation), "crop")]
 public abstract class Annotation
 {
     private string _color = "#E5484D";
@@ -35,6 +43,28 @@ public abstract class Annotation
 
     /// <summary>Moves the shape by the given amount of pixels.</summary>
     public abstract void Offset(double dx, double dy);
+
+    /// <summary>The area the shape covers, for selection.</summary>
+    [JsonIgnore]
+    public abstract Rect Bounds { get; }
+
+    /// <summary>True when <paramref name="p"/> is on the shape (within <paramref name="tolerance"/> pixels).</summary>
+    public virtual bool HitTest(Point p, double tolerance)
+    {
+        var b = Bounds;
+        b.Inflate(tolerance, tolerance);
+        return b.Contains(p);
+    }
+
+    /// <summary>Distance from a point to a segment, for line-like hit tests.</summary>
+    protected static double DistanceToSegment(Point p, Point a, Point b)
+    {
+        var ab = b - a;
+        var len2 = ab.LengthSquared;
+        if (len2 < 1e-9) return (p - a).Length;
+        var t = Math.Clamp(Vector.Multiply(p - a, ab) / len2, 0, 1);
+        return (p - (a + t * ab)).Length;
+    }
 
     /// <summary>True when the shape is too small to be intentional (a stray click).</summary>
     [JsonIgnore]
@@ -77,6 +107,8 @@ public abstract class BoxAnnotation : Annotation
         Y1 += dy; Y2 += dy;
     }
 
+    public override Rect Bounds => Box;
+
     /// <summary>Updates the moving corner. <paramref name="constrain"/> (Shift) makes it square / round.</summary>
     public void DragTo(double x, double y, bool constrain)
     {
@@ -118,6 +150,9 @@ public sealed class RectangleAnnotation : BoxAnnotation
 public sealed class ArrowAnnotation : BoxAnnotation
 {
     public override bool IsDegenerate => (new Point(X2, Y2) - new Point(X1, Y1)).Length < 6;
+
+    public override bool HitTest(Point p, double tolerance) =>
+        DistanceToSegment(p, new Point(X1, Y1), new Point(X2, Y2)) <= tolerance + Thickness * 2;
 
     /// <summary>Shift snaps the arrow to 45° steps.</summary>
     public void DragArrowTo(double x, double y, bool snapAngle)
@@ -182,6 +217,17 @@ public sealed class TextAnnotation : Annotation
     {
         X += dx;
         Y += dy;
+    }
+
+    public override Rect Bounds
+    {
+        get
+        {
+            if (IsDegenerate) return new Rect(X, Y, 0, 0);
+            var ft = Format(Brushes.White);
+            var pad = Bubble ? FontSize * 0.35 : 0;
+            return new Rect(X - pad, Y - pad / 2, ft.WidthIncludingTrailingWhitespace + 2 * pad, ft.Height + pad);
+        }
     }
 
     public FormattedText Format(Brush brush) => new(

@@ -23,6 +23,7 @@ namespace Cometsnap.App.Tray;
 /// </summary>
 public sealed class TrayFlyout : Window
 {
+    private FrameworkElement? _content;
     private const double PanelWidth = 392;
     private const double PanelHeight = 560;
     private const double TileWidth = 112;
@@ -162,6 +163,7 @@ public sealed class TrayFlyout : Window
         root.Children.Add(footer);
         root.Children.Add(footerLine);
         root.Children.Add(gridHost);
+        _content = root;
         Content = root;
 
         Deactivated += (_, _) => HideFlyout();
@@ -231,6 +233,8 @@ public sealed class TrayFlyout : Window
         Win32.SetWindowPos(_hwnd, Win32.HWND_TOPMOST, x, y, w, h, Win32.SWP_SHOWWINDOW);
         Activate();
         Win32.SetForegroundWindow(_hwnd);
+        // Discreet entrance: a short fade and lift, the window itself is already there.
+        if (_content is not null) Editing.EditorUi.Entrance(_content, lift: 6, ms: 140);
         _ = monitor;
     }
 
@@ -310,8 +314,17 @@ public sealed class TrayFlyout : Window
         inner.Children.Add(actions);
         frame.Child = new Border { CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = inner };
 
-        frame.MouseEnter += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.Visibility = Visibility.Visible; };
-        frame.MouseLeave += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.Visibility = Visibility.Collapsed; };
+        var lift = new ScaleTransform(1, 1);
+        frame.RenderTransformOrigin = new Point(0.5, 0.5);
+        frame.RenderTransform = lift;
+        void Zoom(double to)
+        {
+            var a = new System.Windows.Media.Animation.DoubleAnimation(to, TimeSpan.FromMilliseconds(110));
+            lift.BeginAnimation(ScaleTransform.ScaleXProperty, a);
+            lift.BeginAnimation(ScaleTransform.ScaleYProperty, a);
+        }
+        frame.MouseEnter += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.Visibility = Visibility.Visible; Zoom(1.04); };
+        frame.MouseLeave += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.Visibility = Visibility.Collapsed; Zoom(1); };
         frame.MouseLeftButtonDown += (_, e) =>
         {
             _dragStart = e.GetPosition(this);

@@ -115,6 +115,7 @@ public sealed class EditCard : Window
         BeginAnimation(OpacityProperty, null);
         Opacity = 1;
         if (!IsVisible) Show();
+        if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
         UpdateLayout();
         Left = workAreaDip.Right - ActualWidth - 4;
         Top = workAreaDip.Bottom - ActualHeight - 4;
