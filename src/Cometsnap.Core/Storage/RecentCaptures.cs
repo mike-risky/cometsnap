@@ -30,6 +30,7 @@ public sealed class RecentCaptures
             if (Directory.Exists(root))
             {
                 var folders = Directory.EnumerateDirectories(root)
+                    .Where(d => !Path.GetFileName(d).StartsWith('.'))
                     .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
                     .Prepend(root);
                 foreach (var folder in folders)

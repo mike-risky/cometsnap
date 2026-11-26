@@ -71,6 +71,7 @@ public sealed class CaptureOverlay : Window
 
     private Mode _mode = Mode.Idle;
     private bool _detectWindows = true;
+    private bool _instant = true;    // capture as soon as the mouse is released, no quick bar
     private PixelRect? _hover;
     private PixelRect _selection;
     private int _cx, _cy;            // cursor pixel (local)
@@ -91,6 +92,12 @@ public sealed class CaptureOverlay : Window
 
     /// <summary>Raised with the (annotated) capture when the user picks "Save as…".</summary>
     public event Action<BitmapSource>? SaveRequested;
+
+    /// <summary>
+    /// Raised with the plain selected pixels and the annotations (in image coordinates)
+    /// when the user wants the full editor.
+    /// </summary>
+    public event Action<BitmapSource, AnnotationDocument>? EditRequested;
 
     public bool IsCapturing => _mode != Mode.Idle;
 
@@ -137,6 +144,7 @@ public sealed class CaptureOverlay : Window
         _bar.UndoClicked += () => { CommitText(); _doc.Undo(); };
         _bar.CopyClicked += Confirm;
         _bar.SaveClicked += Save;
+        _bar.EditClicked += Edit;
         _bar.CloseClicked += Cancel;
 
         _root = new Canvas { RenderTransform = _scale, ClipToBounds = false };
@@ -185,6 +193,7 @@ public sealed class CaptureOverlay : Window
         _monitors = monitors.Select(screen.ToLocal).ToList();
         _snapper = new EdgeSnapper(_windows.Select(w => w.Bounds).Concat(_monitors), SnapDistance);
         _detectWindows = settings.WindowDetection;
+        _instant = settings.InstantCapture;
         _loupeCorner = settings.LoupeCorner;
         _hover = null;
         _selection = default;
@@ -274,6 +283,16 @@ public sealed class CaptureOverlay : Window
         if (Render() is not { } image) return;
         End();
         SaveRequested?.Invoke(image);
+    }
+
+    private void Edit()
+    {
+        if (_screen is null || _selection.IsEmpty) return;
+        CommitText();
+        var image = _screen.Crop(_selection);
+        var doc = _doc.CopyOffset(-_selection.X, -_selection.Y);
+        End();
+        EditRequested?.Invoke(image, doc);
     }
 
     /// <summary>The selected pixels with the annotations burnt in.</summary>
@@ -442,6 +461,11 @@ public sealed class CaptureOverlay : Window
                 {
                     _selection = hover;
                     _mode = Mode.Selected;
+                    if (_instant)
+                    {
+                        Confirm();
+                        return;
+                    }
                 }
                 else
                 {
@@ -461,6 +485,11 @@ public sealed class CaptureOverlay : Window
             case Mode.Resizing:
                 _spaceHeld = false;
                 _mode = _selection.IsEmpty ? Mode.Hover : Mode.Selected;
+                if (_instant && _mode == Mode.Selected)
+                {
+                    Confirm();
+                    return;
+                }
                 break;
         }
 
@@ -559,6 +588,10 @@ public sealed class CaptureOverlay : Window
                 Save();
                 return;
 
+            case Key.E when ctrl && _mode == Mode.Selected:
+                Edit();
+                return;
+
             case Key.E when _mode == Mode.Selected: ToggleTool(AnnotationTool.Ellipse); return;
             case Key.A when _mode == Mode.Selected: ToggleTool(AnnotationTool.Arrow); return;
             case Key.T when _mode == Mode.Selected: ToggleTool(AnnotationTool.Text); return;
@@ -592,6 +625,11 @@ public sealed class CaptureOverlay : Window
             case Key.F:
                 _selection = Monitors.Containing(_monitors, _cx, _cy).Intersect(_full);
                 _mode = Mode.Selected;
+                if (_instant)
+                {
+                    Confirm();
+                    return;
+                }
                 Refresh();
                 return;
 
@@ -669,7 +707,10 @@ public sealed class CaptureOverlay : Window
             PlaceFrame(_glow, r, _border.StrokeThickness + _glow.StrokeThickness / 2);
             _border.Visibility = _glow.Visibility = Visibility.Visible;
 
-            _labelText.Text = $"{r.Width} × {r.Height}";
+            // Once selected, the tag also tells what the keys do: drawing starts with a tool.
+            _labelText.Text = _mode == Mode.Selected && _tool == AnnotationTool.None
+                ? $"{r.Width} × {r.Height}   ·   E circle  A arrow  T text  R box  ·  Enter copy"
+                : $"{r.Width} × {r.Height}";
             _label.Visibility = Visibility.Visible;
             _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var lh = _label.DesiredSize.Height;
@@ -734,6 +775,7 @@ public sealed class CaptureOverlay : Window
         _tool = tool;
         _bar.SetActive(_tool, _color);
         if (_mode == Mode.Selected) Cursor = SelectedCursor();
+        Refresh();
     }
 
     private void SetColor(string color)

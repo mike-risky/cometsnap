@@ -40,6 +40,7 @@ public sealed class CaptureController
         _overlay = new CaptureOverlay();
         _overlay.Confirmed += (image, rect) => Deliver(image, rect);
         _overlay.SaveRequested += SaveAs;
+        _overlay.EditRequested += (image, doc) => _app.OpenInEditor(image, doc);
         _overlay.Prewarm();
     }
 

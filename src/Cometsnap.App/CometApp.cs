@@ -4,12 +4,16 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 using Cometsnap.App.Capture;
+using Cometsnap.App.Editing;
+using Cometsnap.App.Onboarding;
 using Cometsnap.App.Services;
 using Cometsnap.App.Tray;
 using Cometsnap.Core.Diagnostics;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
 using Cometsnap.Core.Storage;
+using Cometsnap.Core.Takeover;
+using Cometsnap.Editor;
 
 namespace Cometsnap.App;
 
@@ -26,6 +30,8 @@ public sealed class CometApp : Application
     private TrayFlyout? _flyout;
     private SoundService? _sounds;
     private CometFlight? _comet;
+    private PrintScreenHook? _printScreen;
+    private EditCard? _card;
 
     public static new CometApp Current => (CometApp)Application.Current;
 
@@ -55,7 +61,7 @@ public sealed class CometApp : Application
         DispatcherUnhandledException += OnUnhandledException;
 
         Settings = AppSettings.Load(Paths.SettingsFile);
-        if (!File.Exists(Paths.SettingsFile)) TrySaveSettings();
+        TrySaveSettings(); // writes defaults on first run and keeps upgrades of older files
 
         _host = HiddenHost.Create();
         Capture = new CaptureController(this);
@@ -65,11 +71,18 @@ public sealed class CometApp : Application
 
         _sounds = new SoundService();
         _comet = new CometFlight();
+        _card = new EditCard();
+        _card.EditRequested += (path, image) =>
+        {
+            if (path is not null) OpenInEditor(path);
+            else OpenInEditor(image, new AnnotationDocument());
+        };
         Capture.CaptureTaken += OnCaptureTaken;
         Capture.CaptureStored += (path, image) =>
         {
             Thumbnails.Prime(path, image);
             Recent.Add(path);
+            _card?.SetSaved(path, image);
         };
 
         _tray = new TrayIcon(_host, "Cometsnap");
@@ -80,36 +93,186 @@ public sealed class CometApp : Application
         _tray.Activated += () => _flyout.Toggle(_tray.GetIconRect());
 
         _hotkeys = new HotkeyManager(_host);
-        RegisterHotkeys();
+        _printScreen = new PrintScreenHook(Dispatcher, Capture.StartRegion, Capture.CaptureFullscreen, Capture.CaptureActiveWindow);
+        var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
+        ListenForOtherLaunches();
+        var fromInstaller = TakeInstallerChoices();
+        ApplyStartWithWindows(userAsked: fromInstaller);
         Log.Info($"Started in {sw.ElapsedMilliseconds} ms");
+
+        // Right after Setup, always show the replace step, so installing (or reinstalling) is clear.
+        var afterInstall = e.Args.Any(a => a.Equals("--after-install", StringComparison.OrdinalIgnoreCase));
+        if (afterInstall || !Settings.ReplaceOfferAnswered)
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk, afterInstall));
     }
 
-    private void RegisterHotkeys()
+    /// <summary>
+    /// Setup leaves its "Start with Windows" answer in HKCU\Software\Cometsnap; take it into the
+    /// settings once and remove it. Returns true when there was one.
+    /// </summary>
+    private bool TakeInstallerChoices()
     {
-        var main = _hotkeys!.TryRegister(Settings.CaptureHotkey, Capture.StartRegion);
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Cometsnap", writable: true);
+            if (key?.GetValue("InstallerStartWithWindows") is not int value) return false;
+            Settings.StartWithWindows = value != 0;
+            key.DeleteValue("InstallerStartWithWindows", throwOnMissingValue: false);
+            TrySaveSettings();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Could not read the installer choices", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Makes the Windows Run entry match the setting, pointing at this exe. At launch it is a quiet
+    /// sync that keeps a Task Manager "Disabled" choice; from the menu or the offer it is the user's call.
+    /// </summary>
+    public void ApplyStartWithWindows(bool userAsked)
+    {
+        var exe = Environment.ProcessPath ?? "";
+        if (exe.Length == 0 || !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return;
+        CaptureTools.SetCometsnapStartsWithWindows(exe, Settings.StartWithWindows, overrideTaskManager: userAsked);
+    }
+
+    /// <summary>
+    /// Launching Cometsnap again opens the tray panel of the running one; launching a different
+    /// or newer exe makes this one quit so the new one takes over (see Program).
+    /// </summary>
+    private void ListenForOtherLaunches()
+    {
+        void Listen(string name, Action action)
+        {
+            var handle = new EventWaitHandle(false, EventResetMode.AutoReset, name);
+            var thread = new Thread(() =>
+            {
+                while (handle.WaitOne())
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        try { action(); }
+                        catch (Exception ex) { Log.Error($"{name} failed", ex); }
+                    });
+            }) { IsBackground = true, Name = name };
+            thread.Start();
+        }
+        Listen(Program.ActivateEventName, () =>
+        {
+            if (_flyout is { IsVisible: false }) _flyout.Toggle(_tray?.GetIconRect());
+        });
+        Listen(Program.QuitEventName, () =>
+        {
+            Log.Info("A newer Cometsnap was started: handing over");
+            Shutdown();
+        });
+    }
+
+    private static bool UsesPrintScreen(string gesture) =>
+        gesture.Contains("PrintScreen", StringComparison.OrdinalIgnoreCase) || gesture.Contains("PrtSc", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Registers every hotkey. Returns whether the main capture hotkey works.</summary>
+    private bool RegisterHotkeys(bool announce)
+    {
+        _hotkeys!.UnregisterAll();
+        _printScreen?.Uninstall();
+
+        // Owning Print Screen with the keyboard hook beats Snipping Tool, OneDrive and friends.
+        var hooked = Settings.TakeOverPrintScreen && _printScreen!.Install();
+        bool Register(string gesture, Action action) =>
+            hooked && UsesPrintScreen(gesture) ? HookCovers(gesture) : _hotkeys.TryRegister(gesture, action);
+
+        var main = Register(Settings.CaptureHotkey, Capture.StartRegion);
         var fallback = _hotkeys.TryRegister(Settings.CaptureHotkeyFallback, Capture.StartRegion);
-        _hotkeys.TryRegister(Settings.FullscreenHotkey, Capture.CaptureFullscreen);
-        _hotkeys.TryRegister(Settings.ActiveWindowHotkey, Capture.CaptureActiveWindow);
+        Register(Settings.FullscreenHotkey, Capture.CaptureFullscreen);
+        Register(Settings.ActiveWindowHotkey, Capture.CaptureActiveWindow);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
         _menu?.Rebuild();
 
-        if (!main)
+        if (!main && announce)
         {
             var msg = fallback
                 ? $"{Settings.CaptureHotkey} is taken by another app (often Windows' own Snipping Tool). Use {Settings.CaptureHotkeyFallback}, or turn off \"Use the Print screen key to open screen capture\" in Windows Settings > Accessibility > Keyboard and restart Cometsnap."
                 : "No capture hotkey could be registered. Double-click the tray icon to capture.";
             _tray?.ShowBalloon("Cometsnap is ready", msg);
         }
+        return main;
+    }
+
+    /// <summary>The hook handles Print Screen, Ctrl+Print Screen and Alt+Print Screen.</summary>
+    private static bool HookCovers(string gesture) =>
+        gesture.Replace(" ", "", StringComparison.Ordinal) is var g
+        && (g.Equals("PrintScreen", StringComparison.OrdinalIgnoreCase)
+            || g.Equals("Ctrl+PrintScreen", StringComparison.OrdinalIgnoreCase)
+            || g.Equals("Alt+PrintScreen", StringComparison.OrdinalIgnoreCase));
+
+    // ------------------------------------------------------------------ replace the old tool
+
+    /// <summary>"Replace your old screen capture with Cometsnap": first run, or from the tray menu.</summary>
+    public void OfferReplace() => OfferReplace(RegionHotkeyText == Settings.CaptureHotkey);
+
+    private void OfferReplace(bool printScreenRegistered, bool justInstalled = false)
+    {
+        var report = CaptureTools.Detect(printScreenRegistered);
+        var window = new ReplaceWindow(report, Settings.StartWithWindows, justInstalled ? $"Cometsnap {Version} is installed" : null);
+        window.ShowDialog();
+
+        Settings.ReplaceOfferAnswered = true;
+        if (window.Choice is { } choice)
+        {
+            if (choice.DisableSnippingTool) CaptureTools.DisableSnippingPrintScreen();
+            foreach (var tool in choice.ToolsToStop)
+            {
+                if (tool.IsRunning) CaptureTools.Close(tool.Tool);
+                CaptureTools.DisableStartup(tool);
+            }
+            Settings.StartWithWindows = choice.StartWithWindows;
+            ApplyStartWithWindows(userAsked: true);
+            Settings.TakeOverPrintScreen = true;
+            TrySaveSettings();
+            var ok = RegisterHotkeys(announce: false);
+            _tray?.ShowBalloon(ok ? "Print Screen is now Cometsnap" : "Cometsnap is ready",
+                ok ? "Press Print Screen, click a window or drag a box. That's it." : $"Use {RegionHotkeyText ?? "the tray icon"} to capture.");
+        }
+        else
+        {
+            TrySaveSettings();
+            RegisterHotkeys(announce: true);
+            if (justInstalled) _tray?.ShowBalloon($"Cometsnap {Version} is installed", "It lives here in the tray. Press Print Screen to capture.");
+        }
+    }
+
+    // ------------------------------------------------------------------ editor
+
+    public void OpenInEditor(string path)
+    {
+        var editor = EditorWindow.OpenFile(this, path);
+        editor?.Show();
+        editor?.Activate();
+    }
+
+    public void OpenInEditor(System.Windows.Media.Imaging.BitmapSource image, AnnotationDocument doc)
+    {
+        var editor = new EditorWindow(this, image, doc, null);
+        editor.Show();
+        editor.Activate();
     }
 
     private void OnCaptureTaken(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect from)
     {
-        if (Settings.PlaySounds) _sounds?.Whoosh();
-        if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
+        if (Settings.PlaySounds) _sounds?.Snap();
+        if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
+        LaunchComet(new Point(from.CenterX, from.CenterY));
+    }
 
-        var start = new Point(from.CenterX, from.CenterY);
+    /// <summary>Sends the comet from a screen point (physical pixels) into the tray.</summary>
+    public void LaunchComet(Point start)
+    {
+        if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
         Point end;
         if (_tray.GetIconRect() is { } icon)
         {
@@ -117,7 +280,9 @@ public sealed class CometApp : Application
         }
         else
         {
-            var work = Win32.GetWorkArea(from.CenterX, from.CenterY, out _, out _) ?? default;
+            var cx = (int)start.X;
+            var cy = (int)start.Y;
+            var work = Win32.GetWorkArea(cx, cy, out _, out _) ?? default;
             end = new Point(work.Right - 40, work.Bottom - 10);
         }
         _comet.Launch(start, end);
@@ -164,6 +329,7 @@ public sealed class CometApp : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
+        _printScreen?.Dispose();
         _sounds?.Dispose();
         _tray?.Dispose();
         _host?.Dispose();
