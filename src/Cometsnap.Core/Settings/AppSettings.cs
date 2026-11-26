@@ -84,6 +84,25 @@ public sealed class AppSettings
     /// <summary>The "Replace your old screen capture" offer was answered (either way).</summary>
     public bool ReplaceOfferAnswered { get; set; }
 
+    // ---- playful touches (all discreet, none of them ever delays a capture)
+
+    /// <summary>A tiny meteor shower for snap milestones, and a monthly "you captured N snaps" card.</summary>
+    public bool Celebrations { get; set; } = true;
+
+    /// <summary>A snowy comet in December and a pumpkin comet at Halloween (tray icon and panel).</summary>
+    public bool SeasonalSkins { get; set; } = true;
+
+    /// <summary>Editor: join numbered steps with faint star lines, like a constellation.</summary>
+    public bool ConstellationSteps { get; set; }
+
+    /// <summary>Screenshots taken so far (for milestones). Seeded once from the captures folder.</summary>
+    public int SnapCount { get; set; }
+    public bool SnapCountSeeded { get; set; }
+
+    /// <summary>The month being counted ("yyyy-MM") and its snaps so far.</summary>
+    public string SnapMonth { get; set; } = "";
+    public int SnapMonthCount { get; set; }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,

@@ -73,7 +73,12 @@ On Wayland, captures and recordings go through the desktop portal, so the first 
 - Copied to the clipboard and auto-saved to `Pictures\Cometsnap\yyyy-MM\`
 - Left-click the tray icon for the flyout: big capture buttons and your last 30 captures.
   Click a thumbnail to copy it, double-click to edit it, drag it straight into Word, Outlook, Teams or a browser
-- A comet flies into the tray after every capture, with an optional soft click (both in *Options*)
+- After every capture, the capture itself rides a comet into the tray, with an optional soft click (both in *Options*)
+- **Drag any capture out** of the tray panel (or the Copied card) and drop it into Teams, Word, Outlook, a browser or Explorer
+- Little extras, all discreet: a tiny meteor shower for snap milestones (100th, 1,000th…) and a monthly
+  "You captured N snaps" card, a snowy comet in December and a pumpkin comet at Halloween (*Options* to turn off),
+  **Constellation** mode in the editor that joins numbered steps with faint star lines, and a secret in the tray
+  panel for anyone who knows ↑ ↑ ↓ ↓ ← → ← → B A
 - Fullscreen, active window and delayed captures, multi-monitor and mixed DPI
 
 ## Keys

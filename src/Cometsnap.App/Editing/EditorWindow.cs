@@ -41,6 +41,7 @@ public sealed class EditorWindow : Window
     private readonly Dictionary<string, Border> _swatches = new();
     private readonly Border[] _sizeButtons = new Border[3];
     private readonly Border _deleteButton;
+    private readonly Border _constellationButton;
     private readonly Grid _root;
 
     private string? _path;
@@ -68,6 +69,7 @@ public sealed class EditorWindow : Window
         _base = image;
         _doc = doc;
         _doc.Source = image;
+        _doc.ConnectSteps = app.Settings.ConstellationSteps;
         _path = path;
         _dirty = path is null;
 
@@ -172,6 +174,13 @@ public sealed class EditorWindow : Window
         _deleteButton.Visibility = Visibility.Collapsed;
         top.Children.Add(_deleteButton);
 
+        // Constellation mode: shown once there are two steps to connect.
+        _constellationButton = EditorUi.PillButton(EditorUi.Icon("M3,12 L7,6 L12,9 L14,3 M3,12 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M7,6 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 M12,9 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0", null, 16),
+            "Constellation", "Join the numbered steps with faint star lines", ToggleConstellation);
+        _constellationButton.Visibility = Visibility.Collapsed;
+        if (_doc.ConnectSteps) EditorUi.SetActive(_constellationButton, true);
+        top.Children.Add(_constellationButton);
+
         var copy = EditorUi.PillButton(EditorUi.Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", null, 16), "Copy & close", "Copy to the clipboard, save, and close (Ctrl+C or Ctrl+Enter)", CopyAndClose, SpaceTheme.TerracottaBrush, bold: true);
         var save = EditorUi.PillButton(EditorUi.Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5", null, 16), "Save", "Save and close (Ctrl+S)", SaveAndClose, SpaceTheme.NavyBrush);
         var saveAs = EditorUi.PillButton(EditorUi.Icon("M2.5,2.5 H11 L13.5,5 V13.5 H2.5 Z M5,2.5 V6 H10 V2.5 M5,13.5 V9.5 H11 V13.5", null, 16), "Save as…", "Save a copy somewhere else (Ctrl+Shift+S)", SaveAsAndClose);
@@ -209,7 +218,8 @@ public sealed class EditorWindow : Window
         _root.Children.Add(dock);
         Content = _root;
 
-        _doc.Changed += () => { _dirty = true; Title = TitleText(); UpdateStatus(); };
+        _doc.Changed += () => { _dirty = true; Title = TitleText(); UpdateStatus(); UpdateConstellationButton(); };
+        UpdateConstellationButton();
         PreviewKeyDown += OnKeyDown;
         SourceInitialized += (_, _) => ApplyDarkFrame();
         Loaded += (_, _) => OnFirstLayout();
@@ -702,6 +712,24 @@ public sealed class EditorWindow : Window
     }
 
     // ------------------------------------------------------------------ output
+
+    private void UpdateConstellationButton()
+    {
+        var show = _doc.Items.OfType<StepAnnotation>().Skip(1).Any();
+        var was = _constellationButton.Visibility == Visibility.Visible;
+        _constellationButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        if (show && !was) EditorUi.Entrance(_constellationButton, lift: 0, ms: 140);
+    }
+
+    private void ToggleConstellation()
+    {
+        _doc.ConnectSteps = !_doc.ConnectSteps;
+        EditorUi.SetActive(_constellationButton, _doc.ConnectSteps);
+        _app.Settings.ConstellationSteps = _doc.ConnectSteps;
+        _app.TrySaveSettings();
+        _doc.Touch();
+        Flash(_doc.ConnectSteps ? "Constellation on: steps are joined by star lines" : "Constellation off");
+    }
 
     private BitmapSource Flattened()
     {

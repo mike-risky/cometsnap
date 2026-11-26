@@ -60,7 +60,7 @@ internal sealed class RecordingIcons : IDisposable
         return CreateIcon(pixels, size);
     }
 
-    private static IntPtr CreateIcon(byte[] bgra, int size)
+    internal static IntPtr CreateIcon(byte[] bgra, int size)
     {
         var header = new RecordingNative.BITMAPINFOHEADER
         {

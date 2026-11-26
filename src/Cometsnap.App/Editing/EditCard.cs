@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Cometsnap.App.Services;
 using Cometsnap.App.Theme;
 
 namespace Cometsnap.App.Editing;
@@ -27,6 +28,8 @@ public sealed class EditCard : Window
     private readonly DispatcherTimer _timer;
     private BitmapSource? _image;
     private string? _path;
+    private Point? _pressAt;
+    private bool _dragged;
 
     /// <summary>Raised with the saved path (if known yet) and the image when the card or Edit is clicked.</summary>
     public event Action<string?, BitmapSource>? EditRequested;
@@ -67,7 +70,7 @@ public sealed class EditCard : Window
         });
         editRow.Children.Add(new TextBlock { Text = "Edit", Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 14 });
         edit.Child = editRow;
-        edit.MouseLeftButtonUp += (_, e) => { e.Handled = true; OnEdit(); };
+        edit.MouseLeftButtonUp += (_, e) => { e.Handled = true; _pressAt = null; if (!_dragged) OnEdit(); };
 
         var close = new TextBlock
         {
@@ -88,7 +91,7 @@ public sealed class EditCard : Window
             Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(12), Padding = new Thickness(10), Margin = new Thickness(12),
             Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 18, ShadowDepth = 0, Opacity = 0.5, Color = Colors.Black },
-            Child = row, Cursor = Cursors.Hand, ToolTip = "Click to edit",
+            Child = row, Cursor = Cursors.Hand, ToolTip = "Click to edit · Drag into any app",
         };
         card.MouseEnter += (_, _) =>
         {
@@ -100,7 +103,26 @@ public sealed class EditCard : Window
             card.BorderBrush = SpaceTheme.NavyLightBrush;
             card.Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF2);
         };
-        card.MouseLeftButtonUp += (_, e) => { e.Handled = true; OnEdit(); };
+        // Click = edit; drag = drop the capture into any app (Teams, Word, mail, a browser…).
+        card.PreviewMouseLeftButtonDown += (_, e) => { _pressAt = e.GetPosition(this); _dragged = false; };
+        card.PreviewMouseMove += (_, e) =>
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || _pressAt is not { } start || _image is null) return;
+            var d = e.GetPosition(this) - start;
+            if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+            _pressAt = null;
+            _dragged = true;
+            _timer.Stop();
+            var effect = DragOut.Start(card, _path, _image, _image);
+            if (effect != DragDropEffects.None) FadeOut();
+            else _timer.Start();
+        };
+        card.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (!_dragged) OnEdit();
+        };
         Content = card;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };

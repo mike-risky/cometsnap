@@ -5,11 +5,14 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using Cometsnap.App.Capture;
 using Cometsnap.App.Editing;
+using Cometsnap.App.Fun;
 using Cometsnap.App.Onboarding;
 using Cometsnap.App.Recording;
 using Cometsnap.App.Services;
+using Cometsnap.App.Theme;
 using Cometsnap.App.Tray;
 using Cometsnap.Core.Diagnostics;
+using Cometsnap.Core.Fun;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
 using Cometsnap.Core.Storage;
@@ -34,6 +37,8 @@ public sealed class CometApp : Application
     private CometFlight? _comet;
     private PrintScreenHook? _printScreen;
     private EditCard? _card;
+    private Season _season;
+    private DispatcherTimer? _seasonTimer;
 
     public static new CometApp Current => (CometApp)Application.Current;
 
@@ -93,6 +98,11 @@ public sealed class CometApp : Application
         _menu = new TrayMenu(this);
         _flyout = new TrayFlyout(this, Recent, Thumbnails);
         _flyout.Prewarm();
+        ApplySeason();
+        _seasonTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
+        _seasonTimer.Tick += (_, _) => ApplySeason();
+        _seasonTimer.Start();
+        if (!Settings.SnapCountSeeded) SeedSnapCount();
         _tray.ContextMenuRequested += (_, _) => ShowTrayMenu();
         _tray.Activated += () =>
         {
@@ -282,11 +292,90 @@ public sealed class CometApp : Application
     {
         if (Settings.PlaySounds) _sounds?.Snap();
         if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
-        LaunchComet(new Point(from.CenterX, from.CenterY));
+        LaunchComet(new Point(from.CenterX, from.CenterY), image);
+        // Counting (and any celebration) waits until the capture is fully done.
+        Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
     }
 
-    /// <summary>Sends the comet from a screen point (physical pixels) into the tray.</summary>
-    public void LaunchComet(Point start)
+    // ------------------------------------------------------------------ playful touches
+
+    /// <summary>Counts a snap; round numbers and the first snap of a month get a tiny celebration.</summary>
+    private void CountSnap()
+    {
+        var happened = SnapMilestones.Record(Settings, DateTime.Now);
+        TrySaveSettings();
+        if (!Settings.Celebrations) return;
+
+        var delay = TimeSpan.FromMilliseconds(900); // after the comet has landed
+        if (happened.FinishedMonth is { } month)
+        {
+            var count = month.Count.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+            Celebrate(delay, 14, $"You captured {count} snap{(month.Count == 1 ? "" : "s")}", $"in {month.MonthName} {month.Year}. New month, new snaps!");
+            delay += TimeSpan.FromSeconds(3.4);
+        }
+        if (happened.Milestone is { } n)
+            Celebrate(delay, 22, "✦ " + SnapMilestones.Title(n), "Thanks for snapping with Cometsnap.");
+    }
+
+    /// <summary>A small meteor shower above the corner where the Copied card sits.</summary>
+    private void Celebrate(TimeSpan after, int meteors, string title, string subtitle)
+    {
+        var timer = new DispatcherTimer { Interval = after };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            var work = SystemParameters.WorkArea;
+            var area = new Rect(work.Right - 392, Math.Max(work.Top, work.Bottom - 250 - 112), 380, 250);
+            MeteorShower.Play(area, meteors, TimeSpan.FromSeconds(3), title, subtitle);
+        };
+        timer.Start();
+    }
+
+    /// <summary>↑ ↑ ↓ ↓ ← → ← → B A in the tray panel.</summary>
+    public void MeteorShowerEasterEgg()
+    {
+        Log.Info("Konami code: meteor shower");
+        MeteorShower.Play(SystemParameters.WorkArea, 70, TimeSpan.FromSeconds(3.6), "☄ METEOR SHOWER ☄", "You found the secret. Make a wish!", captionAtBottom: false);
+    }
+
+    /// <summary>First run with milestones: start from the snaps already in the captures folder.</summary>
+    private void SeedSnapCount()
+    {
+        var folder = CapturesFolder;
+        _ = Task.Run(() =>
+        {
+            var times = new List<DateTime>();
+            try
+            {
+                if (Directory.Exists(folder))
+                    foreach (var f in Directory.EnumerateFiles(folder, "*.png", SearchOption.AllDirectories))
+                        times.Add(File.GetLastWriteTime(f));
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Could not count existing snaps", ex);
+            }
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+            {
+                SnapMilestones.Seed(Settings, times, DateTime.Now);
+                TrySaveSettings();
+            });
+        });
+    }
+
+    /// <summary>Snowy comet in December, pumpkin comet at Halloween (tray icon and panel header).</summary>
+    public void ApplySeason()
+    {
+        var season = Settings.SeasonalSkins ? Seasons.For(DateTime.Now) : Season.None;
+        if (season == _season) return;
+        _season = season;
+        var size = Math.Max(16, Win32.GetSystemMetrics(49 /* SM_CXSMICON */));
+        _tray?.SetSeasonIcon(SeasonalArt.CreateTrayIcon(season, size));
+        _flyout?.SetSeason(season);
+    }
+
+    /// <summary>Sends the comet from a screen point (physical pixels) into the tray, carrying the capture.</summary>
+    public void LaunchComet(Point start, System.Windows.Media.Imaging.BitmapSource? image = null)
     {
         if (!Settings.ShowCometAnimation || _comet is null || _tray is null) return;
         Point end;
@@ -301,7 +390,7 @@ public sealed class CometApp : Application
             var work = Win32.GetWorkArea(cx, cy, out _, out _) ?? default;
             end = new Point(work.Right - 40, work.Bottom - 10);
         }
-        _comet.Launch(start, end);
+        _comet.Launch(start, end, image);
     }
 
     public static string Version =>

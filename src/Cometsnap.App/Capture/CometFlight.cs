@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Cometsnap.App.Theme;
 using Cometsnap.Core.Native;
@@ -9,16 +10,21 @@ using Cometsnap.Core.Native;
 namespace Cometsnap.App.Capture;
 
 /// <summary>
-/// The little celebration after a capture: a comet flies from the captured area into the tray.
-/// A tiny click-through window moved along a curve; it never takes focus.
+/// The little celebration after a capture: the capture itself, as a small card, flies from the
+/// captured area into the tray, pulled by a comet. A tiny click-through window moved along a
+/// curve; it never takes focus.
 /// </summary>
 public sealed class CometFlight : Window
 {
-    private const double SizeDip = 120;
-    private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(520);
+    private const double SizeDip = 170;
+    private const double ThumbMax = 84;
+    private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(620);
 
     private readonly RotateTransform _rotate = new();
     private readonly ScaleTransform _scale = new();
+    private readonly ScaleTransform _thumbScale = new();
+    private readonly Image _thumb = new() { Stretch = Stretch.Uniform };
+    private readonly Border _thumbFrame;
     private IntPtr _hwnd;
     private Point _from, _to, _control;
     private DateTime _start;
@@ -40,7 +46,7 @@ public sealed class CometFlight : Window
         var c = SizeDip / 2;
         var tail = new Polygon
         {
-            Points = new PointCollection { new(c, c - 9), new(c - 58, c - 2), new(c - 58, c + 2), new(c, c + 9) },
+            Points = new PointCollection { new(c, c - 9), new(c - 80, c - 2), new(c - 80, c + 2), new(c, c + 9) },
             Fill = new LinearGradientBrush(Color.FromArgb(0, 79, 195, 255), Color.FromArgb(200, 120, 200, 255), new Point(0, 0.5), new Point(1, 0.5)),
         };
         var glow = new Ellipse
@@ -63,12 +69,38 @@ public sealed class CometFlight : Window
         group.Children.Add(_rotate);
         canvas.RenderTransform = group;
         canvas.RenderTransformOrigin = new Point(0.5, 0.5);
-        Content = canvas;
+
+        // The capture rides on the comet's head and shrinks into the tray.
+        RenderOptions.SetBitmapScalingMode(_thumb, BitmapScalingMode.HighQuality);
+        _thumbFrame = new Border
+        {
+            Child = _thumb, BorderBrush = SpaceTheme.StarWhiteBrush, BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(4),
+            Background = SpaceTheme.VoidBrush, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = _thumbScale, Visibility = Visibility.Collapsed,
+        };
+        var root = new Grid { Width = SizeDip, Height = SizeDip, IsHitTestVisible = false };
+        root.Children.Add(canvas);
+        root.Children.Add(_thumbFrame);
+        Content = root;
     }
 
-    /// <summary>Fly from one physical screen point to another.</summary>
-    public void Launch(Point from, Point to)
+    /// <summary>Fly from one physical screen point to another, carrying <paramref name="image"/> if given.</summary>
+    public void Launch(Point from, Point to, BitmapSource? image = null)
     {
+        if (image is not null)
+        {
+            var scale = ThumbMax / Math.Max(1, Math.Max(image.PixelWidth, image.PixelHeight));
+            _thumb.Source = image;
+            _thumb.Width = Math.Max(12, image.PixelWidth * scale);
+            _thumb.Height = Math.Max(12, image.PixelHeight * scale);
+            _thumbFrame.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            _thumb.Source = null;
+            _thumbFrame.Visibility = Visibility.Collapsed;
+        }
+
         if (_hwnd == IntPtr.Zero)
         {
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
@@ -100,6 +132,7 @@ public sealed class CometFlight : Window
         {
             CompositionTarget.Rendering -= OnFrame;
             _flying = false;
+            _thumb.Source = null; // don't keep the capture alive
             Hide();
             return;
         }
@@ -117,6 +150,9 @@ public sealed class CometFlight : Window
         _rotate.Angle = angle;
         var s = 1 - 0.45 * t;
         _scale.ScaleX = _scale.ScaleY = s;
+        // The capture starts at card size and shrinks to a dot as it reaches the tray.
+        var ts = 1 - 0.85 * t * t;
+        _thumbScale.ScaleX = _thumbScale.ScaleY = ts;
 
         if (!Win32.GetWindowRect(_hwnd, out var r)) return;
         var w = Math.Max(1, r.Width);

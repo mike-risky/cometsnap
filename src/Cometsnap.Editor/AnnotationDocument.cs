@@ -27,6 +27,9 @@ public sealed class AnnotationDocument
 
     public event Action? Changed;
 
+    /// <summary>Constellation mode: numbered steps are joined, in order, by faint star lines.</summary>
+    public bool ConnectSteps { get; set; }
+
     /// <summary>The image under the annotations, in annotation coordinates (0,0 = its top-left pixel).</summary>
     public BitmapSource? Source
     {
@@ -114,6 +117,7 @@ public sealed class AnnotationDocument
     public AnnotationDocument CopyOffset(double dx, double dy)
     {
         var copy = FromJson(ToJson());
+        copy.ConnectSteps = ConnectSteps;
         foreach (var a in copy._items) a.Offset(dx, dy);
         return copy;
     }
@@ -140,6 +144,8 @@ public sealed class AnnotationDocument
             dc.DrawGeometry(brush, null, dim);
         }
 
+        if (ConnectSteps) RenderConstellation(dc, all.OfType<StepAnnotation>());
+
         foreach (var a in all)
             if (a is not (BlurAnnotation or SpotlightAnnotation or CropAnnotation)) a.Render(dc);
 
@@ -158,6 +164,58 @@ public sealed class AnnotationDocument
                 dc.DrawRectangle(null, frame, crop.Box);
             }
         }
+    }
+
+    /// <summary>Faint lines from step 1 to 2 to 3…, with a little four-pointed star halfway along each.</summary>
+    private static void RenderConstellation(DrawingContext dc, IEnumerable<StepAnnotation> steps)
+    {
+        var ordered = steps.OrderBy(s => s.Number).ToList();
+        for (var i = 1; i < ordered.Count; i++)
+        {
+            var a = ordered[i - 1];
+            var b = ordered[i];
+            var from = new Point(a.X, a.Y);
+            var to = new Point(b.X, b.Y);
+            var v = to - from;
+            var length = v.Length;
+            if (length <= a.Radius + b.Radius + 4) continue;
+            v.Normalize();
+            var start = from + v * (a.Radius + 3);
+            var end = to - v * (b.Radius + 3);
+            var width = Math.Max(1.2, (a.Radius + b.Radius) / 16);
+
+            var glow = new Pen(new SolidColorBrush(Color.FromArgb(0x38, 0xA9, 0xC8, 0xFF)), width * 4) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round };
+            var line = new Pen(new SolidColorBrush(Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF)), width)
+            {
+                StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round,
+                DashStyle = new DashStyle(new[] { 0.0, 3.2 }, 0), DashCap = PenLineCap.Round,
+            };
+            glow.Freeze();
+            line.Freeze();
+            dc.DrawLine(glow, start, end);
+            dc.DrawLine(line, start, end);
+            DrawSparkle(dc, start + (end - start) / 2, Math.Max(4, width * 3.2));
+        }
+    }
+
+    private static void DrawSparkle(DrawingContext dc, Point c, double r)
+    {
+        var k = r * 0.22;
+        var star = new StreamGeometry();
+        using (var g = star.Open())
+        {
+            g.BeginFigure(new Point(c.X, c.Y - r), true, true);
+            g.LineTo(new Point(c.X + k, c.Y - k), false, false);
+            g.LineTo(new Point(c.X + r, c.Y), false, false);
+            g.LineTo(new Point(c.X + k, c.Y + k), false, false);
+            g.LineTo(new Point(c.X, c.Y + r), false, false);
+            g.LineTo(new Point(c.X - k, c.Y + k), false, false);
+            g.LineTo(new Point(c.X - r, c.Y), false, false);
+            g.LineTo(new Point(c.X - k, c.Y - k), false, false);
+        }
+        star.Freeze();
+        dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(0x50, 0xFF, 0xE8, 0x80)), null, c, r * 0.8, r * 0.8);
+        dc.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xFF, 0xF4, 0xC2)), null, star);
     }
 
     private Rect ImageArea(IEnumerable<Annotation> all)
