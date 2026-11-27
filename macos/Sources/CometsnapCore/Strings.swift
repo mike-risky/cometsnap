@@ -262,6 +262,11 @@ enum Strings {
         "Bottom left": "En bas à gauche",
         "Bottom right": "En bas à droite",
         "Follow the cursor": "Suivre le curseur",
+        "{0} selected": "{0} sélectionnées",
+        "Clear selection": "Tout désélectionner",
+        "Copied {0} files ✓": "{0} fichiers copiés ✓",
+        "Moved {0} files to the trash": "{0} fichiers mis à la corbeille",
+        "{0}+click or drag a box to pick several": "{0}+clic ou tracez un cadre pour en choisir plusieurs",
     ]
 
     static let german: [String: String] = [
@@ -511,6 +516,11 @@ enum Strings {
         "Bottom left": "Unten links",
         "Bottom right": "Unten rechts",
         "Follow the cursor": "Dem Cursor folgen",
+        "{0} selected": "{0} ausgewählt",
+        "Clear selection": "Auswahl aufheben",
+        "Copied {0} files ✓": "{0} Dateien kopiert ✓",
+        "Moved {0} files to the trash": "{0} Dateien in den Papierkorb verschoben",
+        "{0}+click or drag a box to pick several": "{0}+Klick oder Rahmen ziehen, um mehrere auszuwählen",
     ]
 
     static let italian: [String: String] = [
@@ -760,6 +770,11 @@ enum Strings {
         "Bottom left": "In basso a sinistra",
         "Bottom right": "In basso a destra",
         "Follow the cursor": "Segui il cursore",
+        "{0} selected": "{0} selezionate",
+        "Clear selection": "Deseleziona tutto",
+        "Copied {0} files ✓": "{0} file copiati ✓",
+        "Moved {0} files to the trash": "{0} file spostati nel cestino",
+        "{0}+click or drag a box to pick several": "{0}+clic o trascina un riquadro per sceglierne più di una",
     ]
 
     static let spanish: [String: String] = [
@@ -1009,6 +1024,11 @@ enum Strings {
         "Bottom left": "Abajo a la izquierda",
         "Bottom right": "Abajo a la derecha",
         "Follow the cursor": "Seguir el cursor",
+        "{0} selected": "{0} seleccionadas",
+        "Clear selection": "Quitar selección",
+        "Copied {0} files ✓": "{0} archivos copiados ✓",
+        "Moved {0} files to the trash": "{0} archivos movidos a la papelera",
+        "{0}+click or drag a box to pick several": "{0}+clic o arrastra un recuadro para elegir varias",
     ]
 
     static let portuguese: [String: String] = [
@@ -1258,6 +1278,11 @@ enum Strings {
         "Bottom left": "Inferior esquerdo",
         "Bottom right": "Inferior direito",
         "Follow the cursor": "Seguir o cursor",
+        "{0} selected": "{0} selecionadas",
+        "Clear selection": "Limpar seleção",
+        "Copied {0} files ✓": "{0} arquivos copiados ✓",
+        "Moved {0} files to the trash": "{0} arquivos movidos para a lixeira",
+        "{0}+click or drag a box to pick several": "{0}+clique ou arraste uma caixa para escolher várias",
     ]
 
     static let chinese: [String: String] = [
@@ -1507,6 +1532,11 @@ enum Strings {
         "Bottom left": "左下",
         "Bottom right": "右下",
         "Follow the cursor": "跟随光标",
+        "{0} selected": "已选 {0} 张",
+        "Clear selection": "取消选择",
+        "Copied {0} files ✓": "已复制 {0} 个文件 ✓",
+        "Moved {0} files to the trash": "已将 {0} 个文件移到废纸篓",
+        "{0}+click or drag a box to pick several": "{0}+单击或拖出方框可多选",
     ]
 
     static let hindi: [String: String] = [
@@ -1756,5 +1786,10 @@ enum Strings {
         "Bottom left": "नीचे बाएँ",
         "Bottom right": "नीचे दाएँ",
         "Follow the cursor": "कर्सर के साथ चले",
+        "{0} selected": "{0} चुनी गईं",
+        "Clear selection": "चयन हटाएँ",
+        "Copied {0} files ✓": "{0} फ़ाइलें कॉपी हुईं ✓",
+        "Moved {0} files to the trash": "{0} फ़ाइलें ट्रैश में भेजी गईं",
+        "{0}+click or drag a box to pick several": "कई चुनने के लिए {0}+क्लिक करें या बॉक्स खींचें",
     ]
 }

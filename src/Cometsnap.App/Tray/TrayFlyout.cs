@@ -21,6 +21,8 @@ namespace Cometsnap.App.Tray;
 /// <summary>
 /// The left-click panel: big capture buttons and the latest captures as thumbnails.
 /// Click a thumbnail to copy it, double-click to open it, drag it into any app.
+/// Ctrl+click, Shift+click, a box drawn on empty space or Ctrl+A pick several: dragging
+/// any of them drags them all, and Copy / Delete work on all of them.
 /// Created once and kept hidden, so it pops instantly.
 /// </summary>
 public sealed class TrayFlyout : Window
@@ -41,6 +43,15 @@ public sealed class TrayFlyout : Window
     private readonly TextBox _search;
     private readonly TextBlock _empty;
     private readonly TextBlock _status;
+    private readonly FrameworkElement _selectionBar;
+    private readonly TextBlock _selectionText;
+    private readonly ScrollViewer _scroll;
+    private readonly Canvas _bandLayer;
+    private readonly System.Windows.Shapes.Rectangle _band;
+    private readonly TraySelection _selection = new();
+    private readonly Dictionary<string, (Border Frame, Action Paint)> _tiles = new(StringComparer.OrdinalIgnoreCase);
+    private Point? _bandStart;
+    private bool _bandMoved;
     private IntPtr _hwnd;
     private bool _dirty = true;
     private DateTime _hiddenAt;
@@ -121,7 +132,22 @@ public sealed class TrayFlyout : Window
         {
             Content = _grid, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Background = Brushes.Transparent, // empty space takes the press that starts a box
+            FocusVisualStyle = null,
         };
+        _scroll = scroll;
+        // The box (rubber band) drawn while picking several captures.
+        _band = new System.Windows.Shapes.Rectangle
+        {
+            Stroke = SpaceTheme.CometBlueBrush, StrokeThickness = 1, Fill = SpaceTheme.WithAlpha(SpaceTheme.CometBlue, 0x30),
+            RadiusX = 3, RadiusY = 3, Visibility = Visibility.Collapsed,
+        };
+        _bandLayer = new Canvas { IsHitTestVisible = false, ClipToBounds = true };
+        _bandLayer.Children.Add(_band);
+        scroll.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(BandDown), handledEventsToo: true);
+        scroll.MouseMove += BandMove;
+        scroll.MouseLeftButtonUp += BandUp;
+        scroll.LostMouseCapture += (_, _) => EndBand();
         _empty = new TextBlock
         {
             Text = L.T("No captures yet.") + "\n" + L.T("Press Print Screen and grab something!") + " ☄️",
@@ -130,6 +156,7 @@ public sealed class TrayFlyout : Window
         };
         var gridHost = new Grid();
         gridHost.Children.Add(scroll);
+        gridHost.Children.Add(_bandLayer);
         gridHost.Children.Add(_empty);
 
         // ---- footer
@@ -144,6 +171,22 @@ public sealed class TrayFlyout : Window
         footer.Children.Add(settings);
         footer.Children.Add(_status);
         _status.Margin = new Thickness(12, 0, 0, 0);
+
+        // ---- shown instead of the count while several captures are picked
+        _selectionText = new TextBlock { Foreground = SpaceTheme.SunBrush, FontSize = 12, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var selectionBar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(12, 0, 0, 0), Visibility = Visibility.Collapsed };
+        selectionBar.Children.Add(_selectionText);
+        TextBlock Dot() => new() { Text = "  ·  ", Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        selectionBar.Children.Add(Dot());
+        selectionBar.Children.Add(LinkButton(L.T("Copy"), CopySelection));
+        selectionBar.Children.Add(Dot());
+        selectionBar.Children.Add(LinkButton(L.T("Delete"), () => Delete(_selection.Selected)));
+        selectionBar.Children.Add(Dot());
+        selectionBar.Children.Add(LinkButton(L.T("Clear selection"), _selection.Clear));
+        DockPanel.SetDock(selectionBar, Dock.Left);
+        footer.Children.Add(selectionBar);
+        _selectionBar = selectionBar;
+        _selection.Changed += OnSelectionChanged;
 
         var root = new DockPanel();
         DockPanel.SetDock(header, Dock.Top);
@@ -164,7 +207,14 @@ public sealed class TrayFlyout : Window
         Content = root;
 
         Deactivated += (_, _) => HideFlyout();
-        KeyDown += (_, e) => { if (e.Key == Key.Escape) HideFlyout(); };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+            // Esc first lets go of a selection of several, then closes.
+            if (_selection.Count > 1) _selection.Clear();
+            else HideFlyout();
+        };
+        PreviewKeyDown += SelectionKeys;
         // ↑ ↑ ↓ ↓ ← → ← → B A: a meteor shower. Watched, never swallowed, so typing in search still works.
         PreviewKeyDown += (_, e) =>
         {
@@ -262,6 +312,7 @@ public sealed class TrayFlyout : Window
         _sky?.Stop();
         _konami.Reset();
         if (_delayPicker is not null) _delayPicker.IsOpen = false;
+        _selection.Clear(); // the next open starts fresh
         Hide();
     }
 
@@ -361,9 +412,124 @@ public sealed class TrayFlyout : Window
             .ToList();
 
         _grid.Children.Clear();
+        _tiles.Clear();
+        _selection.SetItems(paths);
         foreach (var path in paths) _grid.Children.Add(Tile(path));
         _empty.Visibility = paths.Count == 0 && filter.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         _status.Text = paths.Count == 0 ? "" : L.F("{0} recent", paths.Count);
+        OnSelectionChanged();
+    }
+
+    // ------------------------------------------------------------------ picking several
+
+    private void OnSelectionChanged()
+    {
+        foreach (var (_, paint) in _tiles.Values) paint();
+        var several = _selection.Count > 1;
+        _selectionText.Text = L.F("{0} selected", _selection.Count);
+        _selectionBar.Visibility = several ? Visibility.Visible : Visibility.Collapsed;
+        _status.Visibility = several ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private static bool Ctrl => (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+    private static bool Shift => (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
+
+    /// <summary>Ctrl+A, Ctrl+C and Delete on the thumbnails. In the search box they keep editing the text.</summary>
+    private void SelectionKeys(object sender, KeyEventArgs e)
+    {
+        var typing = _search.IsKeyboardFocusWithin && _search.Text.Length > 0;
+        if (e.Key == Key.A && Ctrl && !typing && _grid.Children.Count > 0)
+        {
+            _selection.SelectAll();
+            _scroll.Focus();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.C && Ctrl && !_search.IsKeyboardFocusWithin && _selection.Count > 0)
+        {
+            CopySelection();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Delete && !_search.IsKeyboardFocusWithin && _selection.Count > 0)
+        {
+            Delete(_selection.Selected);
+            e.Handled = true;
+        }
+    }
+
+    private void CopySelection()
+    {
+        var picked = _selection.Selected;
+        if (picked.Count == 1) CopyFile(picked[0]);
+        else if (picked.Count > 1) CopyFiles(picked);
+    }
+
+    /// <summary>A press on empty space (not on a thumbnail or the scroll bar) starts a box.</summary>
+    private void BandDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount > 1 || OnTileOrScrollBar(e.OriginalSource as DependencyObject)) return;
+        _bandStart = e.GetPosition(_grid);
+        _bandMoved = false;
+        _selection.BeginBox(add: Ctrl);
+        _scroll.Focus();
+        _scroll.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private bool OnTileOrScrollBar(DependencyObject? hit)
+    {
+        for (var d = hit; d is not null && d != _scroll; d = d is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+        {
+            if (d is ScrollBar) return true;
+            if (d is Border { Tag: "tile" }) return true;
+        }
+        return false;
+    }
+
+    private void BandMove(object sender, MouseEventArgs e)
+    {
+        if (_bandStart is not { } start || e.LeftButton != MouseButtonState.Pressed) return;
+        // Near the top or bottom edge, scroll so the box can reach captures further down.
+        var inView = e.GetPosition(_scroll);
+        if (inView.Y < 0) _scroll.LineUp();
+        else if (inView.Y > _scroll.ViewportHeight) _scroll.LineDown();
+
+        var now = e.GetPosition(_grid);
+        if (!_bandMoved && Math.Abs(now.X - start.X) < 4 && Math.Abs(now.Y - start.Y) < 4) return;
+        _bandMoved = true;
+        var box = new Rect(start, now);
+
+        var touched = new List<string>();
+        foreach (var (path, (frame, _)) in _tiles)
+        {
+            if (!frame.IsVisible) continue;
+            var r = frame.TransformToAncestor(_grid).TransformBounds(new Rect(frame.RenderSize));
+            if (r.IntersectsWith(box)) touched.Add(path);
+        }
+        _selection.UpdateBox(touched);
+
+        var a = _grid.TranslatePoint(box.TopLeft, _bandLayer);
+        Canvas.SetLeft(_band, a.X);
+        Canvas.SetTop(_band, a.Y);
+        _band.Width = box.Width;
+        _band.Height = box.Height;
+        _band.Visibility = Visibility.Visible;
+    }
+
+    private void BandUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_bandStart is null) return;
+        // A plain click on empty space lets go of the selection.
+        if (!_bandMoved && !Ctrl) _selection.Clear();
+        EndBand();
+        if (_scroll.IsMouseCaptured) _scroll.ReleaseMouseCapture();
+    }
+
+    private void EndBand()
+    {
+        if (_bandStart is null) return;
+        _bandStart = null;
+        _band.Visibility = Visibility.Collapsed;
+        _selection.EndBox();
     }
 
     private FrameworkElement Tile(string path)
@@ -386,22 +552,45 @@ public sealed class TrayFlyout : Window
             actions.Children.Add(MiniButton("M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4", L.T("Trim or cut"), () => Open(path)));
         }
         else actions.Children.Add(MiniButton("M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5", L.T("Edit (circle, arrow, text…)"), () => Open(path)));
-        actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", L.T("Copy"), () => CopyFile(path)));
+        actions.Children.Add(MiniButton("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", L.T("Copy"), () =>
+        {
+            var targets = _selection.For(path);
+            if (targets.Count > 1) CopyFiles(targets); else CopyFile(path);
+        }));
         actions.Children.Add(MiniButton("M2,4 H6 L7.5,5.5 H14 V13 H2 Z", L.T("Show in folder"), () => ShowInFolder(path)));
-        actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", L.T("Delete (to Recycle Bin)"), () => Delete(path)));
+        actions.Children.Add(MiniButton("M3,4.5 H13 M6,4.5 V2.5 H10 V4.5 M4.5,4.5 L5.2,14 H10.8 L11.5,4.5", L.T("Delete (to Recycle Bin)"), () => Delete(_selection.For(path))));
 
         var frame = new Border
         {
             Width = TileWidth, Height = TileHeight, Margin = new Thickness(0, 0, 8, 8), CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1), BorderBrush = SpaceTheme.NavyLightBrush, Background = SpaceTheme.VoidBrush,
-            ClipToBounds = true, Cursor = Cursors.Hand,
-            ToolTip = isRecording
+            ClipToBounds = true, Cursor = Cursors.Hand, Tag = "tile",
+            ToolTip = (isRecording
                 ? Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: trim · Drag: drop into any app")
-                : Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: edit · Drag: drop into any app"),
+                : Path.GetFileName(path) + "\n" + L.T("Click: copy · Double-click: edit · Drag: drop into any app"))
+                + "\n" + L.F("{0}+click or drag a box to pick several", "Ctrl"),
         };
         var inner = new Grid { ClipToBounds = true };
         inner.Children.Add(image);
         if (isRecording) inner.Children.Add(RecordingBadge(Cometsnap.Core.Storage.MediaKinds.IsGif(path)));
+        // Picked tiles get a blue wash and a check mark in the corner.
+        var wash = new Border { Background = SpaceTheme.WithAlpha(SpaceTheme.CometBlue, 0x38), IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        var check = new Border
+        {
+            Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Margin = new Thickness(5),
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+            Background = SpaceTheme.CometBlueBrush, BorderBrush = SpaceTheme.StarWhiteBrush, BorderThickness = new Thickness(1.5),
+            IsHitTestVisible = false, Visibility = Visibility.Collapsed,
+            Child = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M3.5,8.5 L6.5,11.5 L12.5,4.5"), Stroke = SpaceTheme.StarWhiteBrush, StrokeThickness = 2,
+                StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
+                Width = 16, Height = 16, Stretch = Stretch.None, RenderTransform = new ScaleTransform(0.75, 0.75, 8, 8),
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            },
+        };
+        inner.Children.Add(wash);
+        inner.Children.Add(check);
         inner.Children.Add(actions);
         frame.Child = new Border { CornerRadius = new CornerRadius(7), ClipToBounds = true, Child = inner };
 
@@ -414,23 +603,48 @@ public sealed class TrayFlyout : Window
             lift.BeginAnimation(ScaleTransform.ScaleXProperty, a);
             lift.BeginAnimation(ScaleTransform.ScaleYProperty, a);
         }
-        frame.MouseEnter += (_, _) => { frame.BorderBrush = SpaceTheme.CometBlueBrush; actions.Visibility = Visibility.Visible; Zoom(1.04); };
-        frame.MouseLeave += (_, _) => { frame.BorderBrush = SpaceTheme.NavyLightBrush; actions.Visibility = Visibility.Collapsed; Zoom(1); };
+        var hovering = false;
+        void Paint()
+        {
+            var picked = _selection.Contains(path);
+            frame.BorderBrush = picked || hovering ? SpaceTheme.CometBlueBrush : SpaceTheme.NavyLightBrush;
+            frame.BorderThickness = new Thickness(picked ? 2 : 1);
+            wash.Visibility = picked && _selection.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            check.Visibility = wash.Visibility;
+        }
+        _tiles[path] = (frame, Paint);
+        Paint();
+        frame.MouseEnter += (_, _) => { hovering = true; Paint(); actions.Visibility = Visibility.Visible; Zoom(1.04); };
+        frame.MouseLeave += (_, _) => { hovering = false; Paint(); actions.Visibility = Visibility.Collapsed; Zoom(1); };
         frame.MouseLeftButtonDown += (_, e) =>
         {
+            e.Handled = true;
+            _scroll.Focus();
             _dragStart = e.GetPosition(this);
             _dragArmed = path;
             _suppressClick = false;
+            if (Ctrl || Shift)
+            {
+                // Picking several: no copy. A tile Ctrl+clicked off can't start a drag.
+                _suppressClick = true;
+                _selection.Click(path, toggle: Ctrl, range: Shift);
+                if (!_selection.Contains(path)) _dragArmed = null;
+                return;
+            }
             if (e.ClickCount == 2)
             {
                 _suppressClick = true;
                 Open(path);
+                return;
             }
+            // A press on a picked tile keeps the group, so it can be dragged together.
+            if (!_selection.Contains(path)) _selection.Click(path);
         };
         frame.MouseLeftButtonUp += (_, e) =>
         {
             _dragArmed = null;
             if (_suppressClick) return;
+            _selection.Only(path);
             CopyFile(path);
         };
         frame.MouseMove += (_, e) =>
@@ -442,9 +656,20 @@ public sealed class TrayFlyout : Window
             _suppressClick = true;
             _dragArmed = null;
             Zoom(1);
+            var group = _selection.For(path);
+            var frames = group.Select(p => _tiles.TryGetValue(p, out var t) ? t.Frame : null).OfType<Border>().ToList();
+            foreach (var f in frames) f.Opacity = 0.55;
             frame.Opacity = 0.55;
-            try { DragOut.Start(frame, path, null, image.Source); }
-            finally { frame.Opacity = 1; }
+            try
+            {
+                if (group.Count > 1) DragOut.StartFiles(frame, group, image.Source);
+                else DragOut.Start(frame, path, null, image.Source);
+            }
+            finally
+            {
+                foreach (var f in frames) f.Opacity = 1;
+                frame.Opacity = 1;
+            }
         };
         return frame;
     }
@@ -520,6 +745,24 @@ public sealed class TrayFlyout : Window
         }
     }
 
+    /// <summary>Several captures go on the clipboard as files: paste them into Explorer, Outlook, Teams, Slack…</summary>
+    private void CopyFiles(IReadOnlyList<string> paths)
+    {
+        try
+        {
+            var list = new System.Collections.Specialized.StringCollection();
+            foreach (var p in paths.Where(File.Exists)) list.Add(p);
+            if (list.Count == 0) return;
+            Clipboard.SetFileDropList(list);
+            Flash(L.F("Copied {0} files ✓", list.Count));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Copy of several captures from flyout failed", ex);
+            Flash(L.T("Could not copy"));
+        }
+    }
+
     /// <summary>Opens the capture in Cometsnap's editor (recordings: in the trimmer).</summary>
     private void Open(string path)
     {
@@ -543,24 +786,32 @@ public sealed class TrayFlyout : Window
         catch (Exception ex) { Log.Error("Show in folder failed", ex); }
     }
 
-    private void Delete(string path)
+    private void Delete(IReadOnlyList<string> paths)
     {
-        try
+        var moved = 0;
+        var failed = false;
+        foreach (var path in paths.ToList())
         {
-            if (File.Exists(path))
-                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path,
-                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-            Cometsnap.Core.Storage.EditSidecar.DeleteFor(path);
-            _thumbs.Forget(path);
-            _recent.Remove(path);
-            Flash(L.T("Moved to the Recycle Bin"));
+            try
+            {
+                if (File.Exists(path))
+                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path,
+                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                Cometsnap.Core.Storage.EditSidecar.DeleteFor(path);
+                _thumbs.Forget(path);
+                _recent.Remove(path);
+                moved++;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Delete failed", ex);
+                failed = true;
+            }
         }
-        catch (Exception ex)
-        {
-            Log.Error("Delete failed", ex);
-            Flash(L.T("Could not delete"));
-        }
+        if (failed) Flash(L.T("Could not delete"));
+        else if (moved > 1) Flash(L.F("Moved {0} files to the Recycle Bin", moved));
+        else if (moved == 1) Flash(L.T("Moved to the Recycle Bin"));
     }
 
     private async void Flash(string text)

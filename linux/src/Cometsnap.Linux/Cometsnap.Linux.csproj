@@ -39,6 +39,7 @@
     <!-- Scrolling capture and OCR text cleanup: the same code as on Windows. -->
     <Compile Include="..\..\..\src\Cometsnap.Core\Capture\ScrollStitcher.cs" Link="Core\Shared\ScrollStitcher.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Text\OcrText.cs" Link="Core\Shared\OcrText.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Storage\TraySelection.cs" Link="Core\Shared\TraySelection.cs" />
   </ItemGroup>
 
   <ItemGroup>

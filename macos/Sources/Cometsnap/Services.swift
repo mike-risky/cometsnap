@@ -193,6 +193,13 @@ enum Clipboard {
         pb.writeObjects([url as NSURL])
     }
 
+    /// Several files at once: paste them into Finder, Mail, Slack, Messages…
+    static func copyFiles(_ urls: [URL]) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.writeObjects(urls.map { $0 as NSURL })
+    }
+
     static func copyText(_ s: String) {
         let pb = NSPasteboard.general
         pb.clearContents()

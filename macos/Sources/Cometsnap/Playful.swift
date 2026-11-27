@@ -43,6 +43,26 @@ final class DragOut: NSObject, NSDraggingSource {
         return true
     }
 
+    /// Drags several captures at once, as files (Finder, Mail, Slack, Messages take a group).
+    /// Each item starts from its own tile, and AppKit stacks them under the pointer with a count.
+    @discardableResult
+    static func startFiles(from view: NSView, event: NSEvent, items: [(url: URL, preview: NSImage?, frame: CGRect)],
+                           onEnd: @escaping (NSDragOperation) -> Void = { _ in }) -> Bool {
+        let existing = items.filter { FileManager.default.fileExists(atPath: $0.url.path) }
+        guard !existing.isEmpty else { return false }
+        let dragItems = existing.map { entry -> NSDraggingItem in
+            let di = NSDraggingItem(pasteboardWriter: entry.url as NSURL)
+            di.setDraggingFrame(fitted(entry.preview, in: entry.frame), contents: entry.preview)
+            return di
+        }
+        let source = DragOut(onEnd: onEnd)
+        active = source
+        let session = view.beginDraggingSession(with: dragItems, event: event, source: source)
+        session.animatesToStartingPositionsOnCancelOrFail = true
+        session.draggingFormation = .stack
+        return true
+    }
+
     /// Keeps the preview's aspect ratio inside the given frame.
     private static func fitted(_ img: NSImage?, in frame: CGRect) -> CGRect {
         guard let img, img.size.width > 0, img.size.height > 0 else { return frame }
