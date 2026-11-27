@@ -6,7 +6,7 @@ final class WelcomeWindow: NSWindow {
     private unowned let app: AppController
     private let permissionStatus = NSTextField(labelWithString: "")
     private let permissionButton: SpaceButton
-    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧4 for Cometsnap (replaces the built-in macOS shortcut, switch back any time in Settings)"), target: nil, action: nil)
+    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧3, ⌘⇧4 and ⌘⇧5 for Cometsnap (replaces the macOS screenshot shortcuts, switch back any time in Settings)"), target: nil, action: nil)
     private let login = NSButton(checkboxWithTitle: L.t("Start Cometsnap when I log in"), target: nil, action: nil)
     private var poll: Timer?
 
@@ -37,7 +37,7 @@ final class WelcomeWindow: NSWindow {
         }
         permissionStatus.font = Theme.ui(12, .medium)
 
-        let step2 = stepLabel("2", L.t("Replace your old screenshot shortcut"), L.t("Snap with ⌘⇧4 like before, but with window detection, a loupe and instant copy."))
+        let step2 = stepLabel("2", L.t("Replace your old screenshot shortcut"), L.t("Same keys as before: ⌘⇧4 an area or a window, ⌘⇧3 the whole screen, ⌘⇧5 the Cometsnap panel. Now with window detection, a loupe and instant copy."))
         takeOver.state = .on
         styleCheckbox(takeOver)
 
@@ -45,7 +45,7 @@ final class WelcomeWindow: NSWindow {
         login.state = .on
         styleCheckbox(login)
 
-        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 (or ⌘⇧4) capture · ⌘⇧7 record video · ⌘⇧8 record GIF · Print Screen / F13 on PC keyboards. Release the mouse and it's copied and saved."))
+        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧4 (or ⌘⇧2) capture · ⌘⇧3 whole screen · ⌘⇧7 record video · ⌘⇧8 record GIF · Print Screen / F13 on PC keyboards. Release the mouse and it's copied and saved."))
         keys.font = Theme.ui(12)
         keys.textColor = Theme.muted
 
@@ -147,7 +147,7 @@ final class WelcomeWindow: NSWindow {
 final class SettingsWindow: NSWindow {
     private unowned let app: AppController
     private let login = NSButton(checkboxWithTitle: L.t("Start at login"), target: nil, action: nil)
-    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧4 for Cometsnap (turns off the built-in macOS ⌘⇧4)"), target: nil, action: nil)
+    private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧3, ⌘⇧4 and ⌘⇧5 for Cometsnap (turns off the macOS screenshot shortcuts)"), target: nil, action: nil)
     private let copyBox = NSButton(checkboxWithTitle: L.t("Copy every capture to the clipboard"), target: nil, action: nil)
     private let card = NSButton(checkboxWithTitle: L.t("Show the small Edit card after a capture"), target: nil, action: nil)
     private let comet = NSButton(checkboxWithTitle: L.t("Comet animation into the menu bar"), target: nil, action: nil)
@@ -205,7 +205,7 @@ final class SettingsWindow: NSWindow {
         let folderRow = NSStackView(views: [folder, change, reveal])
         folderRow.spacing = 8
         folder.widthAnchor.constraint(equalToConstant: 250).isActive = true
-        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 capture (also ⌘⇧4 when enabled above, and Print Screen / F13) · ⌘⇧7 video · ⌘⇧8 GIF · press again to stop.") + "\n" + L.t("In the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels."))
+        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 capture (with the option above also ⌘⇧4, ⌘⇧3 whole screen and ⌘⇧5 panel, plus Print Screen / F13) · ⌘⇧7 video · ⌘⇧8 GIF · press again to stop.") + "\n" + L.t("In the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels."))
         keys.font = Theme.ui(11)
         keys.textColor = Theme.muted
         keys.preferredMaxLayoutWidth = 460

@@ -17,7 +17,9 @@ Cometsnap for macOS: first launch
    Screen & System Audio Recording > Cometsnap on), then click
    "Quit & Reopen".
 
-Shortcuts: Cmd+Shift+2 capture (Cmd+Shift+4 too if you accept the offer),
+Shortcuts: Cmd+Shift+2 capture. If you accept the offer on first run,
+Cometsnap also takes over Cmd+Shift+4 (area), Cmd+Shift+3 (whole screen)
+and Cmd+Shift+5 (Cometsnap panel) from the macOS screenshot tool.
 Cmd+Shift+7 video, Cmd+Shift+8 GIF. Press again to stop a recording.
 Print Screen on a PC keyboard (F13) also captures.
 

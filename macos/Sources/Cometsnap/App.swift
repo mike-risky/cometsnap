@@ -63,6 +63,8 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         try? FileManager.default.createDirectory(at: capturesDirectory, withIntermediateDirectories: true)
         refreshRecent()
+        // Re-apply the takeover: the live switch ends at logout, and macOS updates can reset it.
+        if settings.takeOverSystemShortcut { SystemShortcuts.setBuiltInShortcuts(enabled: false) }
         registerHotkeys()
         ScreenGrabber.shared.prewarm()
         Log.info("Cometsnap \(Bundle.main.shortVersion) started")
@@ -90,7 +92,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         change(&settings)
         settings.save(to: paths.settingsFile)
         if old.takeOverSystemShortcut != settings.takeOverSystemShortcut {
-            SystemShortcuts.setBuiltInRegionShortcut(enabled: !settings.takeOverSystemShortcut)
+            SystemShortcuts.setBuiltInShortcuts(enabled: !settings.takeOverSystemShortcut)
             registerHotkeys()
         }
         if old.seasonalLooks != settings.seasonalLooks { statusItem.refreshIcon() }
@@ -141,8 +143,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         hk.register(.captureF13, action: region)
         if settings.takeOverSystemShortcut {
             // Give macOS a moment to release the shortcut after the change.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 hk.register(.captureCmdShift4, action: region)
+                hk.register(.fullscreenCmdShift3, action: { self?.capture.captureFullscreen() })
+                hk.register(.panelCmdShift5, action: { self?.toggleFlyout() })
             }
         }
         let video: () -> Void = { [weak self] in self?.recorder.toggleRegion(format: .mp4) }
