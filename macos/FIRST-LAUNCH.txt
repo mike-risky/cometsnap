@@ -11,8 +11,14 @@ EASIEST: one line in Terminal, no security warnings
 
 WITH THE DISK IMAGE (.dmg)
   1. Drag Cometsnap onto the Applications folder.
-  2. Open Cometsnap from Applications. This free build is not signed with a
-     paid Apple certificate yet, so macOS blocks it the first time:
+  2. This free build is not signed with a paid Apple certificate yet, so
+     macOS blocks it the first time. Easiest fix: open Terminal, paste this
+     line and press Return:
+
+       xattr -dr com.apple.quarantine /Applications/Cometsnap.app
+
+     Then open Cometsnap from Applications as usual. Prefer clicking instead?
+     Open Cometsnap from Applications, then:
      - macOS 15 Sequoia and newer: open System Settings > Privacy & Security,
        scroll down to "Cometsnap was blocked..." and click "Open Anyway",
        then confirm with your password.

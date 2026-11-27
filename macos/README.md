@@ -28,7 +28,14 @@ curl -fsSL https://raw.githubusercontent.com/mike-risky/cometsnap/main/macos/ins
 ```
 
 Or download [Cometsnap-macOS.dmg](https://github.com/mike-risky/cometsnap/releases/download/macos-nightly/Cometsnap-macOS.dmg)
-and follow [FIRST-LAUNCH.txt](FIRST-LAUNCH.txt). Opened from the disk image, Cometsnap offers to move
+and drag it into Applications. Then clear the download flag so macOS lets it open without the
+Privacy & Security detour:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/Cometsnap.app
+```
+
+[FIRST-LAUNCH.txt](FIRST-LAUNCH.txt) has the click-through alternative. Opened from the disk image, Cometsnap offers to move
 itself into Applications.
 
 ## Build
