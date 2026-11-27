@@ -129,6 +129,7 @@ public static class Win32
     public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_SHOWWINDOW = 0x0040;
     public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOSIZE = 0x0001;
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -346,6 +347,63 @@ public static class Win32
     public static extern IntPtr GetModuleHandle(string? lpModuleName);
 
     public static bool IsKeyDown(int vk) => (GetAsyncKeyState(vk) & 0x8000) != 0;
+
+    public const int VK_LBUTTON = 0x01;
+    public const int VK_RBUTTON = 0x02;
+    public const int SM_SWAPBUTTON = 23;
+
+    /// <summary>
+    /// Whether the primary (usually left) mouse button is physically down right now.
+    /// GetAsyncKeyState reads the physical buttons, so swapped buttons are taken into account.
+    /// </summary>
+    public static bool IsPrimaryButtonDown() =>
+        IsKeyDown(GetSystemMetrics(SM_SWAPBUTTON) != 0 ? VK_RBUTTON : VK_LBUTTON);
+
+    // ---- power throttling (Windows 11 "efficiency mode" for background processes)
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PROCESS_POWER_THROTTLING_STATE
+    {
+        public uint Version;
+        public uint ControlMask;
+        public uint StateMask;
+    }
+
+    private const int ProcessPowerThrottling = 4;
+    private const uint PROCESS_POWER_THROTTLING_CURRENT_VERSION = 1;
+    private const uint PROCESS_POWER_THROTTLING_EXECUTION_SPEED = 0x1;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetProcessInformation(IntPtr hProcess, int processInformationClass,
+        ref PROCESS_POWER_THROTTLING_STATE processInformation, uint processInformationSize);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    /// <summary>
+    /// Opts out of execution-speed throttling, so Windows does not run the idle tray app on slow
+    /// efficiency settings and the first capture after a quiet spell opens as fast as the others.
+    /// Costs nothing while idle (Cometsnap does no work then). Returns false on older Windows.
+    /// </summary>
+    public static bool DisableExecutionSpeedThrottling()
+    {
+        var state = new PROCESS_POWER_THROTTLING_STATE
+        {
+            Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+            ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+            StateMask = 0, // controlled by us, and turned off
+        };
+        try
+        {
+            return SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, ref state,
+                (uint)Marshal.SizeOf<PROCESS_POWER_THROTTLING_STATE>());
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public static int LOWORD(IntPtr value) => unchecked((short)(long)value);
     public static int HIWORD(IntPtr value) => unchecked((short)((long)value >> 16));

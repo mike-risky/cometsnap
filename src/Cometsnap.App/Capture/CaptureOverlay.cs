@@ -84,6 +84,9 @@ public sealed class CaptureOverlay : Window
     private LoupeCorner _loupeCorner = LoupeCorner.BottomLeft;
     private double _dpi = 1;
     private int _framesUntilVisible;
+    private bool _pressSeen;         // a button press reached us (or was picked up early) this session
+    private bool _buttonWasUp;       // the button has been up since the capture started
+    private bool _warming;
 
     /// <summary>Raised with the captured image and its virtual-screen rectangle.</summary>
     public event Action<BitmapSource, PixelRect>? Confirmed;
@@ -195,9 +198,16 @@ public sealed class CaptureOverlay : Window
         Hide();
     }
 
-    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings, bool scrollHint = false, bool pickColor = false)
+    /// <param name="buttonHeldAtStart">
+    /// The mouse button was already down when the capture was asked for (a delayed capture of a
+    /// held-open menu, say). That press is not ours: only a new one starts a drag.
+    /// </param>
+    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings, bool scrollHint = false, bool pickColor = false, bool buttonHeldAtStart = false)
     {
         if (_hwnd == IntPtr.Zero) Prewarm();
+        CancelWarm();
+        _pressSeen = false;
+        _buttonWasUp = !buttonHeldAtStart;
         _scrollHint = scrollHint;
         _pickColor = pickColor;
 
@@ -256,6 +266,7 @@ public sealed class CaptureOverlay : Window
         Activate();
         Win32.SetForegroundWindow(_hwnd);
         Keyboard.Focus(this);
+        CatchEarlyPress();
 
         _framesUntilVisible = 2;
         CompositionTarget.Rendering -= OnRendering;
@@ -264,9 +275,79 @@ public sealed class CaptureOverlay : Window
 
     private void OnRendering(object? sender, EventArgs e)
     {
+        if (_warming)
+        {
+            FinishWarm();
+            return;
+        }
+        CatchEarlyPress();
         if (--_framesUntilVisible > 0) return;
         CompositionTarget.Rendering -= OnRendering;
         if (_mode != Mode.Idle) SetDwm(Win32.DWMWA_CLOAK, 0);
+    }
+
+    /// <summary>
+    /// The first capture after a quiet spell can take a moment to open (Windows has paged
+    /// Cometsnap out). A press made during that moment never reached the overlay: it went to the
+    /// window underneath, which then kept the mouse, so the drag was lost and letting go only
+    /// "clicked" the window or screen under the cursor. If the button went down since the
+    /// capture started and no press reached us, start the drag here, from the cursor.
+    /// </summary>
+    private void CatchEarlyPress()
+    {
+        if (_mode != Mode.Hover || _pickColor || _pressSeen) return;
+        if (!Win32.IsPrimaryButtonDown())
+        {
+            _buttonWasUp = true;
+            return;
+        }
+        if (!_buttonWasUp) return; // still the press from before the capture
+
+        Win32.GetCursorPos(out var p);
+        _cx = Math.Clamp(p.X - _screen!.Bounds.X, 0, _full.Width - 1);
+        _cy = Math.Clamp(p.Y - _screen.Bounds.Y, 0, _full.Height - 1);
+        _px = _cx;
+        _py = _cy;
+        _pressSeen = true;
+        _pressX = _cx;
+        _pressY = _cy;
+        _mode = Mode.Pressed;
+        CaptureMouse(); // takes the mouse back from the window that got the press
+        Refresh();
+    }
+
+    /// <summary>
+    /// Runs the overlay's show/render path once more, off-screen and cloaked, without taking the
+    /// focus, so it is back in memory before the next capture. Called after a quiet spell and
+    /// when the PC wakes or unlocks.
+    /// </summary>
+    public void Rewarm()
+    {
+        if (_mode != Mode.Idle || _warming || _hwnd == IntPtr.Zero) return;
+        _warming = true;
+        SetDwm(Win32.DWMWA_CLOAK, 1);
+        // Off every screen (so it can never catch a click), keeping its size so the next capture
+        // only has to move it.
+        Win32.SetWindowPos(_hwnd, IntPtr.Zero, -32000, -32000, 0, 0, Win32.SWP_NOACTIVATE | Win32.SWP_NOZORDER | Win32.SWP_NOSIZE);
+        ShowActivated = false;
+        Show();
+        ShowActivated = true;
+        CompositionTarget.Rendering -= OnRendering;
+        CompositionTarget.Rendering += OnRendering; // one rendered frame, then hide again
+    }
+
+    private void FinishWarm()
+    {
+        CompositionTarget.Rendering -= OnRendering;
+        _warming = false;
+        if (_mode == Mode.Idle) Hide();
+    }
+
+    private void CancelWarm()
+    {
+        if (!_warming) return;
+        CompositionTarget.Rendering -= OnRendering;
+        _warming = false;
     }
 
     private void End()
@@ -364,6 +445,18 @@ public sealed class CaptureOverlay : Window
         var snap = !_skipSnapOnce && (Keyboard.Modifiers & ModifierKeys.Alt) == 0;
         _skipSnapOnce = false;
 
+        if (_mode == Mode.Hover && !_pressSeen)
+        {
+            CatchEarlyPress();
+        }
+        else if (_mode is Mode.Pressed or Mode.Dragging && e.LeftButton == MouseButtonState.Released
+                 && (!IsMouseCaptured || !Win32.IsPrimaryButtonDown()))
+        {
+            // The release went to another window (we could not take the mouse back): finish here.
+            Release();
+            return;
+        }
+
         switch (_mode)
         {
             case Mode.Hover:
@@ -421,6 +514,7 @@ public sealed class CaptureOverlay : Window
     {
         if (_mode == Mode.Idle) return;
         e.Handled = true;
+        _pressSeen = true;
         if (_pickColor)
         {
             PickColor(rgb: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
@@ -493,6 +587,12 @@ public sealed class CaptureOverlay : Window
     {
         if (_mode == Mode.Idle || _pickColor) return;
         e.Handled = true;
+        Release();
+    }
+
+    /// <summary>The button went up: finish the click, drag, move or resize.</summary>
+    private void Release()
+    {
         if (IsMouseCaptured) ReleaseMouseCapture();
 
         switch (_mode)

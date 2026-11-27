@@ -60,6 +60,65 @@ public sealed class CaptureController
         };
         _overlay.ColorPicked += (color, text) => (_colorToast ??= new ColorToast()).ShowFor(color, text);
         _overlay.Prewarm();
+        StartKeepingWarm();
+    }
+
+    // ------------------------------------------------------------------ keep warm
+
+    /// <summary>How long the overlay may sit unused before we run it once more in the background.</summary>
+    private static readonly TimeSpan WarmAfter = TimeSpan.FromMinutes(4);
+    private DispatcherTimer? _warmTimer;
+    private long _lastUsed = Environment.TickCount64;
+
+    /// <summary>
+    /// After a quiet spell Windows pages an idle tray app out, so the next overlay is slow to
+    /// open and the first drag could be missed. Every few idle minutes, and when the PC wakes or
+    /// is unlocked, run the overlay's open path once, invisibly, so it stays ready.
+    /// </summary>
+    private void StartKeepingWarm()
+    {
+        _warmTimer = new DispatcherTimer(DispatcherPriority.Background, _app.Dispatcher) { Interval = WarmAfter };
+        _warmTimer.Tick += (_, _) =>
+        {
+            if (Environment.TickCount64 - _lastUsed >= (long)WarmAfter.TotalMilliseconds) Warm();
+        };
+        _warmTimer.Start();
+
+        Microsoft.Win32.SystemEvents.PowerModeChanged += (_, e) =>
+        {
+            if (e.Mode == Microsoft.Win32.PowerModes.Resume) WarmSoon();
+        };
+        Microsoft.Win32.SystemEvents.SessionSwitch += (_, e) =>
+        {
+            if (e.Reason is Microsoft.Win32.SessionSwitchReason.SessionUnlock or Microsoft.Win32.SessionSwitchReason.ConsoleConnect)
+                WarmSoon();
+        };
+    }
+
+    /// <summary>System events arrive on their own thread: warm up on the UI thread a moment later.</summary>
+    private void WarmSoon() => _app.Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+    {
+        var once = new DispatcherTimer(DispatcherPriority.Background, _app.Dispatcher) { Interval = TimeSpan.FromSeconds(3) };
+        once.Tick += (_, _) => { once.Stop(); Warm(); };
+        once.Start();
+    });
+
+    private void Warm()
+    {
+        if (_overlay.IsCapturing || _app.Scrolling is { IsRunning: true }) return;
+        try
+        {
+            // The same native paths a capture uses: a tiny screen grab, the window list, the overlay.
+            FrozenScreen.Capture(new PixelRect(0, 0, 1, 1));
+            WindowFinder.Snapshot(_pid);
+            Monitors.All();
+            _overlay.Rewarm();
+        }
+        catch
+        {
+            // Only a warm-up: the real capture reports its own errors.
+        }
+        _lastUsed = Environment.TickCount64;
     }
 
     public bool IsBusy => _overlay.IsCapturing;
@@ -118,6 +177,7 @@ public sealed class CaptureController
         CancelDelay();
         try
         {
+            _lastUsed = Environment.TickCount64;
             _overlay.Begin(FrozenScreen.CaptureVirtualScreen(), Array.Empty<WindowInfo>(), Monitors.All(), _app.Settings, pickColor: true);
         }
         catch (Exception ex)
@@ -134,7 +194,11 @@ public sealed class CaptureController
     public void StartRegion(bool scrollHint)
     {
         if (_overlay.IsCapturing) return;
+        // Read before the (possibly slow) screen grab: a press made after this point is the
+        // start of a drag, even if it lands before the overlay is on screen.
+        var buttonHeld = Win32.IsPrimaryButtonDown();
         CancelDelay();
+        _lastUsed = Environment.TickCount64;
         var sw = Stopwatch.StartNew();
         try
         {
@@ -142,7 +206,7 @@ public sealed class CaptureController
             var grabbed = sw.ElapsedMilliseconds;
             var windows = WindowFinder.Snapshot(_pid);
             var monitors = Monitors.All();
-            _overlay.Begin(screen, windows, monitors, _app.Settings, scrollHint);
+            _overlay.Begin(screen, windows, monitors, _app.Settings, scrollHint, buttonHeldAtStart: buttonHeld);
             Log.Info($"Overlay ready in {sw.ElapsedMilliseconds} ms (grab {grabbed} ms, {windows.Count} windows, {screen.Bounds})");
         }
         catch (Exception ex)
