@@ -52,6 +52,10 @@ final class ScrollingCapture {
 
             if pill == nil { pill = ScrollingPill() }
             pill?.show(above: rect, on: screen)
+            // The wheel scrolls the area wherever the mouse is (needs Accessibility; else: under the mouse).
+            let redirect = WheelRedirect(area: rect)
+            redirect.start()
+            defer { redirect.stop() }
 
             let image = try await grab()
             let w = image.width, h = image.height
@@ -59,7 +63,7 @@ final class ScrollingCapture {
             var frame = Self.pixels(image, width: w, height: h)
             _ = stitcher.add(frame)
             // The overlay took the first turn of the wheel: pass it on (only allowed with Accessibility).
-            if let delta = picked.scrollDelta { Self.repost(delta) }
+            if let delta = picked.scrollDelta { Self.repost(delta, at: redirect.center) }
 
             var lost = false
             var cancelled = false
@@ -125,11 +129,12 @@ final class ScrollingCapture {
     }
 
     /// Posts the wheel turn the overlay swallowed, when macOS lets Cometsnap post events.
-    private static func repost(_ delta: OverlayResult.ScrollDelta) {
+    private static func repost(_ delta: OverlayResult.ScrollDelta, at point: CGPoint) {
         guard CGPreflightPostEventAccess() else { return }
         let event = delta.precise
             ? CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(delta.y.rounded()), wheel2: 0, wheel3: 0)
             : CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(delta.y.rounded(.awayFromZero)), wheel2: 0, wheel3: 0)
+        event?.location = point
         event?.post(tap: .cghidEventTap)
     }
 
@@ -150,6 +155,58 @@ final class ScrollingCapture {
         return CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: width * 4,
                        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
+    }
+}
+
+/// While a scrolling capture runs, moves every scroll-wheel event over the area, so the page
+/// under the area scrolls wherever the mouse is. Needs the Accessibility permission; without it
+/// nothing changes and the wheel scrolls what is under the mouse, as usual.
+private final class WheelRedirect {
+    /// The area and its middle, in CG global coordinates (y down from the top of the main screen).
+    let area: CGRect
+    let center: CGPoint
+    private var tap: CFMachPort?
+    private var source: CFRunLoopSource?
+
+    init(area appKit: CGRect) {
+        let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+        area = CGRect(x: appKit.minX, y: mainHeight - appKit.maxY, width: appKit.width, height: appKit.height)
+        center = CGPoint(x: area.midX, y: area.midY)
+    }
+
+    func start() {
+        guard tap == nil else { return }
+        let mask = CGEventMask(1 << CGEventType.scrollWheel.rawValue)
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+                                          eventsOfInterest: mask, callback: { _, type, event, info in
+            guard let info else { return Unmanaged.passUnretained(event) }
+            let me = Unmanaged<WheelRedirect>.fromOpaque(info).takeUnretainedValue()
+            if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                if let t = me.tap { CGEvent.tapEnable(tap: t, enable: true) }
+                return Unmanaged.passUnretained(event)
+            }
+            if type == .scrollWheel, !me.area.contains(event.location) { event.location = me.center }
+            return Unmanaged.passUnretained(event)
+        }, userInfo: me) else {
+            Log.info("scrolling capture: no event tap (Accessibility off), the wheel scrolls what is under the mouse")
+            return
+        }
+        self.tap = tap
+        let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
+        self.source = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    func stop() {
+        if let tap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+        tap = nil
+        source = nil
     }
 }
 
