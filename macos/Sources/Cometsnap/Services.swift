@@ -40,6 +40,8 @@ struct Hotkey: Equatable {
     static let captureCmdShift4 = Hotkey(keyCode: UInt32(kVK_ANSI_4), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧4")
     /// Print Screen on a PC keyboard plugged into a Mac arrives as F13.
     static let captureF13 = Hotkey(keyCode: UInt32(kVK_F13), modifiers: 0, display: "F13 / Print Screen")
+    static let fullscreenCmdShift3 = Hotkey(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧3")
+    static let panelCmdShift5 = Hotkey(keyCode: UInt32(kVK_ANSI_5), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧5")
     static let fullscreenCmdShift3Alt = Hotkey(keyCode: UInt32(kVK_ANSI_3), modifiers: UInt32(cmdKey | shiftKey | optionKey), display: "⌥⌘⇧3")
     static let videoCmdShift7 = Hotkey(keyCode: UInt32(kVK_ANSI_7), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧7")
     static let gifCmdShift8 = Hotkey(keyCode: UInt32(kVK_ANSI_8), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧8")
@@ -100,20 +102,43 @@ final class HotkeyCenter {
 
 // MARK: - macOS screenshot shortcut takeover
 
-/// Optionally hands ⌘⇧4 (and ⌃⌘⇧4) from the built-in screenshot tool to Cometsnap, the Mac
-/// version of "Replace your old screen capture tool". Fully reversible.
+/// Optionally hands the macOS screenshot shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5 and their ⌃ copy variants)
+/// to Cometsnap, the Mac version of "Replace your old screen capture tool". Fully reversible.
+///
+/// Two layers: the live switch through the window server (takes effect at once, lasts until
+/// logout), and the saved preference in com.apple.symbolichotkeys (what macOS reads at login and
+/// what System Settings › Keyboard › Shortcuts shows). Cometsnap applies both at every launch.
 enum SystemShortcuts {
-    // IDs in com.apple.symbolichotkeys: 30 = ⌘⇧4 save, 31 = ⌃⌘⇧4 copy.
-    private static let entries: [(id: Int, modifiers: Int)] = [(30, 1_179_648), (31, 1_441_792)]
+    /// IDs in com.apple.symbolichotkeys, with their default key (ASCII, key code, modifiers).
+    private static let entries: [(id: Int, ascii: Int, key: Int, modifiers: Int)] = [
+        (28, 51, 20, 1_179_648),  // ⌘⇧3 save screen
+        (29, 51, 20, 1_441_792),  // ⌃⌘⇧3 copy screen
+        (30, 52, 21, 1_179_648),  // ⌘⇧4 save area
+        (31, 52, 21, 1_441_792),  // ⌃⌘⇧4 copy area
+        (184, 53, 23, 1_179_648), // ⌘⇧5 screenshot and recording options
+    ]
 
-    static func setBuiltInRegionShortcut(enabled: Bool) {
+    private typealias SetEnabled = @convention(c) (Int32, Bool) -> Int32
+    private typealias IsEnabled = @convention(c) (Int32) -> Bool
+    private static let handle = dlopen(nil, RTLD_NOW)
+    private static let setEnabledFn: SetEnabled? = dlsym(handle, "CGSSetSymbolicHotKeyEnabled").map { unsafeBitCast($0, to: SetEnabled.self) }
+    private static let isEnabledFn: IsEnabled? = dlsym(handle, "CGSIsSymbolicHotKeyEnabled").map { unsafeBitCast($0, to: IsEnabled.self) }
+
+    /// True when macOS's own ⌘⇧4 is switched off right now.
+    static var builtInRegionShortcutIsOff: Bool { isEnabledFn.map { !$0(30) } ?? false }
+
+    static func setBuiltInShortcuts(enabled: Bool) {
+        // Live: the window server stops (or starts) handling these keys at once.
+        if let f = setEnabledFn {
+            for e in entries { _ = f(Int32(e.id), enabled) }
+        }
+        // Saved: survives logout, and shows in System Settings.
         for e in entries {
-            let dict = "{ enabled = \(enabled ? 1 : 0); value = { parameters = (52, 21, \(e.modifiers)); type = standard; }; }"
+            let dict = "{ enabled = \(enabled ? 1 : 0); value = { parameters = (\(e.ascii), \(e.key), \(e.modifiers)); type = standard; }; }"
             run("/usr/bin/defaults", ["write", "com.apple.symbolichotkeys", "AppleSymbolicHotKeys", "-dict-add", "\(e.id)", dict])
         }
-        // Makes the change take effect without logging out.
         run("/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings", ["-u"])
-        Log.info("built-in ⌘⇧4 \(enabled ? "restored" : "handed to Cometsnap")")
+        Log.info("macOS screenshot shortcuts \(enabled ? "restored" : "handed to Cometsnap") (live switch \(setEnabledFn == nil ? "missing" : "ok"), now \(builtInRegionShortcutIsOff ? "off" : "on"))")
     }
 
     @discardableResult

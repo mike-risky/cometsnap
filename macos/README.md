@@ -5,7 +5,7 @@ Native Swift app (AppKit + ScreenCaptureKit), same feel and features as the Wind
 | Area | What it does |
 |---|---|
 | Menu bar | Comet icon. Click: flyout with a starry header, big Region / Fullscreen / Delayed / Record buttons, search and the latest captures 3 per row (click copies, double-click edits, drag into any app, hover for edit / copy / Finder / trash). Right-click: full menu. |
-| Capture | **⌘⇧2** (or **⌘⇧4** after the takeover offer, or **Print Screen / F13**) freezes every screen. Hover highlights the window under the cursor, click grabs it, or drag any area (edges snap to windows, hold ⌥ to turn snapping off, hold Space to move the selection). Release = copied and saved, no toolbar in the way. |
+| Capture | **⌘⇧2** (or **⌘⇧4** after the takeover offer, or **Print Screen / F13**) freezes every screen. The takeover offer on first run hands all the macOS screenshot keys to Cometsnap: **⌘⇧4** area or window, **⌘⇧3** whole screen, **⌘⇧5** the Cometsnap panel (switch back any time in Settings). Hover highlights the window under the cursor, click grabs it, or drag any area (edges snap to windows, hold ⌥ to turn snapping off, hold Space to move the selection). Release = copied and saved, no toolbar in the way. |
 | Loupe | 15×15 real pixels with grid, X/Y, size and hex color (**C** copies it). Sits in a corner and jumps away when the cursor comes close. |
 | Keys in the overlay | arrows 1 px, ⇧ arrows 10 px, Return confirm, Esc cancel, **F** whole screen, **W** window detection on/off. |
 | Edit card | Small "COPIED!" card in the corner. Click anywhere on it to edit, or drag it straight into any app. Never steals focus, fades out by itself. |
