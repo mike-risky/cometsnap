@@ -42,7 +42,12 @@ jobs:
           fi
 
       - name: Unit tests
-        run: swift test 2>&1 | tail -40
+        run: |
+          set -o pipefail
+          if ! swift test 2>&1 | tee test.log | tail -40; then
+            grep -E 'error: |: failed' test.log | sort -u | head -30 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          fi
 
       - name: Bundle .app, .dmg and .zip
         run: |
