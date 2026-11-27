@@ -72,6 +72,9 @@ public sealed class CometApp : Application
         Log.Info($"Cometsnap {Version} starting (portable: {Paths.IsPortable})");
 
         DispatcherUnhandledException += OnUnhandledException;
+        // Windows 11 slows idle background apps down; the first capture after a quiet spell
+        // must open as fast as the rest, so opt out (no cost while Cometsnap is idle).
+        Win32.DisableExecutionSpeedThrottling();
 
         Settings = AppSettings.Load(Paths.SettingsFile);
         L.Use(Settings.Language);
