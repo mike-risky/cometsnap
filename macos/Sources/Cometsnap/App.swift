@@ -52,6 +52,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         L.use(settings.language)
         Theme.registerFonts()
         NSApp.appearance = NSAppearance(named: .darkAqua)
+        if MoveToApplications.offerIfNeeded() { return }
         buildMainMenu()
 
         capture = CaptureController(app: self)
@@ -77,7 +78,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        if recorder.isRecording { recorder.stop() }
+        if recorder?.isRecording == true { recorder.stop() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

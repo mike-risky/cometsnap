@@ -18,6 +18,8 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
+    env:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
     defaults:
       run:
         working-directory: macos
@@ -47,6 +49,37 @@ jobs:
           if ! swift test 2>&1 | tee test.log | tail -40; then
             grep -E 'error: |: failed' test.log | sort -u | head -30 | while IFS= read -r line; do echo "::error::${line}"; done
             exit 1
+          fi
+
+      # Optional signing: add these repository secrets to turn it on (see macos/SIGNING.md).
+      #   MACOS_CERT_P12 (base64 .p12), MACOS_CERT_PASSWORD, and for notarization
+      #   NOTARY_KEY_P8 (base64 .p8), NOTARY_KEY_ID, NOTARY_ISSUER.
+      # Pull requests from forks never see secrets and fall back to ad-hoc signing.
+      - name: Import the signing certificate
+        if: ${{ env.MACOS_CERT_P12 != '' }}
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"; KCPASS="$(uuidgen)"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KCPASS" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPASS" "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          ID="$(security find-identity -v -p codesigning "$KC" | sed -nE 's/.*"(.+)"$/\1/p' | head -1)"
+          [ -n "$ID" ] || { echo "::error::No code signing identity in MACOS_CERT_P12"; exit 1; }
+          echo "Signing as: $ID"
+          echo "SIGN_IDENTITY=$ID" >> "$GITHUB_ENV"
+          if [ -n "$NOTARY_KEY_P8" ]; then
+            echo "$NOTARY_KEY_P8" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+            { echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8"; echo "NOTARY_KEY_ID=$NOTARY_KEY_ID"; echo "NOTARY_ISSUER=$NOTARY_ISSUER"; } >> "$GITHUB_ENV"
           fi
 
       - name: Bundle .app, .dmg and .zip

@@ -45,9 +45,35 @@ sed -e "s/__VERSION__/$VERSION/g" -e "s/__BUILD__/$BUILD/g" Resources/Info.plist
 plutil -lint "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-echo "==> ad-hoc sign"
-codesign --force --deep --sign - --timestamp=none "$APP"
+# Signing. With a Developer ID certificate (SIGN_IDENTITY, imported by CI from secrets) the app
+# gets the hardened runtime and a secure timestamp, ready for notarization. A self-signed
+# certificate works the same way minus notarization: macOS then keeps the screen permission
+# across updates. Without either, an ad-hoc signature.
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+  echo "==> sign with \"$SIGN_IDENTITY\""
+  if [[ "$SIGN_IDENTITY" == "Developer ID Application"* ]]; then
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP"
+  else
+    codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$APP"
+  fi
+else
+  echo "==> ad-hoc sign"
+  codesign --force --deep --sign - --timestamp=none "$APP"
+fi
 codesign --verify --verbose=2 "$APP"
+
+# Notarization (needs a Developer ID signature and an App Store Connect API key).
+notarize() {
+  [[ "${SIGN_IDENTITY:-}" == "Developer ID Application"* && -n "${NOTARY_KEY_PATH:-}" ]] || return 0
+  echo "==> notarize $(basename "$1")"
+  xcrun notarytool submit "$1" --key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
+}
+if [[ "${SIGN_IDENTITY:-}" == "Developer ID Application"* && -n "${NOTARY_KEY_PATH:-}" ]]; then
+  ( cd "$OUT" && ditto -c -k --keepParent Cometsnap.app notarize.zip )
+  notarize "$OUT/notarize.zip"
+  xcrun stapler staple "$APP"
+  rm -f "$OUT/notarize.zip"
+fi
 
 echo "==> zip"
 ( cd "$OUT" && ditto -c -k --keepParent Cometsnap.app Cometsnap-macOS.zip )
@@ -59,5 +85,10 @@ cp -R "$APP" "$DMGROOT/"
 ln -s /Applications "$DMGROOT/Applications"
 cp "$HERE/FIRST-LAUNCH.txt" "$DMGROOT/Read me first.txt"
 hdiutil create -volname "Cometsnap" -srcfolder "$DMGROOT" -ov -format UDZO "$OUT/Cometsnap-macOS.dmg"
+if [ -n "${SIGN_IDENTITY:-}" ]; then codesign --force --sign "$SIGN_IDENTITY" "$OUT/Cometsnap-macOS.dmg"; fi
+if [[ "${SIGN_IDENTITY:-}" == "Developer ID Application"* && -n "${NOTARY_KEY_PATH:-}" ]]; then
+  notarize "$OUT/Cometsnap-macOS.dmg"
+  xcrun stapler staple "$OUT/Cometsnap-macOS.dmg"
+fi
 
 ls -la "$OUT"

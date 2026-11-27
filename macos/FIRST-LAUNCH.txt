@@ -1,27 +1,38 @@
-Cometsnap for macOS: first launch
-=================================
+Cometsnap for macOS: install
+============================
 
-1. Drag Cometsnap into the Applications folder.
+EASIEST: one line in Terminal, no security warnings
+  Open Terminal (Applications > Utilities), paste this line, press Return:
 
-2. Open it. This build is free and not signed with a paid Apple certificate,
-   so macOS blocks it the first time:
-   - macOS 15 Sequoia and newer: open System Settings > Privacy & Security,
-     scroll down to "Cometsnap was blocked..." and click "Open Anyway",
-     then confirm with your password.
-   - macOS 14 Sonoma: right-click (or Control-click) Cometsnap in
-     Applications, choose Open, then click Open.
-   Power users can instead run in Terminal:
-     xattr -dr com.apple.quarantine /Applications/Cometsnap.app
+    curl -fsSL https://raw.githubusercontent.com/mike-risky/cometsnap/main/macos/install.sh | bash
 
-3. Allow screen access when asked (System Settings > Privacy & Security >
-   Screen & System Audio Recording > Cometsnap on), then click
-   "Quit & Reopen".
+  It downloads the latest Cometsnap, puts it in Applications and opens it.
+  Run the same line again any time to update.
 
-Shortcuts: Cmd+Shift+2 capture. If you accept the offer on first run,
-Cometsnap also takes over Cmd+Shift+4 (area), Cmd+Shift+3 (whole screen)
-and Cmd+Shift+5 (Cometsnap panel) from the macOS screenshot tool.
-Cmd+Shift+7 video, Cmd+Shift+8 GIF. Press again to stop a recording.
-Print Screen on a PC keyboard (F13) also captures.
+WITH THE DISK IMAGE (.dmg)
+  1. Drag Cometsnap onto the Applications folder.
+  2. Open Cometsnap from Applications. This free build is not signed with a
+     paid Apple certificate yet, so macOS blocks it the first time:
+     - macOS 15 Sequoia and newer: open System Settings > Privacy & Security,
+       scroll down to "Cometsnap was blocked..." and click "Open Anyway",
+       then confirm with your password.
+     - macOS 14 Sonoma: right-click (or Control-click) Cometsnap in
+       Applications, choose Open, then click Open.
+  If you opened it straight from the disk image, Cometsnap offers to move
+  itself into Applications. Say yes: macOS only remembers its screen
+  permission there.
+
+THEN, ONCE
+  The welcome window walks you through the rest:
+  - Screen access: click "Allow screen access", switch Cometsnap on in
+    System Settings > Privacy & Security > Screen & System Audio Recording,
+    then click "Quit & Reopen".
+  - Screenshot keys: leave "Use Cmd+Shift+3, 4 and 5 for Cometsnap" ticked
+    and the macOS screenshot tool steps aside.
+
+Shortcuts: Cmd+Shift+4 area or window, Cmd+Shift+3 whole screen, Cmd+Shift+5
+Cometsnap panel (with the takeover), Cmd+Shift+2 always. Cmd+Shift+7 video,
+Cmd+Shift+8 GIF, press again to stop. Print Screen / F13 on PC keyboards.
 
 After an update, macOS may ask for screen access again: switch Cometsnap
 off and on in the same Settings page.
