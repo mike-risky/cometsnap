@@ -34,6 +34,7 @@ public sealed class EditCard : Window
     private string? _recording;           // set while the card shows a recording
     private string? _text;                // set while the card shows recognized text
     private readonly DispatcherTimer _timer;
+    private readonly CornerPlacement _corner;
     private BitmapSource? _image;
     private string? _path;
     private Point? _pressAt;
@@ -67,6 +68,7 @@ public sealed class EditCard : Window
         Topmost = true;
         SizeToContent = SizeToContent.WidthAndHeight;
         FontFamily = SpaceTheme.UiFont;
+        Left = Top = -32000;   // placed on the right screen once shown
 
         _thumb = new Image { Width = 88, Height = 56, Stretch = Stretch.UniformToFill };
         RenderOptions.SetBitmapScalingMode(_thumb, BitmapScalingMode.HighQuality);
@@ -174,6 +176,7 @@ public sealed class EditCard : Window
             if (!_dragged) OnEdit();
         };
         Content = card;
+        _corner = new CornerPlacement(this);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
         _timer.Tick += (_, _) => FadeOut();
@@ -188,8 +191,8 @@ public sealed class EditCard : Window
         };
     }
 
-    /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area.</summary>
-    public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied)
+    /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the screen you are working on.</summary>
+    public void ShowFor(BitmapSource image, bool copied)
     {
         SetMode(recording: null, text: null);
         _image = image;
@@ -202,9 +205,7 @@ public sealed class EditCard : Window
         Opacity = 1;
         if (!IsVisible) Show();
         if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
-        UpdateLayout();
-        Left = workAreaDip.Right - ActualWidth - 4;
-        Top = workAreaDip.Bottom - ActualHeight - 4;
+        _corner.PlaceNearCursor();
         _timer.Stop();
         _timer.Start();
     }
@@ -213,7 +214,7 @@ public sealed class EditCard : Window
     /// Shows the card for a finished recording: its poster frame, length and size, and a Trim button
     /// that opens the trimmer. Dragging the card drops the video file into any app.
     /// </summary>
-    public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied, Rect workAreaDip)
+    public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied)
     {
         SetMode(path, text: null);
         _image = poster;
@@ -225,9 +226,7 @@ public sealed class EditCard : Window
         Opacity = 1;
         if (!IsVisible) Show();
         if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
-        UpdateLayout();
-        Left = workAreaDip.Right - ActualWidth - 4;
-        Top = workAreaDip.Bottom - ActualHeight - 4;
+        _corner.PlaceNearCursor();
         _timer.Stop();
         _timer.Start();
     }
@@ -250,7 +249,7 @@ public sealed class EditCard : Window
     }
 
     /// <summary>The text of a capture is being read: shows the card with a "Reading" title until it is done.</summary>
-    public void ShowReading(BitmapSource image, Rect workAreaDip)
+    public void ShowReading(BitmapSource image)
     {
         SetMode(recording: null, text: "");
         _image = image;
@@ -258,11 +257,11 @@ public sealed class EditCard : Window
         _thumb.Source = image;
         _title.Text = L.T("READING…");
         _detail.Text = L.T("Looking for text");
-        Present(workAreaDip, fadeLater: false);
+        Present(fadeLater: false);
     }
 
     /// <summary>Shows what text recognition found (already on the clipboard).</summary>
-    public void ShowText(BitmapSource image, string text, int lines, Rect workAreaDip)
+    public void ShowText(BitmapSource image, string text, int lines)
     {
         SetMode(recording: null, text: text);
         _image = image;
@@ -271,22 +270,20 @@ public sealed class EditCard : Window
         _title.Text = text.Length > 0 ? L.T("TEXT COPIED!") : L.T("NO TEXT FOUND");
         _detail.Text = text.Length == 0 ? L.T("Try a bigger area")
             : lines == 1 ? FirstLine(text) : L.F("{0} lines · {1}", lines, FirstLine(text));
-        Present(workAreaDip, fadeLater: true);
+        Present(fadeLater: true);
     }
 
     private static string FirstLine(string text) =>
         text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
 
-    private void Present(Rect workAreaDip, bool fadeLater)
+    private void Present(bool fadeLater)
     {
         BeginAnimation(OpacityProperty, null);
         Opacity = 1;
         var wasVisible = IsVisible;
         if (!wasVisible) Show();
         if (!wasVisible && Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
-        UpdateLayout();
-        Left = workAreaDip.Right - ActualWidth - 4;
-        Top = workAreaDip.Bottom - ActualHeight - 4;
+        _corner.PlaceNearCursor();
         _timer.Stop();
         if (fadeLater) _timer.Start();
     }

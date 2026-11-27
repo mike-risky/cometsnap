@@ -192,14 +192,28 @@ public sealed class EditCard : Window
         Position = new PixelPoint(
             workArea.Right - (int)(size.Width * scaling) - 4,
             workArea.Bottom - (int)(size.Height * scaling) - 4);
-        Dispatcher.UIThread.Post(() =>
-        {
-            Position = new PixelPoint(
-                workArea.Right - (int)(Bounds.Width * scaling) - 4,
-                workArea.Bottom - (int)(Bounds.Height * scaling) - 4);
-        }, DispatcherPriority.Loaded);
+        _anchor = (workArea, scaling);
+        Dispatcher.UIThread.Post(Reanchor, DispatcherPriority.Loaded);
         _timer.Stop();
         _timer.Start();
+    }
+
+    private (PixelRect Work, double Scaling)? _anchor;
+
+    /// <summary>Keeps the card fully inside the bottom-right corner, even after its text grows.</summary>
+    private void Reanchor()
+    {
+        if (_anchor is not { } a) return;
+        var x = Math.Max(a.Work.X, a.Work.Right - (int)Math.Ceiling(Bounds.Width * a.Scaling) - 4);
+        var y = Math.Max(a.Work.Y, a.Work.Bottom - (int)Math.Ceiling(Bounds.Height * a.Scaling) - 4);
+        if (Position.X != x || Position.Y != y) Position = new PixelPoint(x, y);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        // "saving…" becomes the file name, a button shows or hides: stay anchored to the corner.
+        if (change.Property == ClientSizeProperty && IsVisible && _anchor is not null) Reanchor();
     }
 
     /// <summary>The capture reached the disk: Edit will now open the file.</summary>
