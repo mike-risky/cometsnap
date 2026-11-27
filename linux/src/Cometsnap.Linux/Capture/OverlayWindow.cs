@@ -290,6 +290,10 @@ internal sealed class OverlaySurface : Control
     {
         var text = s.Flash ?? (s.Purpose == OverlayPurpose.Record
             ? T("RECORD: click a window or drag an area · F full screen · Esc cancel")
+            : s.Purpose == OverlayPurpose.Text
+            ? T("Drag over the text to copy, or click a window · Esc cancel")
+            : s.Purpose == OverlayPurpose.Scroll
+            ? T("Click the window to scroll, or drag over the part that scrolls · Esc cancel")
             : s.WindowDetection
                 ? T("Click a window or drag an area · F full screen · C copy color · Esc cancel")
                 : T("Drag an area or click for the whole screen · C copy color · Esc cancel"));

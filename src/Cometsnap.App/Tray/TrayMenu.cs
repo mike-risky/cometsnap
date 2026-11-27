@@ -27,6 +27,8 @@ public sealed class TrayMenu
         var captureMenu = new MenuItem { Header = L.T("Capture") };
         captureMenu.Items.Add(Item(L.T("Region / window"), Later(capture.StartRegion), _app.RegionHotkeyText));
         captureMenu.Items.Add(Item(L.T("Fullscreen (monitor under the mouse)"), Later(capture.CaptureFullscreen), _app.Settings.FullscreenHotkey));
+        captureMenu.Items.Add(Item(L.T("Scrolling capture"), Later(_app.Scrolling.Start), _app.Settings.ScrollingHotkey));
+        captureMenu.Items.Add(Item(L.T("Copy text from the screen"), Later(capture.StartTextCapture), _app.Settings.TextHotkey));
         var delayed = new MenuItem { Header = L.T("Delayed"), ToolTip = L.T("Capture after 3, 5 or 10 seconds: time to open a menu or hover something first") };
         foreach (var s in new[] { 3, 5, 10 })
             delayed.Items.Add(Item(L.F("{0} seconds", s), () => capture.StartDelayed(s)));

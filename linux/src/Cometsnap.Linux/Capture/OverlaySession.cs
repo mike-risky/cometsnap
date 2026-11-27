@@ -9,6 +9,10 @@ public enum OverlayPurpose
     Capture,
     /// <summary>Pick the area to record.</summary>
     Record,
+    /// <summary>Pick the text to copy (OCR).</summary>
+    Text,
+    /// <summary>Pick the window to scroll.</summary>
+    Scroll,
 }
 
 /// <summary>

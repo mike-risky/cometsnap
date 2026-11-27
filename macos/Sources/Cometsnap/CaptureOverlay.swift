@@ -21,7 +21,7 @@ struct OverlayResult {
 /// the cursor (click grabs it), drag selects any area with edges snapping to windows, and a
 /// loupe in a corner shows the real pixels and dodges the cursor.
 final class CaptureOverlay {
-    enum Purpose { case screenshot, recording }
+    enum Purpose { case screenshot, recording, text, scrolling }
 
     let purpose: Purpose
     let loupeCorner: LoupeCorner
@@ -309,9 +309,12 @@ final class OverlayView: NSView {
         addSubview(sizeTag)
         addSubview(loupe)
         hint.style = .hint
-        hint.text = overlay.purpose == .recording
-            ? L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
-            : L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")
+        switch overlay.purpose {
+        case .recording: hint.text = L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
+        case .text: hint.text = L.t("Drag over the text to copy, or click a window · Esc cancel")
+        case .scrolling: hint.text = L.t("Click the window to scroll, or drag over the part that scrolls · Esc cancel")
+        case .screenshot: hint.text = L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")
+        }
         addSubview(hint)
         hint.sizeToFitText()
         hint.setFrameOrigin(CGPoint(x: (bounds.width - hint.frame.width) / 2, y: bounds.height - hint.frame.height - 40))

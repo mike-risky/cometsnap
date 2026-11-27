@@ -16,6 +16,8 @@ struct HotkeyDisplay {
     let capture: String
     let video: String
     let gif: String
+    var text = "⌘⇧9"
+    var scrolling = "⌘⇧0"
 }
 
 /// Owns everything: settings, the menu bar item, the flyout, capture, recording and editors.
@@ -28,6 +30,9 @@ final class AppController: NSObject, NSApplicationDelegate {
     private(set) var flyout: FlyoutPanel!
     private(set) var capture: CaptureController!
     private(set) var recorder: Recorder!
+    private(set) var scrolling: ScrollingCapture!
+    private var textWindows: [TextWindow] = []
+    private var reading = false
     private(set) var editCard: EditCard!
     private var editors: [EditorWindow] = []
     private var trimmers: [TrimWindow] = []
@@ -51,6 +56,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         capture = CaptureController(app: self)
         recorder = Recorder(app: self)
+        scrolling = ScrollingCapture(app: self)
         statusItem = StatusItemController(app: self)
         flyout = FlyoutPanel(app: self)
         editCard = makeEditCard()
@@ -98,6 +104,8 @@ final class AppController: NSObject, NSApplicationDelegate {
         let card = EditCard()
         card.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
         card.onOpen = { [weak self] url in self?.openTrimmer(url) }
+        card.onText = { [weak self] image, scale in self?.copyText(image, scale: scale, from: nil) }
+        card.onShowText = { [weak self] text in self?.showText(text) }
         return card
     }
 
@@ -143,6 +151,43 @@ final class AppController: NSObject, NSApplicationDelegate {
         hk.register(.videoShiftF13, action: video)
         hk.register(.gifCmdShift8, action: gif)
         hk.register(.gifCtrlShiftF13, action: gif)
+        hk.register(.textCmdShift9, action: { [weak self] in self?.capture.startTextCapture() })
+        hk.register(.scrollingCmdShift0, action: { [weak self] in self?.scrolling.start() })
+    }
+
+    // MARK: copy text (OCR)
+
+    /// Reads the text in an image with Vision and puts it on the clipboard; the card shows what was found.
+    func copyText(_ image: CGImage, scale: CGFloat, from rect: CGRect?) {
+        guard !reading else { return }
+        reading = true
+        let card = settings.showEditCard ? editCard : nil
+        card?.showReading(image: image, scale: scale)
+        Task { @MainActor in
+            defer { self.reading = false }
+            do {
+                let outcome = try await TextReader.read(image)
+                Log.info("ocr: \(outcome.lines) lines, \(outcome.text.count) characters")
+                if outcome.found { Clipboard.copyText(outcome.text) }
+                if let card { card.showText(outcome.text, lines: outcome.lines) }
+                if outcome.found, let rect, self.settings.cometAnimation {
+                    CometFlight.fly(from: rect, to: self.statusItem.buttonFrame, image: image)
+                }
+            } catch {
+                card?.orderOut(nil)
+                self.report(error)
+            }
+        }
+    }
+
+    func showText(_ text: String) {
+        let w = TextWindow(text: text)
+        textWindows.append(w)
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            DispatchQueue.main.async { self?.textWindows.removeAll { $0 === w } }
+        }
+        NSApp.activate()
+        w.makeKeyAndOrderFront(nil)
     }
 
     // MARK: captures

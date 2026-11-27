@@ -25,6 +25,19 @@ final class CaptureController {
         openOverlay(purpose: .recording, completion)
     }
 
+    /// The overlay, for something else than a screenshot (scrolling capture, copy text).
+    func pickRegion(purpose: CaptureOverlay.Purpose, _ completion: @escaping (OverlayResult?) -> Void) {
+        openOverlay(purpose: purpose, completion)
+    }
+
+    /// Copy text: drag over some text (or click a window) and its text goes on the clipboard.
+    func startTextCapture() {
+        openOverlay(purpose: .text) { [weak self] result in
+            guard let self, let result, let image = result.image else { return }
+            self.app.copyText(image, scale: result.frozen.scale, from: result.rect)
+        }
+    }
+
     func captureFullscreen() {
         guard !isBusy else { return }
         guard ensurePermission() else { return }
@@ -120,6 +133,12 @@ final class CaptureController {
 final class EditCard: NSPanel {
     var onEdit: ((URL?, CGImage, CGFloat) -> Void)?
     var onOpen: ((URL) -> Void)?
+    /// The T button: read the text in the capture.
+    var onText: ((CGImage, CGFloat) -> Void)?
+    /// A click on the card of a text capture: show the text.
+    var onShowText: ((String) -> Void)?
+    private var recognized: String?
+    private let textButton: SpaceButton
 
     private let thumb = NSImageView()
     private let titleLabel = NSTextField(labelWithString: L.t("COPIED!"))
@@ -134,6 +153,7 @@ final class EditCard: NSPanel {
 
     init() {
         editButton = SpaceButton(title: L.t("Edit"), symbol: "pencil", fill: Theme.terracotta, tip: L.t("Open in the editor"))
+        textButton = SpaceButton(title: "", symbol: "text.viewfinder", fill: Theme.surface, tip: L.t("Copy the text in this capture"))
         super.init(contentRect: CGRect(x: 0, y: 0, width: 340, height: 84), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
@@ -175,11 +195,16 @@ final class EditCard: NSPanel {
         detail.lineBreakMode = .byTruncatingMiddle
 
         editButton.onClick = { [weak self] in self?.edit() }
+        textButton.onClick = { [weak self] in
+            guard let self, let image = self.image, !self.fileOnly else { return }
+            self.hideTimer?.invalidate()
+            self.onText?(image, self.scale)
+        }
         let close = SpaceButton(title: "", symbol: "xmark", tip: L.t("Dismiss"))
         close.layer?.borderWidth = 0
         close.onClick = { [weak self] in self?.fadeOut() }
 
-        for v in [thumb, titleLabel, detail, editButton, close] as [NSView] {
+        for v in [thumb, titleLabel, detail, textButton, editButton, close] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
         }
@@ -192,7 +217,12 @@ final class EditCard: NSPanel {
             titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
             detail.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             detail.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
-            detail.trailingAnchor.constraint(lessThanOrEqualTo: editButton.leadingAnchor, constant: -8),
+            detail.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
+            textButton.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
+            textButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            textButton.widthAnchor.constraint(equalToConstant: 34),
+            textButton.heightAnchor.constraint(equalToConstant: 34),
             editButton.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -4),
             editButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             editButton.widthAnchor.constraint(equalToConstant: 74),
@@ -212,6 +242,9 @@ final class EditCard: NSPanel {
         self.scale = scale
         self.url = nil
         fileOnly = false
+        recognized = nil
+        textButton.isHidden = false
+        editButton.isHidden = false
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = copied ? L.t("COPIED!") : L.t("SNAPPED!")
         detail.stringValue = "\(image.width) × \(image.height) · " + L.t("saving…")
@@ -226,6 +259,9 @@ final class EditCard: NSPanel {
         image = thumbnail
         self.url = url
         fileOnly = true
+        recognized = nil
+        textButton.isHidden = true
+        editButton.isHidden = false
         thumb.image = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
         titleLabel.stringValue = url.pathExtension.lowercased() == "gif" ? L.t("GIF SAVED!") : L.t("VIDEO SAVED!")
@@ -236,8 +272,39 @@ final class EditCard: NSPanel {
         present()
     }
 
+    /// The text of a capture is being read.
+    func showReading(image: CGImage, scale: CGFloat) {
+        self.image = image
+        self.scale = scale
+        url = nil
+        fileOnly = false
+        recognized = ""
+        textButton.isHidden = true
+        editButton.isHidden = true
+        thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        titleLabel.stringValue = L.t("READING…")
+        detail.stringValue = L.t("Looking for text")
+        root?.toolTip = nil
+        if !isVisible { present() }
+        hideTimer?.invalidate()
+    }
+
+    /// Shows what text recognition found (already on the clipboard).
+    func showText(_ text: String, lines: Int) {
+        recognized = text
+        textButton.isHidden = true
+        editButton.isHidden = text.isEmpty
+        editButton.update(title: L.t("Show"), symbol: "eye")
+        editButton.toolTip = L.t("See the text and copy just a part")
+        root?.toolTip = text.isEmpty ? nil : L.t("Click to see the text")
+        let firstLine = text.split(separator: "\n").first.map { String($0) } ?? ""
+        titleLabel.stringValue = text.isEmpty ? L.t("NO TEXT FOUND") : L.t("TEXT COPIED!")
+        detail.stringValue = text.isEmpty ? L.t("Try a bigger area") : lines == 1 ? firstLine : L.f("{0} lines · {1}", lines, firstLine)
+        if !isVisible { present() } else { restartTimer() }
+    }
+
     func setSaved(_ url: URL, for image: CGImage) {
-        guard image === self.image, isVisible else { return }
+        guard image === self.image, isVisible, recognized == nil else { return }
         self.url = url
         detail.stringValue = "\(image.width) × \(image.height) · \(url.lastPathComponent)"
     }
@@ -277,12 +344,16 @@ final class EditCard: NSPanel {
     private func edit() {
         hideTimer?.invalidate()
         orderOut(nil)
+        if let recognized {
+            if !recognized.isEmpty { onShowText?(recognized) }
+            return
+        }
         if fileOnly, let url { onOpen?(url); return }
         if let image { onEdit?(url, image, scale) }
     }
 
     private func drag(_ event: NSEvent) {
-        guard let root, image != nil || url != nil else { return }
+        guard let root, image != nil || url != nil, recognized == nil else { return }
         hideTimer?.invalidate()
         let started = DragOut.start(from: root, event: event, url: url, image: fileOnly ? nil : image, preview: thumb.image,
                                     frame: root.convert(thumb.bounds, from: thumb)) { [weak self] op in

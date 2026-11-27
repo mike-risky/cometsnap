@@ -59,6 +59,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let capture = NSMenu()
         capture.addItem(action(L.t("Region / Window") + "\t\(keys.capture)", #selector(region)))
         capture.addItem(action(L.t("Fullscreen"), #selector(fullscreen)))
+        capture.addItem(action(L.t("Scrolling capture") + "\t\(keys.scrolling)", #selector(scrollingCapture)))
+        capture.addItem(action(L.t("Copy text from the screen") + "\t\(keys.text)", #selector(copyText)))
         capture.addItem(.separator())
         for s in [3, 5, 10] {
             let i = action(L.f("Delayed {0} s", s), #selector(delayed(_:)))
@@ -111,6 +113,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
 
     @objc private func region() { app.capture.startRegion() }
     @objc private func fullscreen() { app.capture.captureFullscreen() }
+    @objc private func scrollingCapture() { app.scrolling.start() }
+    @objc private func copyText() { app.capture.startTextCapture() }
     @objc private func delayed(_ sender: NSMenuItem) { app.capture.captureDelayed(sender.tag) }
     @objc private func recordRegion() { app.recorder.toggleRegion(format: .mp4) }
     @objc private func recordScreen() { app.recorder.startFullscreen(format: .mp4) }

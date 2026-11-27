@@ -52,6 +52,7 @@ public sealed class CometApp : Application
     public RecentCaptures Recent { get; private set; } = null!;
     public ThumbnailCache Thumbnails { get; private set; } = null!;
     public RecordingController Recorder { get; private set; } = null!;
+    public ScrollingCapture Scrolling { get; private set; } = null!;
 
     /// <summary>Text of the hotkey that actually works for region capture (shown in menus).</summary>
     public string? RegionHotkeyText { get; private set; }
@@ -79,6 +80,7 @@ public sealed class CometApp : Application
 
         _host = HiddenHost.Create();
         Capture = new CaptureController(this);
+        Scrolling = new ScrollingCapture(this);
         Recent = new RecentCaptures(Math.Clamp(Settings.RecentCount, 6, 200));
         Thumbnails = new ThumbnailCache(Paths.ThumbnailCacheDirectory);
         _ = Task.Run(() => Recent.Load(CapturesFolder));
@@ -116,6 +118,7 @@ public sealed class CometApp : Application
         {
             Shift = () => Recorder.ToggleRegion(RecordingFormat.Mp4),
             CtrlShift = () => Recorder.ToggleRegion(RecordingFormat.Gif),
+            CtrlAlt = Scrolling.Start,
         };
         var printScreenOk = RegisterHotkeys(announce: Settings.ReplaceOfferAnswered);
 
@@ -219,6 +222,8 @@ public sealed class CometApp : Application
         Register(Settings.ActiveWindowHotkey, Capture.CaptureActiveWindow);
         Register(Settings.RecordHotkey, () => Recorder.ToggleRegion(RecordingFormat.Mp4));
         Register(Settings.RecordGifHotkey, () => Recorder.ToggleRegion(RecordingFormat.Gif));
+        Register(Settings.ScrollingHotkey, Scrolling.Start);
+        Register(Settings.TextHotkey, Capture.StartTextCapture);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
         _menu?.Rebuild();
@@ -240,7 +245,8 @@ public sealed class CometApp : Application
             || g.Equals("Ctrl+PrintScreen", StringComparison.OrdinalIgnoreCase)
             || g.Equals("Alt+PrintScreen", StringComparison.OrdinalIgnoreCase)
             || g.Equals("Shift+PrintScreen", StringComparison.OrdinalIgnoreCase)
-            || g.Equals("Ctrl+Shift+PrintScreen", StringComparison.OrdinalIgnoreCase));
+            || g.Equals("Ctrl+Shift+PrintScreen", StringComparison.OrdinalIgnoreCase)
+            || g.Equals("Ctrl+Alt+PrintScreen", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Registers the hotkeys again after a change. With a gesture: returns whether that one works.</summary>
     public bool ReapplyHotkeys(string? gesture = null)
@@ -360,6 +366,65 @@ public sealed class CometApp : Application
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
     }
 
+    // ------------------------------------------------------------------ copy text (OCR)
+
+    private bool _reading;
+
+    /// <summary>
+    /// Reads the text in an image with Windows' own OCR and puts it on the clipboard. The Copied
+    /// card shows what was found; a click on it opens the text to pick just a part.
+    /// </summary>
+    public async Task<OcrOutcome?> CopyTextAsync(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect? from)
+    {
+        if (_reading) return null;
+        _reading = true;
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            if (Settings.ShowEditCard) _card?.ShowReading(image, SystemParameters.WorkArea);
+            var outcome = await OcrService.RecognizeAsync(image);
+            Log.Info($"OCR: {outcome.Lines} lines, {outcome.Text.Length} chars in {sw.ElapsedMilliseconds} ms ({outcome.Language})");
+            if (outcome.EngineMissing)
+            {
+                _card?.Hide();
+                Notify(L.T("Text recognition is not installed"), L.T("Add a language with \"Optical character recognition\" in Windows Settings > Time & language > Language & region, then try again."));
+                return outcome;
+            }
+            if (outcome.Found && !ClipboardService.SetText(outcome.Text))
+                Log.Error("Could not copy the text to the clipboard");
+            if (Settings.ShowEditCard && _card is not null) _card.ShowText(image, outcome.Text, outcome.Lines, SystemParameters.WorkArea);
+            else if (outcome.Found) Notify(L.T("Text copied"), Preview(outcome.Text));
+            else Notify(L.T("No text found"), L.T("Try a bigger area, or zoom in on small text."));
+            if (outcome.Found && from is { } rect) LaunchComet(new Point(rect.CenterX, rect.CenterY));
+            return outcome;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Text recognition failed", ex);
+            _card?.Hide();
+            Notify(L.T("Could not read the text"), ex.Message);
+            return null;
+        }
+        finally
+        {
+            _reading = false;
+        }
+    }
+
+    private static string Preview(string text)
+    {
+        var first = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+        return first.Length > 80 ? first[..80] + "…" : first;
+    }
+
+    /// <summary>Shows the recognized text in a small window, to copy only a part of it.</summary>
+    public void ShowRecognizedText(string text)
+    {
+        var window = new TextResultWindow(text);
+        window.Show();
+        window.Activate();
+    }
+
     // ------------------------------------------------------------------ playful touches
 
     /// <summary>Counts a snap; round numbers and the first snap of a month get a tiny celebration.</summary>
@@ -458,6 +523,8 @@ public sealed class CometApp : Application
             else OpenInEditor(image, new AnnotationDocument());
         };
         card.TrimRequested += OpenTrimmer;
+        card.TextRequested += image => _ = CopyTextAsync(image, null);
+        card.ShowTextRequested += ShowRecognizedText;
         return card;
     }
 
@@ -493,6 +560,9 @@ public sealed class CometApp : Application
 
     public static string Version =>
         typeof(CometApp).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
+    /// <summary>A Windows notification from the tray icon.</summary>
+    public void Notify(string title, string text) => _tray?.ShowBalloon(title, text);
 
     /// <summary>Shows a status in the tray tooltip (null restores the default).</summary>
     public void SetTrayStatus(string? text)

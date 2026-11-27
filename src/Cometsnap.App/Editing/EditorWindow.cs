@@ -182,6 +182,8 @@ public sealed class EditorWindow : Window
         if (_doc.ConnectSteps) EditorUi.SetActive(_constellationButton, true);
         top.Children.Add(_constellationButton);
 
+        var copyText = EditorUi.PillButton(EditorUi.Icon("M3,3.5 H13 M8,3.5 V13.5 M6,13.5 H10", null, 16), L.T("Copy text"), L.T("Copy the text in this image (Ctrl+Shift+C)"), CopyText);
+        DockPanel.SetDock(copyText, Dock.Right);
         var copy = EditorUi.PillButton(EditorUi.Icon("M5.5,5.5 H13.5 V13.5 H5.5 Z M2.5,10.5 V2.5 H10.5", null, 16), L.T("Copy & close"), L.T("Copy to the clipboard, save, and close (Ctrl+C or Ctrl+Enter)"), CopyAndClose, SpaceTheme.TerracottaBrush, bold: true);
         var save = EditorUi.PillButton(EditorUi.Icon("M8,2.5 V10 M4.5,6.5 L8,10 L11.5,6.5 M2.5,13.5 H13.5", null, 16), L.T("Save"), L.T("Save and close (Ctrl+S)"), SaveAndClose, SpaceTheme.NavyBrush);
         var saveAs = EditorUi.PillButton(EditorUi.Icon("M2.5,2.5 H11 L13.5,5 V13.5 H2.5 Z M5,2.5 V6 H10 V2.5 M5,13.5 V9.5 H11 V13.5", null, 16), L.T("Save as…"), L.T("Save a copy somewhere else (Ctrl+Shift+S)"), SaveAsAndClose);
@@ -191,6 +193,7 @@ public sealed class EditorWindow : Window
         top.Children.Add(copy);
         top.Children.Add(save);
         top.Children.Add(saveAs);
+        top.Children.Add(copyText);
 
         // ---- footer
         _status = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -654,6 +657,17 @@ public sealed class EditorWindow : Window
         _textBox = null;
     }
 
+    /// <summary>Reads the text in the image (Windows OCR) and puts it on the clipboard. The editor stays open.</summary>
+    private async void CopyText()
+    {
+        CommitText();
+        Flash(L.T("Reading the text…"));
+        var outcome = await _app.CopyTextAsync(Flattened(), null);
+        if (outcome is null) return;
+        Flash(outcome.EngineMissing ? L.T("Text recognition is not installed")
+            : outcome.Found ? L.T("Text copied") : L.T("No text found"));
+    }
+
     // ------------------------------------------------------------------ keyboard
 
     private void OnKeyDown(object sender, KeyEventArgs e)
@@ -670,6 +684,7 @@ public sealed class EditorWindow : Window
             {
                 case Key.Z: Undo(); return;
                 case Key.Y: CommitText(); Select(null); _doc.Redo(); return;
+                case Key.C when shift: CopyText(); return;
                 case Key.C or Key.Enter: CopyAndClose(); return;
                 case Key.S when shift: SaveAsAndClose(); return;
                 case Key.S: SaveAndClose(); return;

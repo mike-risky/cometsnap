@@ -41,18 +41,22 @@ public sealed class CaptureController
         _overlay = new CaptureOverlay();
         _overlay.Confirmed += (image, rect) =>
         {
+            var pickImage = _pickImage;
+            _pickImage = null;
             if (TakePick() is { } pick) pick(rect);
+            else if (pickImage is not null) pickImage(image, rect);
             else Deliver(image, rect);
         };
-        _overlay.Cancelled += () => _pick = null;
-        _overlay.SaveRequested += image => { _pick = null; SaveAs(image); };
-        _overlay.EditRequested += (image, doc) => { _pick = null; _app.OpenInEditor(image, doc); };
+        _overlay.Cancelled += () => { _pick = null; _pickImage = null; };
+        _overlay.SaveRequested += image => { _pick = null; _pickImage = null; SaveAs(image); };
+        _overlay.EditRequested += (image, doc) => { _pick = null; _pickImage = null; _app.OpenInEditor(image, doc); };
         _overlay.Prewarm();
     }
 
     public bool IsBusy => _overlay.IsCapturing;
 
     private Action<PixelRect>? _pick;
+    private Action<BitmapSource, PixelRect>? _pickImage;
 
     private Action<PixelRect>? TakePick()
     {
@@ -69,9 +73,29 @@ public sealed class CaptureController
     {
         if (_overlay.IsCapturing) return;
         _pick = picked;
+        _pickImage = null;
         StartRegion();
         if (!_overlay.IsCapturing) _pick = null;
     }
+
+    /// <summary>
+    /// Opens the usual overlay and hands the picked pixels to <paramref name="picked"/> instead of
+    /// copying and saving them. Used to read the text in an area.
+    /// </summary>
+    public void PickArea(Action<BitmapSource, PixelRect> picked)
+    {
+        if (_overlay.IsCapturing) return;
+        _pick = null;
+        _pickImage = picked;
+        StartRegion();
+        if (!_overlay.IsCapturing) _pickImage = null;
+    }
+
+    /// <summary>"Copy text": drag over some text (or click a window) and its text goes on the clipboard.</summary>
+    public void StartTextCapture() => PickArea((image, rect) => _ = _app.CopyTextAsync(image, rect));
+
+    /// <summary>Copies, saves and announces an image made elsewhere (a scrolling capture), like a normal capture.</summary>
+    public void DeliverImage(BitmapSource image, PixelRect from) => Deliver(image, from);
 
     /// <summary>Region / window capture with the frozen-screen overlay.</summary>
     public void StartRegion()

@@ -153,6 +153,10 @@ internal static class LinuxStrings
         ["{0} · whole recording"] = "{0} · tout l’enregistrement",
         ["This video can’t be previewed here, but trimming still works."] = "Impossible d’afficher l’aperçu de cette vidéo, mais le découpage fonctionne quand même.",
         ["Trimming needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again."] = "Le découpage a besoin de ffmpeg. Installez-le (par exemple : sudo apt install ffmpeg) puis réessayez.",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "Tracez sur le texte à copier, ou cliquez une fenêtre · Échap annule",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "Cliquez la fenêtre à faire défiler, ou tracez sur la partie qui défile · Échap annule",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "Copier du texte nécessite Tesseract. Installez-le avec : sudo apt install tesseract-ocr (ou le paquet tesseract de votre distribution)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "La capture défilante demande pour l’instant une session X11 : Wayland ne laisse pas les apps faire défiler d’autres fenêtres.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> German = new Dictionary<string, string>
@@ -290,6 +294,10 @@ internal static class LinuxStrings
         ["{0} · whole recording"] = "{0} · ganze Aufnahme",
         ["This video can’t be previewed here, but trimming still works."] = "Von diesem Video lässt sich keine Vorschau zeigen, aber das Kürzen funktioniert trotzdem.",
         ["Trimming needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again."] = "Zum Kürzen braucht es ffmpeg. Installieren Sie es (zum Beispiel: sudo apt install ffmpeg) und versuchen Sie es erneut.",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "Ziehen Sie über den Text zum Kopieren oder klicken Sie ein Fenster an · Esc bricht ab",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "Klicken Sie das Fenster zum Scrollen an oder ziehen Sie über den scrollenden Teil · Esc bricht ab",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "Text kopieren braucht Tesseract. Installieren Sie es mit: sudo apt install tesseract-ocr (oder dem Tesseract-Paket Ihrer Distribution)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "Die Scroll-Aufnahme braucht vorerst eine X11-Sitzung: Wayland lässt Apps keine anderen Fenster scrollen.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Italian = new Dictionary<string, string>
@@ -427,6 +435,10 @@ internal static class LinuxStrings
         ["{0} · whole recording"] = "{0} · registrazione intera",
         ["This video can’t be previewed here, but trimming still works."] = "Impossibile mostrare l’anteprima di questo video, ma il taglio funziona lo stesso.",
         ["Trimming needs ffmpeg. Install it (for example: sudo apt install ffmpeg) and try again."] = "Per tagliare serve ffmpeg. Installalo (per esempio: sudo apt install ffmpeg) e riprova.",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "Trascina sul testo da copiare, o clicca una finestra · Esc annulla",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "Clicca la finestra da scorrere, o trascina sulla parte che scorre · Esc annulla",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "Copia testo richiede Tesseract. Installalo con: sudo apt install tesseract-ocr (o il pacchetto tesseract della tua distribuzione)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "Per ora la cattura a scorrimento richiede una sessione X11: Wayland non permette alle app di scorrere altre finestre.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Spanish = new Dictionary<string, string>
@@ -561,6 +573,10 @@ internal static class LinuxStrings
         ["Your desktop's own screenshot shortcut"] = "El atajo de capturas de tu escritorio",
         ["{0} parts cut out"] = "{0} partes quitadas",
         ["{0} · whole recording"] = "{0} · grabación completa",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "Arrastra sobre el texto que quieres copiar o haz clic en una ventana · Esc cancela",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "Haz clic en la ventana que se desplaza o arrastra sobre la parte que se desplaza · Esc cancela",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "Copiar texto necesita Tesseract. Instálalo con: sudo apt install tesseract-ocr (o el paquete tesseract de tu distribución)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "Por ahora la captura con desplazamiento necesita una sesión X11: Wayland no deja que las apps desplacen otras ventanas.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Portuguese = new Dictionary<string, string>
@@ -695,6 +711,10 @@ internal static class LinuxStrings
         ["Your desktop's own screenshot shortcut"] = "O atalho de captura da sua área de trabalho",
         ["{0} parts cut out"] = "{0} trechos cortados",
         ["{0} · whole recording"] = "{0} · gravação inteira",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "Arraste sobre o texto a copiar ou clique numa janela · Esc cancela",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "Clique na janela para rolar ou arraste sobre a parte que rola · Esc cancela",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "Copiar texto precisa do Tesseract. Instale com: sudo apt install tesseract-ocr (ou o pacote tesseract da sua distribuição)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "Por enquanto a captura com rolagem precisa de uma sessão X11: o Wayland não deixa apps rolarem outras janelas.",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Chinese = new Dictionary<string, string>
@@ -829,6 +849,10 @@ internal static class LinuxStrings
         ["Your desktop's own screenshot shortcut"] = "桌面自带的截图快捷键",
         ["{0} parts cut out"] = "已剪去 {0} 段",
         ["{0} · whole recording"] = "{0} · 整段录制",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "拖选要复制的文字，或点击一个窗口 · Esc 取消",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "点击要滚动的窗口，或拖选可滚动的部分 · Esc 取消",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "复制文字需要 Tesseract。安装命令：sudo apt install tesseract-ocr（或你的发行版中的 tesseract 软件包）",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "滚动截图目前需要 X11 会话：Wayland 不允许应用滚动其他窗口。",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Hindi = new Dictionary<string, string>
@@ -963,5 +987,9 @@ internal static class LinuxStrings
         ["Your desktop's own screenshot shortcut"] = "आपके डेस्कटॉप का अपना स्क्रीनशॉट शॉर्टकट",
         ["{0} parts cut out"] = "{0} हिस्से काटे गए",
         ["{0} · whole recording"] = "{0} · पूरी रिकॉर्डिंग",
+        ["Drag over the text to copy, or click a window · Esc cancel"] = "कॉपी करने वाले टेक्स्ट पर खींचें, या किसी विंडो पर क्लिक करें · Esc रद्द",
+        ["Click the window to scroll, or drag over the part that scrolls · Esc cancel"] = "स्क्रॉल करने वाली विंडो पर क्लिक करें, या स्क्रॉल होने वाले हिस्से पर खींचें · Esc रद्द",
+        ["Copy text needs Tesseract. Install it with: sudo apt install tesseract-ocr (or your distro's tesseract package)"] = "टेक्स्ट कॉपी करने के लिए Tesseract चाहिए। इसे इंस्टॉल करें: sudo apt install tesseract-ocr (या अपने डिस्ट्रो का tesseract पैकेज)",
+        ["Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."] = "स्क्रॉलिंग कैप्चर को अभी X11 सेशन चाहिए: Wayland ऐप्स को दूसरी विंडो स्क्रॉल नहीं करने देता।",
     };
 }
