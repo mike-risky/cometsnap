@@ -45,6 +45,10 @@ public sealed class ScrollStitcher
     private byte[]? _last;
     private ulong[] _lastHashes = Array.Empty<ulong>();
     private bool[] _lastPlain = Array.Empty<bool>();
+    private int[] _lastSig = Array.Empty<int>();
+
+    /// <summary>Columns of each row's coarse signature (average brightness of that many slices).</summary>
+    internal const int Slices = 16;
     private readonly List<byte[]> _strips = new();
 
     public ScrollStitcher(int width, int frameHeight, int? ignoreRight = null)
@@ -58,12 +62,13 @@ public sealed class ScrollStitcher
     public StitchStep Add(byte[] pixels)
     {
         if (pixels.Length < Width * 4 * FrameHeight) throw new ArgumentException("Frame is too small", nameof(pixels));
-        var (hashes, plain) = HashRows(pixels);
+        var (hashes, plain, sig) = HashRows(pixels);
         if (_last is null)
         {
             _first = _last = pixels;
             _lastHashes = hashes;
             _lastPlain = plain;
+            _lastSig = sig;
             return StitchStep.First;
         }
 
@@ -76,6 +81,9 @@ public sealed class ScrollStitcher
         }
 
         var shift = FindShift(_lastHashes, hashes, plain, Header, FrameHeight - Footer, LastShift);
+        // No exact match: smooth scrolling and fractional display scaling redraw text a little
+        // differently at every position, and hover effects change a few rows. Match loosely.
+        if (shift < 0) shift = FindShiftLoose(_lastSig, sig, plain, Header, FrameHeight - Footer, LastShift);
         if (shift <= 0)
         {
             // Only the sticky parts changed (or nothing we can match): not a scroll.
@@ -90,6 +98,7 @@ public sealed class ScrollStitcher
         _last = pixels;
         _lastHashes = hashes;
         _lastPlain = plain;
+        _lastSig = sig;
         LastShift = shift;
         return StitchStep.Appended;
     }
@@ -113,12 +122,14 @@ public sealed class ScrollStitcher
         return result;
     }
 
-    private (ulong[] Hashes, bool[] Plain) HashRows(byte[] pixels)
+    private (ulong[] Hashes, bool[] Plain, int[] Signature) HashRows(byte[] pixels)
     {
         var hashes = new ulong[FrameHeight];
         var plain = new bool[FrameHeight];
+        var sig = new int[FrameHeight * Slices];
         var rowBytes = Width * 4;
-        var used = (Width - IgnoreRight) * 4;
+        var usedPixels = Width - IgnoreRight;
+        var used = usedPixels * 4;
         for (var y = 0; y < FrameHeight; y++)
         {
             var row = pixels.AsSpan(y * rowBytes, used);
@@ -133,8 +144,76 @@ public sealed class ScrollStitcher
             }
             hashes[y] = h;
             plain[y] = same;
+
+            // Average brightness (×4 for precision) of each slice of the row.
+            for (var k = 0; k < Slices; k++)
+            {
+                var from = k * usedPixels / Slices;
+                var to = Math.Max(from + 1, (k + 1) * usedPixels / Slices);
+                var sum = 0;
+                for (var x = from; x < to; x++)
+                {
+                    var i = x * 4;
+                    sum += row[i] + 2 * row[i + 1] + row[i + 2];
+                }
+                sig[y * Slices + k] = sum / (to - from);
+            }
         }
-        return (hashes, plain);
+        return (hashes, plain, sig);
+    }
+
+    /// <summary>
+    /// Like <see cref="FindShift"/>, but rows only have to look alike (same brightness slice by slice,
+    /// give or take a little), not be identical. The shift with the smallest difference wins when it
+    /// is clearly better than not moving at all. 0 when nothing moved, -1 when no shift fits.
+    /// </summary>
+    internal static int FindShiftLoose(int[] previous, int[] current, bool[] currentPlain, int top, int bottom, int expected)
+    {
+        var height = bottom - top;
+        if (height < 16) return -1;
+        var minOverlap = Math.Max(12, height / 6);
+        var step = height > 300 ? 2 : 1;
+        var errors = new double[height - minOverlap];
+        for (var shift = 0; shift < errors.Length; shift++)
+        {
+            long sum = 0;
+            var n = 0;
+            for (var i = 0; i < height - shift; i += step)
+            {
+                var y = top + i;
+                if (currentPlain[y]) continue;
+                var a = y * Slices;
+                var b = (y + shift) * Slices;
+                for (var k = 0; k < Slices; k++) sum += Math.Abs(current[a + k] - previous[b + k]);
+                n++;
+            }
+            errors[shift] = n < 6 ? double.MaxValue : sum / (n * (double)Slices);
+        }
+
+        var min = errors.Min();
+        // Brightness is ×4 (0…1020). Sharp text drawn half a pixel off differs quite a bit, so the
+        // test is mostly relative: the best shift must fit far better than not moving at all.
+        const double cap = 80;
+        if (min > cap) return -1;
+        if (errors[0] <= min * 1.15 + 1) return 0; // staying put fits as well: nothing moved
+        if (errors[0] < min * 4) return -1;        // moved, but not clearly: do not guess
+
+        // Several dips about as good (a repeating list): the one closest to the last shift.
+        // Only true dips count, not the neighbours of the best one.
+        var best = -1;
+        var bestDistance = int.MaxValue;
+        for (var shift = 1; shift < errors.Length; shift++)
+        {
+            if (errors[shift] > min * 1.1 + 0.5) continue;
+            if (errors[shift] > errors[shift - 1] || (shift + 1 < errors.Length && errors[shift] > errors[shift + 1])) continue;
+            var distance = expected > 0 ? Math.Abs(shift - expected) : shift;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = shift;
+            }
+        }
+        return best;
     }
 
     /// <summary>
