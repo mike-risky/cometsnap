@@ -75,6 +75,7 @@ public sealed class CometApp : Application
 
         Settings = AppSettings.Load(Paths.SettingsFile);
         L.Use(Settings.Language);
+        Theme.CaptureLook.Use(Settings.CaptureTheme);
         Log.Info($"Language: {L.Language}");
         TrySaveSettings(); // writes defaults on first run and keeps upgrades of older files
 
@@ -224,6 +225,7 @@ public sealed class CometApp : Application
         Register(Settings.RecordGifHotkey, () => Recorder.ToggleRegion(RecordingFormat.Gif));
         Register(Settings.ScrollingHotkey, Scrolling.Start);
         Register(Settings.TextHotkey, Capture.StartTextCapture);
+        Register(Settings.ColorHotkey, Capture.StartColorPicker);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
         _menu?.Rebuild();

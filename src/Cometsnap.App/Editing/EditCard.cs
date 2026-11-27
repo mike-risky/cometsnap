@@ -109,7 +109,7 @@ public sealed class EditCard : Window
                 StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, Width = 16, Height = 16,
             },
         };
-        _textButton.MouseEnter += (_, _) => _textButton.Background = SpaceTheme.CometBlueBrush;
+        _textButton.MouseEnter += (_, _) => _textButton.Background = CaptureLook.AccentBrush;
         _textButton.MouseLeave += (_, _) => _textButton.Background = SpaceTheme.NavyBrush;
         _textButton.MouseLeftButtonUp += (_, e) =>
         {
@@ -145,7 +145,7 @@ public sealed class EditCard : Window
         _cardBorder = card;
         card.MouseEnter += (_, _) =>
         {
-            card.BorderBrush = SpaceTheme.CometBlueBrush;
+            card.BorderBrush = CaptureLook.AccentBrush;
             card.Background = SpaceTheme.WithAlpha(SpaceTheme.Navy, 0xF6);
         };
         card.MouseLeave += (_, _) =>
@@ -234,6 +234,7 @@ public sealed class EditCard : Window
 
     private void SetMode(string? recording, string? text)
     {
+        _title.Foreground = CaptureLook.TagBrush;
         _recording = recording;
         _text = text;
         var video = recording is not null;

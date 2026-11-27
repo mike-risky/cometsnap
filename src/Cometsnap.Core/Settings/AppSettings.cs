@@ -33,6 +33,9 @@ public sealed class AppSettings
     /// <summary>Scrolling capture: pick a window, Cometsnap scrolls it and glues one tall image.</summary>
     public string ScrollingHotkey { get; set; } = "Ctrl+Alt+PrintScreen";
 
+    /// <summary>Color picker: the loupe opens, a click copies the color under the cursor as #RRGGBB.</summary>
+    public string ColorHotkey { get; set; } = "Win+Shift+C";
+
     /// <summary>Copy text (OCR): drag over text on the screen and the text goes on the clipboard.</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
 
@@ -47,6 +50,9 @@ public sealed class AppSettings
 
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
+
+    /// <summary>Look of the capture screen: a <see cref="CaptureThemes"/> id ("blue" is the classic look).</summary>
+    public string CaptureTheme { get; set; } = CaptureThemes.DefaultId;
 
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;

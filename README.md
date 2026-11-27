@@ -116,6 +116,10 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 - **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
   button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
   Click the card to see the text and copy just a part
+- **Color picker** (Win+Shift+C, or the tray menu): the loupe opens, click any pixel and its color lands on the
+  clipboard as `#RRGGBB` (Shift+click for `rgb(...)`). In any capture, **C** copies the color under the cursor too
+- **Capture colors**: pick the look of the capture screen in Settings (Comet blue, Sun yellow, Terracotta, Flame
+  orange or Stardust). Crosshair, frames, loupe, size tag, scrolling frame and Copied card follow, with a live preview
 
 ## Keys
 
@@ -128,6 +132,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
 | Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (hold the button and scroll, let go to finish) |
 | Anywhere | **Ctrl+Alt+T** | Copy the text in an area (OCR) |
+| Anywhere | **Win+Shift+C** | Color picker: click a pixel to copy its `#RRGGBB` |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |
 | Overlay | arrows / **Shift**+arrows | Move the cursor 1 px / 10 px |
@@ -135,7 +140,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Overlay | **Esc** / right click | Close |
 | Overlay | **F** | Capture the whole monitor |
 | Overlay | **W** | Toggle window detection |
-| Overlay | **C** | Copy the hex color under the cursor |
+| Overlay | **C** / **Shift+C** | Copy the color under the cursor as `#RRGGBB` / `rgb(...)` |
 | Editor | **V** | Select: drag to move, arrows to nudge, **Del** to delete, pick a color or size to change it |
 | Editor | **A** / **L** / **R** / **E** | Arrow / line / box / circle (Shift = 45°, square, perfect circle) |
 | Editor | **T** / **K** | Text / speech bubble (drag from the target to where the bubble goes) |

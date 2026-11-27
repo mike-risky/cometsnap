@@ -38,6 +38,7 @@ public sealed class ScrollingCapture
     private readonly CometApp _app;
     private ScrollingPill? _pill;
     private RecordingFrame? _frame;
+    private int _frameLook = -1;
     private volatile bool _running;
 
     public ScrollingCapture(CometApp app) => _app = app;
@@ -70,7 +71,9 @@ public sealed class ScrollingCapture
         using var wheel = new WheelTap();
         try
         {
-            _frame ??= new RecordingFrame(SpaceTheme.CometBlue);
+            CaptureLook.Use(_app.Settings.CaptureTheme);
+            if (_frameLook != CaptureLook.Version) { _frame?.Close(); _frame = null; _frameLook = CaptureLook.Version; }
+            _frame ??= new RecordingFrame(CaptureLook.Accent);
             _frame.ShowAround(rect);
             _pill ??= new ScrollingPill();
             _pill.ShowFor(rect);
@@ -448,7 +451,7 @@ internal sealed class ScrollingPill : Window
         Width = PillWidth;
         Height = PillHeight;
 
-        _dot = new Ellipse { Width = 10, Height = 10, Fill = SpaceTheme.CometBlueBrush, Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        _dot = new Ellipse { Width = 10, Height = 10, Fill = CaptureLook.AccentBrush, Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         var title = _title = new TextBlock
         {
             Text = L.T("Scroll, then let go"), Foreground = SpaceTheme.StarWhiteBrush, FontFamily = SpaceTheme.UiFont,
@@ -486,7 +489,7 @@ internal sealed class ScrollingPill : Window
     {
         _height.Text = "";
         _title.Text = L.T("Scroll, then let go");
-        _dot.Fill = SpaceTheme.CometBlueBrush;
+        _dot.Fill = CaptureLook.AccentBrush;
         if (_hwnd == IntPtr.Zero)
         {
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
@@ -517,7 +520,7 @@ internal sealed class ScrollingPill : Window
     {
         _height.Text = lost ? "" : L.F("{0:N0} px", pixels);
         _title.Text = lost ? L.T("Too fast: scroll back a little") : L.T("Scroll, then let go");
-        _dot.Fill = lost ? SpaceTheme.SunBrush : SpaceTheme.CometBlueBrush;
+        _dot.Fill = lost ? (CaptureLook.Theme.Id == "yellow" ? SpaceTheme.TerracottaBrush : SpaceTheme.SunBrush) : CaptureLook.AccentBrush;
     }
 
     public void HideNow()

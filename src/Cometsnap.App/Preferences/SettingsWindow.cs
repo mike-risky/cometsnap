@@ -92,6 +92,13 @@ public sealed class SettingsWindow : Window
 
         // ---- capturing
         Section(stack, L.T("Capturing"));
+        stack.Children.Add(Label(L.T("Capture colors")));
+        stack.Children.Add(new TextBlock
+        {
+            Text = L.T("The crosshair, frames, loupe and size tag, in the comet's colors."),
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -4, 0, 10),
+        });
+        stack.Children.Add(ThemePicker());
         stack.Children.Add(Switch(L.T("Instant capture (no toolbar)"), L.T("The capture is taken the moment you release the mouse."), S.InstantCapture, v => S.InstantCapture = v));
         stack.Children.Add(Switch(L.T("Copy to the clipboard"), L.T("Ready to paste anywhere right after the capture."), S.CopyToClipboardOnCapture, v => S.CopyToClipboardOnCapture = v));
         stack.Children.Add(Switch(L.T("Save every capture"), L.T("Each capture is also saved as a PNG in your captures folder."), S.AutoSave, v => S.AutoSave = v));
@@ -121,6 +128,7 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(HotkeyRow(L.T("Active window"), () => S.ActiveWindowHotkey, v => S.ActiveWindowHotkey = v, new AppSettings().ActiveWindowHotkey));
         stack.Children.Add(HotkeyRow(L.T("Scrolling capture"), () => S.ScrollingHotkey, v => S.ScrollingHotkey = v, new AppSettings().ScrollingHotkey));
         stack.Children.Add(HotkeyRow(L.T("Copy text from the screen"), () => S.TextHotkey, v => S.TextHotkey = v, new AppSettings().TextHotkey));
+        stack.Children.Add(HotkeyRow(L.T("Pick a color (copies #RRGGBB)"), () => S.ColorHotkey, v => S.ColorHotkey = v, new AppSettings().ColorHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a video (MP4)"), () => S.RecordHotkey, v => S.RecordHotkey = v, new AppSettings().RecordHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a GIF"), () => S.RecordGifHotkey, v => S.RecordGifHotkey = v, new AppSettings().RecordGifHotkey));
 
@@ -168,6 +176,162 @@ public sealed class SettingsWindow : Window
             }));
         }
         return wrap;
+    }
+
+    // ------------------------------------------------------------------ capture colors
+
+    /// <summary>English names of the themes, here so the translation check sees them.</summary>
+    private static string ThemeName(CaptureTheme t) => t.Id switch
+    {
+        "blue" => L.T("Comet blue"),
+        "yellow" => L.T("Sun yellow"),
+        "terracotta" => L.T("Terracotta"),
+        "orange" => L.T("Flame orange"),
+        "stardust" => L.T("Stardust"),
+        _ => t.Name,
+    };
+
+    /// <summary>Color chips plus a live preview of the capture screen in the chosen colors.</summary>
+    private UIElement ThemePicker()
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
+        var current = CaptureThemes.Get(S.CaptureTheme);
+        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        foreach (var theme in CaptureThemes.All)
+        {
+            var t = theme;
+            var selected = t.Id == current.Id;
+            var dot = new Border
+            {
+                Width = 14, Height = 14, CornerRadius = new CornerRadius(7), Margin = new Thickness(0, 0, 8, 0),
+                Background = new SolidColorBrush(CaptureLook.ToColor(t.Accent)), VerticalAlignment = VerticalAlignment.Center,
+                BorderBrush = SpaceTheme.StarWhiteBrush, BorderThickness = new Thickness(selected ? 2 : 0),
+            };
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            row.Children.Add(dot);
+            row.Children.Add(new TextBlock { Text = ThemeName(t), FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+            var accent = new SolidColorBrush(CaptureLook.ToColor(t.Accent));
+            var chip = new Border
+            {
+                Background = selected ? SpaceTheme.NavyLightBrush : SpaceTheme.NavyBrush,
+                BorderBrush = selected ? accent : SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(selected ? 2 : 1),
+                CornerRadius = new CornerRadius(16), Padding = new Thickness(10, 5, 14, 5), Margin = new Thickness(0, 0, 8, 8),
+                Cursor = Cursors.Hand, Child = row,
+            };
+            if (!selected)
+            {
+                chip.MouseEnter += (_, _) => chip.BorderBrush = accent;
+                chip.MouseLeave += (_, _) => chip.BorderBrush = SpaceTheme.NavyLightBrush;
+            }
+            chip.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                if (S.CaptureTheme == t.Id) return;
+                S.CaptureTheme = t.Id;
+                CaptureLook.Use(t.Id);
+                _app.TrySaveSettings();
+                Build();
+            };
+            wrap.Children.Add(chip);
+        }
+        panel.Children.Add(wrap);
+        panel.Children.Add(ThemePreview(current));
+        return panel;
+    }
+
+    /// <summary>A small fake capture screen: dimmed desktop, crosshair, selection with glow, size tag and loupe.</summary>
+    private static UIElement ThemePreview(CaptureTheme theme)
+    {
+        var accent = CaptureLook.ToColor(theme.Accent);
+        var accentBrush = new SolidColorBrush(accent);
+        const double w = 520, h = 150;
+        var canvas = new Canvas { Width = w, Height = h, ClipToBounds = true, Background = SpaceTheme.NebulaBrush };
+
+        // a pretend desktop: two windows
+        void Win(double x, double y, double ww, double wh, Color bar)
+        {
+            var r = new Border
+            {
+                Width = ww, Height = wh, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x3C, 0x8F)),
+                BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+                Child = new Border { Height = 12, VerticalAlignment = VerticalAlignment.Top, Background = new SolidColorBrush(bar), CornerRadius = new CornerRadius(4, 4, 0, 0) },
+            };
+            Canvas.SetLeft(r, x);
+            Canvas.SetTop(r, y);
+            canvas.Children.Add(r);
+        }
+        Win(24, 18, 190, 110, Color.FromRgb(0x5E, 0x4C, 0x4A));
+        Win(150, 46, 230, 92, Color.FromRgb(0x1F, 0x25, 0x59));
+        canvas.Children.Add(new Border { Width = w, Height = h, Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0x8C) });
+
+        // selection: the second window, undimmed, with glow and frame
+        var sel = new Rect(150, 46, 230, 92);
+        var hole = new Border
+        {
+            Width = sel.Width, Height = sel.Height, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x3C, 0x8F)),
+            Child = new Border { Height = 12, VerticalAlignment = VerticalAlignment.Top, Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x25, 0x59)), CornerRadius = new CornerRadius(4, 4, 0, 0) },
+        };
+        Canvas.SetLeft(hole, sel.X);
+        Canvas.SetTop(hole, sel.Y);
+        canvas.Children.Add(hole);
+        var glow = new System.Windows.Shapes.Rectangle { Width = sel.Width + 10, Height = sel.Height + 10, Stroke = SpaceTheme.WithAlpha(accent, 0x55), StrokeThickness = 4 };
+        Canvas.SetLeft(glow, sel.X - 5);
+        Canvas.SetTop(glow, sel.Y - 5);
+        canvas.Children.Add(glow);
+        var frame = new System.Windows.Shapes.Rectangle { Width = sel.Width + 2, Height = sel.Height + 2, Stroke = accentBrush, StrokeThickness = 1.5 };
+        Canvas.SetLeft(frame, sel.X - 1);
+        Canvas.SetTop(frame, sel.Y - 1);
+        canvas.Children.Add(frame);
+
+        // size tag
+        var tag = new Border
+        {
+            Background = new SolidColorBrush(CaptureLook.ToColor(theme.Tag)), CornerRadius = new CornerRadius(3), Padding = new Thickness(5, 1, 5, 1),
+            Child = new TextBlock { Text = "1280 × 720", FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(CaptureLook.ToColor(theme.TagText)) },
+        };
+        Canvas.SetLeft(tag, sel.X);
+        Canvas.SetTop(tag, sel.Y - 20);
+        canvas.Children.Add(tag);
+
+        // crosshair
+        var guide = SpaceTheme.WithAlpha(accent, 0x70);
+        canvas.Children.Add(new System.Windows.Shapes.Line { X1 = 0, X2 = w, Y1 = 112.5, Y2 = 112.5, Stroke = guide, StrokeThickness = 1 });
+        canvas.Children.Add(new System.Windows.Shapes.Line { X1 = 300.5, X2 = 300.5, Y1 = 0, Y2 = h, Stroke = guide, StrokeThickness = 1 });
+
+        // loupe
+        var loupe = new Border
+        {
+            Width = 92, Height = 112, CornerRadius = new CornerRadius(8), Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xF0),
+            BorderBrush = accentBrush, BorderThickness = new Thickness(1.5), Padding = new Thickness(5),
+        };
+        var lstack = new StackPanel();
+        var pixels = new System.Windows.Controls.Primitives.UniformGrid { Rows = 5, Columns = 5, Width = 80, Height = 70 };
+        var rng = new Random(7);
+        for (var i = 0; i < 25; i++)
+        {
+            var v = (byte)(0x22 + rng.Next(0x30));
+            pixels.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(i == 12 ? accent : Color.FromRgb(v, (byte)(v + 0x10), (byte)(0x60 + rng.Next(0x40)))),
+                BorderBrush = i == 12 ? Brushes.White : SpaceTheme.WithAlpha(Colors.Black, 0x30), BorderThickness = new Thickness(i == 12 ? 1.5 : 0.5),
+            });
+        }
+        lstack.Children.Add(pixels);
+        lstack.Children.Add(new TextBlock
+        {
+            Text = CaptureThemes.Hex(theme.Accent), FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 11,
+            Foreground = SpaceTheme.StarWhiteBrush, Margin = new Thickness(0, 6, 0, 0), HorizontalAlignment = HorizontalAlignment.Center,
+        });
+        loupe.Child = lstack;
+        Canvas.SetLeft(loupe, w - 92 - 12);
+        Canvas.SetTop(loupe, h - 112 - 12);
+        canvas.Children.Add(loupe);
+
+        return new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Left, Child = new Viewbox { Child = canvas, Stretch = Stretch.Uniform, MaxWidth = w },
+        };
     }
 
     // ------------------------------------------------------------------ folder
