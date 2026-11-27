@@ -58,6 +58,32 @@ public static class DragOut
         }
     }
 
+    /// <summary>Drags several captures at once, as files (file managers, chat and mail apps take a group).</summary>
+    public static async Task<bool> StartFilesAsync(IReadOnlyList<string> paths, Bitmap? preview)
+    {
+        var files = paths.Where(File.Exists).ToList();
+        if (files.Count <= 1) return files.Count == 1 && await StartAsync(files[0], null, preview);
+        if (Active || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY"))) return false;
+        Active = true;
+        DragGhost? ghost = null;
+        try
+        {
+            if (preview is not null) ghost = new DragGhost(preview, files.Count);
+            return await XdndSource.RunAsync(new XdndSource.Payload(files, null),
+                (x, y) => Dispatcher.UIThread.Post(() => ghost?.Follow(x, y)));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Drag out of several files failed", ex);
+            return false;
+        }
+        finally
+        {
+            ghost?.Close();
+            DispatcherTimer.RunOnce(() => Active = false, TimeSpan.FromMilliseconds(120));
+        }
+    }
+
     private static byte[]? TryRead(string path)
     {
         try { return File.ReadAllBytes(path); }
@@ -69,7 +95,7 @@ public static class DragOut
     {
         private const double MaxSide = 132;
 
-        public DragGhost(Bitmap picture)
+        public DragGhost(Bitmap picture, int count = 1)
         {
             Title = "Cometsnap";
             SystemDecorations = SystemDecorations.None;
@@ -93,7 +119,37 @@ public static class DragOut
                 Child = img, CornerRadius = new CornerRadius(6), BorderBrush = SpaceTheme.CometBlueBrush, BorderThickness = new Thickness(2),
                 Background = SpaceTheme.VoidBrush, ClipToBounds = true,
             };
-            Content = frame;
+            if (count <= 1) Content = frame;
+            else
+            {
+                // A small stack of cards behind the picture, and how many files are coming along.
+                var stack = new Grid();
+                for (var i = Math.Min(count, 3) - 1; i >= 1; i--)
+                    stack.Children.Add(new Border
+                    {
+                        Width = img.Width + 4, Height = img.Height + 4, CornerRadius = new CornerRadius(6),
+                        Background = SpaceTheme.NavyBrush, BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1.5),
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                        Margin = new Thickness(i * 6, 12 - i * 6, 0, 0),
+                    });
+                frame.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left;
+                frame.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
+                frame.Margin = new Thickness(0, 12, 12, 0);
+                stack.Children.Add(frame);
+                stack.Children.Add(new Border
+                {
+                    MinWidth = 26, Height = 26, CornerRadius = new CornerRadius(13), Padding = new Thickness(7, 0),
+                    Background = SpaceTheme.TerracottaBrush, BorderBrush = SpaceTheme.StarWhiteBrush, BorderThickness = new Thickness(1.5),
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
+                    Child = new TextBlock
+                    {
+                        Text = count.ToString(System.Globalization.CultureInfo.CurrentCulture), Foreground = SpaceTheme.StarWhiteBrush,
+                        FontWeight = FontWeight.Bold, FontSize = 13,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    },
+                });
+                Content = stack;
+            }
             Position = X11.PointerPosition() is { } p ? new PixelPoint(p.X + 14, p.Y + 18) : new PixelPoint(-32000, -32000);
             Opened += (_, _) => X11.MakeClickThrough(this);
             Show();

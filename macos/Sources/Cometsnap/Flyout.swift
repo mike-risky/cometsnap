@@ -5,6 +5,8 @@ import ImageIO
 
 /// The menu bar flyout: a starry header, big capture buttons, search and the latest captures,
 /// 3 per row. Click a thumbnail to copy it, double-click to edit it, drag it into any app.
+/// ⌘-click, Shift-click, a box drawn on empty space or ⌘A pick several: dragging any of them
+/// drags them all, and Copy / Move to Trash work on all of them.
 /// Created once and kept hidden, so it pops instantly.
 final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
     static let width: CGFloat = 486
@@ -12,11 +14,19 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
     private unowned let app: AppController
     private let header: StarHeaderView
     private let search = NSSearchField()
-    private let grid = FlippedView()
+    private let grid = BandGridView()
     private let scroll = NSScrollView()
     private let empty = NSTextField(labelWithString: "")
     private let status = NSTextField(labelWithString: "")
-    private var tiles: [TileView] = []
+    fileprivate var tiles: [TileView] = []
+    let selection = TraySelection()
+    private let selectionBar = NSView()
+    private let selectionText = NSTextField(labelWithString: "")
+    private var folderLink: NSView?
+    private let band = NSView()
+    private var bandStart: CGPoint?
+    private var bandMoved = false
+    private var bandAdd = false
     private var clickMonitor: Any?
     private var keyMonitor: Any?
     private var konami = KonamiCode()
@@ -119,6 +129,7 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         root.addSubview(line)
 
         let folder = LinkLabel(L.t("Open folder")) { [weak self] in self?.hide(); self?.app.openCapturesFolder() }
+        folderLink = folder
         let settings = LinkLabel(L.t("Settings")) { [weak self] in self?.hide(); self?.app.showSettings() }
         let quit = LinkLabel(L.t("Quit")) { NSApp.terminate(nil) }
         folder.sizeToFit(); settings.sizeToFit(); quit.sizeToFit()
@@ -130,6 +141,132 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         quit.setFrameOrigin(CGPoint(x: W - pad - quit.frame.width, y: fy))
         settings.setFrameOrigin(CGPoint(x: quit.frame.minX - 16 - settings.frame.width, y: fy))
         for v in [folder, status, settings, quit] as [NSView] { root.addSubview(v) }
+
+        // Shown instead of "Open folder" and the count while several captures are picked.
+        selectionText.font = Theme.ui(11, .semibold)
+        selectionText.textColor = Theme.yellow
+        selectionText.frame = CGRect(x: 0, y: 0, width: 90, height: 16)
+        selectionBar.addSubview(selectionText)
+        var x: CGFloat = 96
+        let picks: [(String, () -> Void)] = [
+            (L.t("Copy"), { [weak self] in self?.copySelection() }),
+            (L.t("Move to Trash"), { [weak self] in self?.trashSelection() }),
+            (L.t("Clear selection"), { [weak self] in self?.selection.clear() }),
+        ]
+        for (title, act) in picks {
+            let l = LinkLabel(title, action: act)
+            l.sizeToFit()
+            l.setFrameOrigin(CGPoint(x: x, y: 0))
+            selectionBar.addSubview(l)
+            x += l.frame.width + 12
+        }
+        selectionBar.frame = CGRect(x: pad, y: fy, width: min(x, settings.frame.minX - pad - 8), height: 16)
+        selectionBar.isHidden = true
+        root.addSubview(selectionBar)
+        selection.onChange = { [weak self] in self?.selectionChanged() }
+
+        // The box (rubber band) drawn on empty space to pick several captures.
+        band.wantsLayer = true
+        band.layer?.backgroundColor = Theme.blue.withAlphaComponent(0.18).cgColor
+        band.layer?.borderColor = Theme.blue.cgColor
+        band.layer?.borderWidth = 1
+        band.layer?.cornerRadius = 3
+        band.isHidden = true
+        grid.addSubview(band)
+        grid.onDown = { [weak self] e in self?.bandDown(e) }
+        grid.onDragged = { [weak self] e in self?.bandDragged(e) }
+        grid.onUp = { [weak self] _ in self?.bandUp() }
+    }
+
+    // MARK: picking several
+
+    private func selectionChanged() {
+        tiles.forEach { $0.paintSelection() }
+        let several = selection.count > 1
+        selectionText.stringValue = L.f("{0} selected", selection.count)
+        selectionBar.isHidden = !several
+        status.isHidden = several
+        folderLink?.isHidden = several
+    }
+
+    private func copySelection() {
+        let picked = selection.picked
+        if picked.count == 1, let t = tiles.first(where: { $0.item.url.path == picked[0] }) { t.copyItem(); return }
+        guard picked.count > 1 else { return }
+        Clipboard.copyFiles(picked.map { URL(fileURLWithPath: $0) })
+        flashStatus(L.f("Copied {0} files ✓", picked.count))
+    }
+
+    fileprivate func trash(_ paths: [String]) {
+        let urls = paths.map { URL(fileURLWithPath: $0) }
+        NSWorkspace.shared.recycle(urls) { [weak self] done, _ in
+            DispatchQueue.main.async {
+                for u in done.keys { EditSidecar.delete(for: u) }
+                if done.count > 1 { self?.flashStatus(L.f("Moved {0} files to the trash", done.count)) }
+                self?.selection.clear()
+                self?.app.capturesChanged()
+            }
+        }
+    }
+
+    private func trashSelection() { trash(selection.picked) }
+
+    fileprivate func flashStatus(_ text: String) {
+        selectionBar.isHidden = true
+        folderLink?.isHidden = false
+        status.isHidden = false
+        status.stringValue = text
+        status.textColor = Theme.yellow
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self else { return }
+            self.status.textColor = Theme.muted
+            self.populateStatus()
+            self.selectionChanged()
+        }
+    }
+
+    private func bandDown(_ e: NSEvent) {
+        makeFirstResponder(grid)
+        bandStart = grid.convert(e.locationInWindow, from: nil)
+        bandMoved = false
+        bandAdd = e.modifierFlags.contains(.command)
+        selection.beginBox(add: bandAdd)
+    }
+
+    private func bandDragged(_ e: NSEvent) {
+        guard let start = bandStart else { return }
+        grid.autoscroll(with: e) // near the edge, scroll so the box can reach captures further down
+        let now = grid.convert(e.locationInWindow, from: nil)
+        if !bandMoved && abs(now.x - start.x) < 4 && abs(now.y - start.y) < 4 { return }
+        bandMoved = true
+        let box = CGRect(x: min(start.x, now.x), y: min(start.y, now.y), width: abs(now.x - start.x), height: abs(now.y - start.y))
+        selection.updateBox(tiles.filter { $0.frame.intersects(box) }.map { $0.item.url.path })
+        band.frame = box
+        band.isHidden = false
+    }
+
+    private func bandUp() {
+        guard bandStart != nil else { return }
+        // A plain click on empty space lets go of the selection.
+        if !bandMoved && !bandAdd { selection.clear() }
+        bandStart = nil
+        band.isHidden = true
+        selection.endBox()
+    }
+
+    /// ⌘A, ⌘C and ⌘⌫ on the thumbnails. In the search field they keep editing the text.
+    private func selectionKey(_ e: NSEvent) -> Bool {
+        let cmd = e.modifierFlags.contains(.command)
+        let inSearch = search.currentEditor() != nil && firstResponder === search.currentEditor()
+        let key = e.charactersIgnoringModifiers?.lowercased()
+        if cmd && key == "a" && !(inSearch && !search.stringValue.isEmpty) && !tiles.isEmpty {
+            selection.selectAll()
+            makeFirstResponder(grid)
+            return true
+        }
+        if cmd && key == "c" && !inSearch && selection.count > 0 { copySelection(); return true }
+        if cmd && e.keyCode == 51 && !inSearch && selection.count > 0 { trashSelection(); return true }
+        return false
     }
 
     private func delayMenu() -> NSMenu {
@@ -190,6 +327,7 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         konami.reset()
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.window === self else { return event }
+            if self.selectionKey(event) { return nil }
             if self.konami.feed(FlyoutPanel.konamiKey(event)) {
                 self.hide()
                 self.app.meteorShowerEasterEgg()
@@ -218,6 +356,7 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         if let m = clickMonitor { NSEvent.removeMonitor(m); clickMonitor = nil }
         if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
         header.stop()
+        selection.clear() // the next open starts fresh
         orderOut(nil)
     }
 
@@ -229,7 +368,10 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         }
     }
 
-    override func cancelOperation(_ sender: Any?) { hide() }
+    override func cancelOperation(_ sender: Any?) {
+        // Esc first lets go of a selection of several, then closes.
+        if selection.count > 1 { selection.clear() } else { hide() }
+    }
 
     func controlTextDidChange(_ obj: Notification) { populate() }
 
@@ -246,12 +388,13 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         let items = all.filter { $0.matches(search.stringValue) }.prefix(30)
         tiles.forEach { $0.removeFromSuperview() }
         tiles.removeAll()
+        selection.setItems(items.map { $0.url.path })
         let pad: CGFloat = 14, gap: CGFloat = 9
         let tw = (FlyoutPanel.width - pad * 2 - gap * 2) / 3
         let th = tw * 0.66
         for (i, item) in items.enumerated() {
             let row = i / 3, col = i % 3
-            let t = TileView(item: item, app: app)
+            let t = TileView(item: item, app: app, panel: self)
             t.frame = CGRect(x: pad + CGFloat(col) * (tw + gap), y: 4 + CGFloat(row) * (th + gap), width: tw, height: th)
             grid.addSubview(t)
             tiles.append(t)
@@ -259,13 +402,31 @@ final class FlyoutPanel: NSPanel, NSSearchFieldDelegate {
         let rows = (items.count + 2) / 3
         grid.frame = CGRect(x: 0, y: 0, width: FlyoutPanel.width, height: max(scroll.contentSize.height, 8 + CGFloat(rows) * (th + gap)))
         empty.isHidden = !all.isEmpty
-        let count = all.count
+        populateStatus()
+        selectionChanged()
+    }
+
+    private func populateStatus() {
+        let count = app.recentItems.count
         status.stringValue = count == 0 ? "" : (count >= 60 ? L.t("60+ captures") : count == 1 ? L.t("1 capture") : L.f("{0} captures", count))
     }
 }
 
 final class FlippedView: NSView {
     override var isFlipped: Bool { true }
+}
+
+/// The thumbnails' grid. A press on empty space (tiles take their own) starts a box selection.
+final class BandGridView: NSView {
+    var onDown: ((NSEvent) -> Void)?
+    var onDragged: ((NSEvent) -> Void)?
+    var onUp: ((NSEvent) -> Void)?
+    override var isFlipped: Bool { true }
+    override var acceptsFirstResponder: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) { onDown?(event) }
+    override func mouseDragged(with event: NSEvent) { onDragged?(event) }
+    override func mouseUp(with event: NSEvent) { onUp?(event) }
 }
 
 final class ClosureMenuItem: NSMenuItem {
@@ -289,6 +450,10 @@ final class ClosureMenuItem: NSMenuItem {
 final class TileView: NSView, NSDraggingSource {
     let item: RecentItem
     private unowned let app: AppController
+    private unowned let panel: FlyoutPanel
+    private var picking = false
+    private let wash = CALayer()
+    private let check = NSTextField(labelWithString: "✓")
     private let imageLayer = CALayer()
     private var hovering = false { didSet { updateHover() } }
     private var downPoint: CGPoint?
@@ -296,9 +461,10 @@ final class TileView: NSView, NSDraggingSource {
     private let badge = NSTextField(labelWithString: "")
     private let flash = NSTextField(labelWithString: L.t("COPIED!"))
 
-    init(item: RecentItem, app: AppController) {
+    init(item: RecentItem, app: AppController, panel: FlyoutPanel) {
         self.item = item
         self.app = app
+        self.panel = panel
         super.init(frame: .zero)
         wantsLayer = true
         layer?.cornerRadius = 8
@@ -310,6 +476,22 @@ final class TileView: NSView, NSDraggingSource {
         imageLayer.masksToBounds = true
         layer?.addSublayer(imageLayer)
         toolTip = item.name + "\n" + (item.kind == .image ? L.t("Click: copy · Double-click: edit · Drag: drop into any app") : L.t("Click: copy · Double-click: trim · Drag: drop into any app"))
+            + "\n" + L.f("{0}+click or drag a box to pick several", "⌘")
+        // Picked tiles get a blue wash and a check mark in the corner.
+        wash.backgroundColor = Theme.blue.withAlphaComponent(0.22).cgColor
+        wash.isHidden = true
+        layer?.addSublayer(wash)
+        check.font = Theme.ui(12, .bold)
+        check.textColor = .white
+        check.alignment = .center
+        check.wantsLayer = true
+        check.drawsBackground = true
+        check.backgroundColor = Theme.blue
+        check.layer?.cornerRadius = 10
+        check.layer?.masksToBounds = true
+        check.layer?.borderColor = NSColor.white.cgColor
+        check.layer?.borderWidth = 1.5
+        check.isHidden = true
 
         if item.kind != .image {
             badge.stringValue = item.kind == .gif ? " GIF " : " ▶ MP4 "
@@ -334,9 +516,19 @@ final class TileView: NSView, NSDraggingSource {
                 self.app.flyout.hide()
             }))
         }
-        specs.append(("doc.on.doc", L.t("Copy"), { [weak self] in self?.copyItem() }))
+        specs.append(("doc.on.doc", L.t("Copy"), { [weak self] in
+            guard let self else { return }
+            let targets = self.panel.selection.targets(for: self.item.url.path)
+            if targets.count > 1 {
+                Clipboard.copyFiles(targets.map { URL(fileURLWithPath: $0) })
+                self.panel.flashStatus(L.f("Copied {0} files ✓", targets.count))
+            } else { self.copyItem() }
+        }))
         specs.append(("folder", L.t("Show in Finder"), { [weak self] in if let self { NSWorkspace.shared.activateFileViewerSelecting([self.item.url]) } }))
-        specs.append(("trash", L.t("Move to Trash"), { [weak self] in self?.trash() }))
+        specs.append(("trash", L.t("Move to Trash"), { [weak self] in
+            guard let self else { return }
+            self.panel.trash(self.panel.selection.targets(for: self.item.url.path))
+        }))
         for (sym, tip, act) in specs {
             let b = SpaceButton(title: "", symbol: sym, fill: Theme.night.withAlphaComponent(0.85), tip: tip)
             b.layer?.cornerRadius = 6
@@ -358,6 +550,7 @@ final class TileView: NSView, NSDraggingSource {
         flash.backgroundColor = Theme.night.withAlphaComponent(0.8)
         flash.isHidden = true
         addSubview(flash)
+        addSubview(check)
 
         Thumbnails.shared.load(item) { [weak self] img in self?.imageLayer.contents = img }
     }
@@ -367,6 +560,8 @@ final class TileView: NSView, NSDraggingSource {
     override func layout() {
         super.layout()
         imageLayer.frame = bounds
+        wash.frame = bounds
+        check.frame = CGRect(x: 5, y: bounds.height - 25, width: 20, height: 20)
         let size = actions.fittingSize
         actions.frame = CGRect(x: bounds.width - size.width - 4, y: bounds.height - size.height - 4, width: size.width, height: size.height)
         badge.setFrameOrigin(CGPoint(x: 5, y: 5))
@@ -384,14 +579,35 @@ final class TileView: NSView, NSDraggingSource {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private func updateHover() {
-        layer?.borderColor = (hovering ? Theme.blue : Theme.line).cgColor
-        layer?.borderWidth = hovering ? 2 : 1
+        paintSelection()
         actions.isHidden = !hovering
+    }
+
+    func paintSelection() {
+        let picked = panel.selection.contains(item.url.path)
+        layer?.borderColor = (hovering || picked ? Theme.blue : Theme.line).cgColor
+        layer?.borderWidth = hovering || picked ? 2 : 1
+        let several = picked && panel.selection.count > 1
+        wash.isHidden = !several
+        check.isHidden = !several
     }
 
     override func mouseDown(with event: NSEvent) {
         downPoint = event.locationInWindow
-        if event.clickCount == 2 { primary() }
+        picking = false
+        let id = item.url.path
+        let cmd = event.modifierFlags.contains(.command)
+        let shift = event.modifierFlags.contains(.shift)
+        if cmd || shift {
+            // Picking several: no copy. A tile ⌘-clicked off can't start a drag.
+            picking = true
+            panel.selection.click(id, toggle: cmd, range: shift)
+            if !panel.selection.contains(id) { downPoint = nil }
+            return
+        }
+        if event.clickCount == 2 { primary(); return }
+        // A press on a picked tile keeps the group, so it can be dragged together.
+        if !panel.selection.contains(id) { panel.selection.click(id) }
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -399,8 +615,19 @@ final class TileView: NSView, NSDraggingSource {
         let p = event.locationInWindow
         guard hypot(p.x - d.x, p.y - d.y) > 4 else { return }
         downPoint = nil
+        picking = true // the release ends a drag, not a click
+        let group = panel.selection.targets(for: item.url.path)
+        if group.count > 1 {
+            let tiles = panel.tiles.filter { group.contains($0.item.url.path) }
+            let entries = tiles.map { t -> (url: URL, preview: NSImage?, frame: CGRect) in
+                (t.item.url, t.previewImage, t.convert(t.bounds, to: self))
+            }
+            tiles.forEach { $0.alphaValue = 0.55 }
+            DragOut.startFiles(from: self, event: event, items: entries) { _ in tiles.forEach { $0.alphaValue = 1 } }
+            return
+        }
         // The file and, for pictures, the PNG itself: drops into Finder, Mail, Slack, Pages, browsers…
-        let preview = imageLayer.contents.map { NSImage(cgImage: $0 as! CGImage, size: bounds.size) }
+        let preview = previewImage
         alphaValue = 0.55
         DragOut.start(from: self, event: event, url: item.url, image: nil, preview: preview, frame: bounds) { [weak self] _ in
             self?.alphaValue = 1
@@ -408,8 +635,15 @@ final class TileView: NSView, NSDraggingSource {
     }
 
     override func mouseUp(with event: NSEvent) {
-        if downPoint != nil && event.clickCount == 1 { copyItem() }
+        if downPoint != nil && event.clickCount == 1 && !picking {
+            panel.selection.only(item.url.path)
+            copyItem()
+        }
         downPoint = nil
+    }
+
+    fileprivate var previewImage: NSImage? {
+        imageLayer.contents.map { NSImage(cgImage: $0 as! CGImage, size: bounds.size) }
     }
 
     func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
@@ -421,7 +655,7 @@ final class TileView: NSView, NSDraggingSource {
         app.flyout.hide()
     }
 
-    private func copyItem() {
+    func copyItem() {
         if item.kind == .image, let img = PNG.load(item.url) {
             Clipboard.copy(img, scale: NSScreen.underMouse.backingScaleFactor)
         } else {
@@ -434,13 +668,6 @@ final class TileView: NSView, NSDraggingSource {
                 ctx.duration = 0.25
                 self?.flash.animator().alphaValue = 0
             }, completionHandler: { self?.flash.isHidden = true })
-        }
-    }
-
-    private func trash() {
-        NSWorkspace.shared.recycle([item.url]) { [weak self] _, _ in
-            if let self { EditSidecar.delete(for: self.item.url) }
-            self?.app.capturesChanged()
         }
     }
 }

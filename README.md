@@ -61,6 +61,7 @@ On first start Cometsnap offers to take over Print Screen from your desktop's sc
 (automatic on GNOME, Cinnamon and Xfce; other desktops get the commands to bind).
 On Wayland, captures and recordings go through the desktop portal, so the first one asks for permission.
 Drag any capture out of the tray panel (or the Copied card) into a file manager, browser, chat or office app.
+Pick several in the tray panel (Ctrl+click, Shift+click, drag a box on empty space, or Ctrl+A) and drag them all out together.
 The playful extras (comet flight, milestones, seasonal looks, Constellation, the tray-panel secret) are here too;
 the comet and meteor showers need a compositing desktop, which almost every desktop is.
 It speaks English, Spanish, Portuguese, French, German, Italian, Simplified Chinese and Hindi, following your desktop's language (change it in *Settings*).
@@ -100,6 +101,8 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
   Click a thumbnail to copy it, double-click to edit it, drag it straight into Word, Outlook, Teams or a browser
 - After every capture, the capture itself rides a comet into the tray, with an optional soft click (both in *Options*)
 - **Drag any capture out** of the tray panel (or the Copied card) and drop it into Teams, Word, Outlook, a browser or Explorer
+- **Pick several captures** in the tray panel with Ctrl+click, Shift+click, a box drawn on empty space or Ctrl+A,
+  then drag any of them to drop them all at once into Explorer, Outlook, Teams or Slack. Copy and Delete work on the whole selection
 - Little extras, all discreet: a tiny meteor shower for snap milestones (100th, 1,000th…) and a monthly
   "You captured N snaps" card, a snowy comet in December and a pumpkin comet at Halloween (*Options* to turn off),
   **Constellation** mode in the editor that joins numbered steps with faint star lines, and a secret in the tray

@@ -310,6 +310,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "Essayez une zone plus grande, ou zoomez sur le petit texte.",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} lignes · {1}",
+        ["{0} selected"] = "{0} sélectionnées",
+        ["Clear selection"] = "Tout désélectionner",
+        ["Copied {0} files ✓"] = "{0} fichiers copiés ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} fichiers envoyés à la Corbeille",
+        ["Moved {0} files to the trash"] = "{0} fichiers mis à la corbeille",
+        ["{0}+click or drag a box to pick several"] = "{0}+clic ou tracez un cadre pour en choisir plusieurs",
     };
 
     public static readonly IReadOnlyDictionary<string, string> German = new Dictionary<string, string>
@@ -617,6 +623,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "Versuchen Sie einen größeren Bereich, oder zoomen Sie kleinen Text heran.",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} Zeilen · {1}",
+        ["{0} selected"] = "{0} ausgewählt",
+        ["Clear selection"] = "Auswahl aufheben",
+        ["Copied {0} files ✓"] = "{0} Dateien kopiert ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} Dateien in den Papierkorb verschoben",
+        ["Moved {0} files to the trash"] = "{0} Dateien in den Papierkorb verschoben",
+        ["{0}+click or drag a box to pick several"] = "{0}+Klick oder Rahmen ziehen, um mehrere auszuwählen",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Italian = new Dictionary<string, string>
@@ -924,6 +936,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "Prova un’area più grande, o ingrandisci il testo piccolo.",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} righe · {1}",
+        ["{0} selected"] = "{0} selezionate",
+        ["Clear selection"] = "Deseleziona tutto",
+        ["Copied {0} files ✓"] = "{0} file copiati ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} file spostati nel Cestino",
+        ["Moved {0} files to the trash"] = "{0} file spostati nel cestino",
+        ["{0}+click or drag a box to pick several"] = "{0}+clic o trascina un riquadro per sceglierne più di una",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Spanish = new Dictionary<string, string>
@@ -1231,6 +1249,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "Prueba un área más grande o amplía el texto pequeño.",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} líneas · {1}",
+        ["{0} selected"] = "{0} seleccionadas",
+        ["Clear selection"] = "Quitar selección",
+        ["Copied {0} files ✓"] = "{0} archivos copiados ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} archivos movidos a la Papelera de reciclaje",
+        ["Moved {0} files to the trash"] = "{0} archivos movidos a la papelera",
+        ["{0}+click or drag a box to pick several"] = "{0}+clic o arrastra un recuadro para elegir varias",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Chinese = new Dictionary<string, string>
@@ -1538,6 +1562,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "试试更大的区域，或放大较小的文字。",
         ["{0:N0} px"] = "{0:N0} 像素",
         ["{0} lines · {1}"] = "{0} 行 · {1}",
+        ["{0} selected"] = "已选 {0} 张",
+        ["Clear selection"] = "取消选择",
+        ["Copied {0} files ✓"] = "已复制 {0} 个文件 ✓",
+        ["Moved {0} files to the Recycle Bin"] = "已将 {0} 个文件移到回收站",
+        ["Moved {0} files to the trash"] = "已将 {0} 个文件移到废纸篓",
+        ["{0}+click or drag a box to pick several"] = "{0}+单击或拖出方框可多选",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Hindi = new Dictionary<string, string>
@@ -1845,6 +1875,12 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "बड़ा क्षेत्र आज़माएँ, या छोटे टेक्स्ट पर ज़ूम करें।",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} पंक्तियाँ · {1}",
+        ["{0} selected"] = "{0} चुनी गईं",
+        ["Clear selection"] = "चयन हटाएँ",
+        ["Copied {0} files ✓"] = "{0} फ़ाइलें कॉपी हुईं ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} फ़ाइलें रीसायकल बिन में भेजी गईं",
+        ["Moved {0} files to the trash"] = "{0} फ़ाइलें ट्रैश में भेजी गईं",
+        ["{0}+click or drag a box to pick several"] = "कई चुनने के लिए {0}+क्लिक करें या बॉक्स खींचें",
     };
 
     public static readonly IReadOnlyDictionary<string, string> Portuguese = new Dictionary<string, string>
@@ -2152,5 +2188,11 @@ internal static class Strings
         ["Try a bigger area, or zoom in on small text."] = "Tente uma área maior ou amplie o texto pequeno.",
         ["{0:N0} px"] = "{0:N0} px",
         ["{0} lines · {1}"] = "{0} linhas · {1}",
+        ["{0} selected"] = "{0} selecionadas",
+        ["Clear selection"] = "Limpar seleção",
+        ["Copied {0} files ✓"] = "{0} arquivos copiados ✓",
+        ["Moved {0} files to the Recycle Bin"] = "{0} arquivos movidos para a Lixeira",
+        ["Moved {0} files to the trash"] = "{0} arquivos movidos para a lixeira",
+        ["{0}+click or drag a box to pick several"] = "{0}+clique ou arraste uma caixa para escolher várias",
     };
 }

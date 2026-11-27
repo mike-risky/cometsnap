@@ -79,6 +79,46 @@ public static class DragOut
         }
     }
 
+    /// <summary>
+    /// Drags several captures at once (blocks until the drop). Offers them as files only, which is
+    /// what Explorer, Outlook, Teams, Slack and browsers take for a group. One path = <see cref="Start"/>.
+    /// </summary>
+    public static DragDropEffects StartFiles(UIElement source, IReadOnlyList<string> paths, ImageSource? preview)
+    {
+        var files = paths.Where(File.Exists).ToArray();
+        if (files.Length == 0) return DragDropEffects.None;
+        if (files.Length == 1) return Start(source, files[0], null, preview);
+
+        var data = new DataObject();
+        data.SetData(DataFormats.FileDrop, files);
+        DragGhost? ghost = null;
+        GiveFeedbackEventHandler feedback = (_, e) =>
+        {
+            ghost?.Follow();
+            e.UseDefaultCursors = true;
+        };
+        try
+        {
+            if (preview is not null)
+            {
+                ghost = new DragGhost(preview, files.Length);
+                ghost.Follow();
+            }
+            source.GiveFeedback += feedback;
+            return DragDrop.DoDragDrop(source, data, DragDropEffects.Copy);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Drag out of several files failed", ex);
+            return DragDropEffects.None;
+        }
+        finally
+        {
+            source.GiveFeedback -= feedback;
+            ghost?.Close();
+        }
+    }
+
     private static byte[] Encode(BitmapSource image)
     {
         var encoder = new PngBitmapEncoder();
@@ -94,7 +134,7 @@ public static class DragOut
         private const double MaxSide = 132;
         private IntPtr _hwnd;
 
-        public DragGhost(ImageSource picture)
+        public DragGhost(ImageSource picture, int count = 1)
         {
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
@@ -113,12 +153,46 @@ public static class DragOut
             var scale = Math.Min(1, MaxSide / Math.Max(1, Math.Max(w, h)));
             var img = new Image { Source = picture, Width = Math.Max(24, w * scale), Height = Math.Max(16, h * scale), Stretch = Stretch.UniformToFill };
             RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-            Content = new Border
+            var card = new Border
             {
                 Child = img, CornerRadius = new CornerRadius(6), BorderBrush = SpaceTheme.CometBlueBrush, BorderThickness = new Thickness(2),
                 Background = SpaceTheme.VoidBrush, Margin = new Thickness(8),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 12, ShadowDepth = 0, Opacity = 0.55, Color = Colors.Black },
             };
+            if (count <= 1)
+            {
+                Content = card;
+            }
+            else
+            {
+                // A small stack of cards behind the picture, and how many files are coming along.
+                var stack = new Grid();
+                for (var i = Math.Min(count, 3) - 1; i >= 1; i--)
+                    stack.Children.Add(new Border
+                    {
+                        Width = img.Width + 4, Height = img.Height + 4, CornerRadius = new CornerRadius(6),
+                        Background = SpaceTheme.NavyBrush, BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1.5),
+                        HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+                        Margin = new Thickness(8 + i * 6, 20 - i * 6, 0, 0),
+                    });
+                card.HorizontalAlignment = HorizontalAlignment.Left;
+                card.VerticalAlignment = VerticalAlignment.Top;
+                card.Margin = new Thickness(8, 20, 20, 8);
+                stack.Children.Add(card);
+                stack.Children.Add(new Border
+                {
+                    MinWidth = 26, Height = 26, CornerRadius = new CornerRadius(13), Padding = new Thickness(7, 0, 7, 0),
+                    Background = SpaceTheme.TerracottaBrush, BorderBrush = SpaceTheme.StarWhiteBrush, BorderThickness = new Thickness(1.5),
+                    HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 6, 6, 0),
+                    Child = new TextBlock
+                    {
+                        Text = count.ToString(System.Globalization.CultureInfo.CurrentCulture), Foreground = SpaceTheme.StarWhiteBrush,
+                        FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.Bold, FontSize = 13,
+                        HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                    },
+                });
+                Content = stack;
+            }
             SourceInitialized += (_, _) =>
             {
                 _hwnd = new WindowInteropHelper(this).Handle;

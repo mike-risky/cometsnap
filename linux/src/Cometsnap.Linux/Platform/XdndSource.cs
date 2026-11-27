@@ -41,7 +41,10 @@ internal static unsafe partial class XdndSource
     [LibraryImport(Lib, EntryPoint = "XNextEvent")] private static partial int NextEvent(IntPtr d, RawEvent* ev);
 
     /// <summary>What the drag offers.</summary>
-    public sealed record Payload(string? FilePath, Func<byte[]?>? Png);
+    public sealed record Payload(IReadOnlyList<string> Files, Func<byte[]?>? Png)
+    {
+        public Payload(string? file, Func<byte[]?>? png) : this(file is null ? Array.Empty<string>() : new[] { file }, png) { }
+    }
 
     /// <summary>
     /// Runs one drag on a background thread. <paramref name="moved"/> gets the pointer position
@@ -84,7 +87,8 @@ internal static unsafe partial class XdndSource
         a.TextPlain = Atom("text/plain"); a.TextPlainUtf8 = Atom("text/plain;charset=utf-8"); a.Utf8String = Atom("UTF8_STRING");
         a.AtomType = (IntPtr)4; /* XA_ATOM */ a.Timestamp = Atom("TIMESTAMP");
 
-        var hasFile = payload.FilePath is not null && File.Exists(payload.FilePath);
+        var files = payload.Files.Where(File.Exists).ToList();
+        var hasFile = files.Count > 0;
         var types = new List<IntPtr>();
         if (hasFile) types.Add(a.UriList);
         if (payload.Png is not null) types.Add(a.Png);
@@ -95,8 +99,8 @@ internal static unsafe partial class XdndSource
         var pngLoaded = false;
         byte[]? Bytes(IntPtr target)
         {
-            if (target == a.UriList) return Encoding.UTF8.GetBytes(new Uri(payload.FilePath!).AbsoluteUri + "\r\n");
-            if (target == a.TextPlain || target == a.TextPlainUtf8 || target == a.Utf8String) return Encoding.UTF8.GetBytes(payload.FilePath!);
+            if (target == a.UriList) return Encoding.UTF8.GetBytes(string.Concat(files.Select(f => new Uri(f).AbsoluteUri + "\r\n")));
+            if (target == a.TextPlain || target == a.TextPlainUtf8 || target == a.Utf8String) return Encoding.UTF8.GetBytes(string.Join("\n", files));
             if (target == a.Png)
             {
                 if (!pngLoaded) { pngLoaded = true; png = payload.Png?.Invoke(); }
