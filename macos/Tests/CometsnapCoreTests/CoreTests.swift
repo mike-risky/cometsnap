@@ -268,7 +268,8 @@ final class CutListTests: XCTestCase {
         XCTAssertTrue(c.addCut(5, 6))
         XCTAssertEqual(c.kept.count, 3)
         XCTAssertEqual(c.keptLength, 6, accuracy: 1e-9)
-        XCTAssertEqual(c.toOutput(4.5), 2.0, accuracy: 1e-9)
+        XCTAssertEqual(c.toOutput(4.5), 2.5, accuracy: 1e-9) // 2 s kept before the first cut, then 0.5 s
+        XCTAssertEqual(c.toOutput(3.5), 2.0, accuracy: 1e-9) // inside a cut: where the next kept part starts
         XCTAssertEqual(c.nextKept(3.5)!, 4, accuracy: 1e-9)
         XCTAssertNil(c.nextKept(9.5))
         XCTAssertTrue(c.addCut(3.5, 5.5)) // merges both
