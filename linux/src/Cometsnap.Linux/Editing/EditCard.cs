@@ -99,7 +99,7 @@ public sealed class EditCard : Window
         // The whole card opens the editor (faster than aiming for the button); Edit and ✕ still work.
         _card.Cursor = new Cursor(StandardCursorType.Hand);
         ToolTip.SetTip(_card, T("Click to edit · Drag into any app"));
-        _card.PointerEntered += (_, _) => _card.BorderBrush = SpaceTheme.CometBlueBrush;
+        _card.PointerEntered += (_, _) => _card.BorderBrush = CaptureLook.AccentBrush;
         _card.PointerExited += (_, _) => _card.BorderBrush = SpaceTheme.NavyLightBrush;
         // Click = edit; drag = drop the capture into any app (file manager, chat, mail, a browser…).
         _card.PointerPressed += (_, e) =>
@@ -152,6 +152,7 @@ public sealed class EditCard : Window
         _image = image;
         _path = null;
         _thumb.Source = image;
+        _title.Foreground = CaptureLook.TagBrush;
         _title.Text = title ?? (copied ? T("COPIED!") : T("SNAPPED!"));
         _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · {T("saving…")}";
         Place(workArea, scaling);
@@ -167,6 +168,7 @@ public sealed class EditCard : Window
         _image = poster;
         _path = path;
         _thumb.Source = poster;
+        _title.Foreground = CaptureLook.TagBrush;
         _title.Text = copied ? T("COPIED!") : T("SAVED!");
         _detail.Text = detail;
         Place(workArea, scaling);

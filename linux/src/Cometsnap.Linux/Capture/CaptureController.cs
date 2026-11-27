@@ -62,6 +62,19 @@ public sealed class CaptureController
         if (picked is { } p) Deliver(p.Screen, p.Rect);
     }
 
+    /// <summary>Color picker: the loupe opens on the frozen screen, a click copies the color as #RRGGBB.</summary>
+    public void StartColorPicker() => _ = ColorPickerAsync();
+
+    private async Task ColorPickerAsync()
+    {
+        string? text = null;
+        var picked = await PickAsync(OverlayPurpose.Color, s => text = s.PickedColor);
+        if (picked is { } p) p.Screen.Dispose();
+        if (text is null) return;
+        await _app.Clipboard.SetTextAsync(text);
+        _app.Toast(F("Copied {0}", text), 2200);
+    }
+
     public void StartDelayed(int seconds) => _ = DelayedAsync(seconds);
 
     private async Task DelayedAsync(int seconds)
@@ -91,7 +104,7 @@ public sealed class CaptureController
     }
 
     /// <summary>Freezes the screen and lets the user pick a window or an area. Null when cancelled.</summary>
-    public async Task<(FrozenScreen Screen, PixelRect Rect)?> PickAsync(OverlayPurpose purpose)
+    public async Task<(FrozenScreen Screen, PixelRect Rect)?> PickAsync(OverlayPurpose purpose, Action<OverlaySession>? finished = null)
     {
         if (_busy) return null;
         _busy = true;
@@ -99,7 +112,7 @@ public sealed class CaptureController
         {
             var monitors = Monitors();
             var desktop = Union(monitors);
-            var windowsTask = Task.Run(() => _app.Settings.WindowDetection ? WindowFinder.List(desktop) : Array.Empty<WindowInfo>());
+            var windowsTask = Task.Run(() => _app.Settings.WindowDetection && purpose != OverlayPurpose.Color ? WindowFinder.List(desktop) : Array.Empty<WindowInfo>());
             var screen = await _grabber.GrabAsync(desktop);
             if (screen is null)
             {
@@ -132,6 +145,7 @@ public sealed class CaptureController
 
             var rect = await done.Task;
             foreach (var o in _overlays) o.End();
+            finished?.Invoke(session);
             if (rect is not { IsEmpty: false } r) { screen.Dispose(); return null; }
             if (session.ScrollDelta != 0)
             {

@@ -13,6 +13,8 @@ public enum OverlayPurpose
     Text,
     /// <summary>A screenshot, with a reminder that holding the button and scrolling makes a long one.</summary>
     Scroll,
+    /// <summary>Color picker: a click copies the color under the cursor.</summary>
+    Color,
 }
 
 /// <summary>
@@ -67,14 +69,14 @@ public sealed class OverlaySession
         Monitors = monitors;
         Settings = settings;
         Purpose = purpose;
-        WindowDetection = settings.WindowDetection && windows.Count > 0;
+        WindowDetection = settings.WindowDetection && windows.Count > 0 && purpose != OverlayPurpose.Color;
         LoupeCorner = settings.LoupeCorner;
         _snapper = new EdgeSnapper(windows.Select(w => w.Bounds).Concat(monitors), SnapDistance);
     }
 
     /// <summary>What a click (no drag) would grab right now: the window under the cursor, or its monitor.</summary>
     public PixelRect? HoverRect =>
-        !HasCursor ? null
+        !HasCursor || Purpose == OverlayPurpose.Color ? null
         : WindowDetection && HoverWindow is not null ? HoverWindow.Bounds
         : MonitorAt(CursorX, CursorY);
 
@@ -141,6 +143,19 @@ public sealed class OverlaySession
     /// <summary>The loupe's size in desktop pixels on a monitor (it is drawn at a fixed size in DIPs).</summary>
     public Func<PixelRect, (int W, int H)> LoupeSizePixels { get; set; } = _ => (150, 200);
 
+    /// <summary>Color picker: the text that was picked (#RRGGBB or rgb(...)), set just before it finishes.</summary>
+    public string? PickedColor { get; private set; }
+
+    /// <summary>Color picker: picks the color under the cursor and closes. Shift = rgb(...).</summary>
+    public void PickColor(int x, int y, bool rgb)
+    {
+        if (_finished) return;
+        MoveTo(x, y);
+        if (ColorTextUnderCursor(rgb) is not { } text) return;
+        PickedColor = text;
+        Finish(new PixelRect(x, y, 1, 1));
+    }
+
     public void Press(int x, int y)
     {
         if (_finished) return;
@@ -192,10 +207,14 @@ public sealed class OverlaySession
     /// <summary>Enter: grab what is highlighted.</summary>
     public void Confirm()
     {
+        if (Purpose == OverlayPurpose.Color) { PickColor(CursorX, CursorY, rgb: false); return; }
         if (Highlight is { IsEmpty: false } r) Finish(r);
     }
 
-    public void CaptureMonitor() => Finish(MonitorAt(CursorX, CursorY));
+    public void CaptureMonitor()
+    {
+        if (Purpose != OverlayPurpose.Color) Finish(MonitorAt(CursorX, CursorY));
+    }
 
     public void ToggleWindowDetection()
     {
@@ -224,6 +243,15 @@ public sealed class OverlaySession
     {
         var (ix, iy) = Screen.ToImage(CursorX + 0.5, CursorY + 0.5);
         return Screen.ColorAtImage(ix, iy) is { } c ? $"#{c:X6}" : null;
+    }
+
+    /// <summary>The color under the cursor as #RRGGBB, or rgb(r, g, b).</summary>
+    public string? ColorTextUnderCursor(bool rgb)
+    {
+        var (ix, iy) = Screen.ToImage(CursorX + 0.5, CursorY + 0.5);
+        if (Screen.ColorAtImage(ix, iy) is not { } c) return null;
+        byte r = (byte)(c >> 16), g = (byte)(c >> 8), b = (byte)c;
+        return rgb ? Cometsnap.Core.Settings.ColorText.Rgb(r, g, b) : Cometsnap.Core.Settings.ColorText.Hex(r, g, b);
     }
 
     private void Finish(PixelRect? rect)

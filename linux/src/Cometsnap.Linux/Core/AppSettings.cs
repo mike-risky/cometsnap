@@ -30,6 +30,12 @@ public sealed class AppSettings
     /// <summary>Scrolling capture (X11): Cometsnap scrolls the picked window and glues one tall image.</summary>
     public string ScrollingHotkey { get; set; } = "Ctrl+Alt+PrintScreen";
 
+    /// <summary>Color picker: the loupe opens, a click copies the color under the cursor as #RRGGBB.</summary>
+    public string ColorHotkey { get; set; } = "Super+Shift+C";
+
+    /// <summary>Look of the capture screen: a CaptureThemes id ("blue" is the classic look).</summary>
+    public string CaptureTheme { get; set; } = Cometsnap.Core.Settings.CaptureThemes.DefaultId;
+
     /// <summary>Copy text (OCR with Tesseract).</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
 

@@ -118,16 +118,20 @@ public sealed class CometFlight : Window
 
     private sealed class Comet : Control
     {
-        private static readonly IBrush Tail = new LinearGradientBrush
+        // Classic icy blue for the blue capture theme, else that theme's accent.
+        private static Color Far => CaptureLook.IsClassic ? Color.FromRgb(79, 195, 255) : CaptureLook.Accent;
+        private static Color Near => CaptureLook.IsClassic ? Color.FromRgb(120, 200, 255) : CaptureLook.Accent;
+
+        private static IBrush Tail => new LinearGradientBrush
         {
             StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
             EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(Color.FromArgb(0, 79, 195, 255), 0), new GradientStop(Color.FromArgb(200, 120, 200, 255), 1) },
+            GradientStops = { new GradientStop(Color.FromArgb(0, Far.R, Far.G, Far.B), 0), new GradientStop(Color.FromArgb(200, Near.R, Near.G, Near.B), 1) },
         }.ToImmutable();
 
-        private static readonly IBrush Glow = new RadialGradientBrush
+        private static IBrush Glow => new RadialGradientBrush
         {
-            GradientStops = { new GradientStop(Color.FromArgb(170, 120, 200, 255), 0), new GradientStop(Color.FromArgb(0, 79, 195, 255), 1) },
+            GradientStops = { new GradientStop(Color.FromArgb(170, Near.R, Near.G, Near.B), 0), new GradientStop(Color.FromArgb(0, Far.R, Far.G, Far.B), 1) },
         }.ToImmutable();
 
         private static readonly Geometry TailShape = Geometry.Parse("M0,-9 L-80,-2 L-80,2 L0,9 Z");
