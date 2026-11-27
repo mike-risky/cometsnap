@@ -156,7 +156,7 @@ final class ScrollingCapture {
 /// The little pill shown while a scrolling capture runs (Cometsnap's own windows are left out of the frames).
 final class ScrollingPill: NSPanel {
     private let heightLabel = NSTextField(labelWithString: "")
-    private let title = NSTextField(labelWithString: "")
+    private let titleLabel = NSTextField(labelWithString: "")
 
     init() {
         super.init(contentRect: CGRect(x: 0, y: 0, width: 330, height: 34), styleMask: [.borderless, .nonactivatingPanel],
@@ -175,15 +175,15 @@ final class ScrollingPill: NSPanel {
         root.layer?.cornerRadius = 17
         root.layer?.borderWidth = 1
         root.layer?.borderColor = Theme.line.cgColor
-        title.stringValue = L.t("Scroll, then let go")
-        title.font = Theme.ui(13, .semibold)
-        title.textColor = .white
+        titleLabel.stringValue = L.t("Scroll, then let go")
+        titleLabel.font = Theme.ui(13, .semibold)
+        titleLabel.textColor = .white
         heightLabel.font = Theme.ui(12)
         heightLabel.textColor = Theme.yellow
         let hint = NSTextField(labelWithString: L.t("Esc cancels"))
         hint.font = Theme.ui(11)
         hint.textColor = Theme.muted
-        let stack = NSStackView(views: [title, heightLabel, NSView(), hint])
+        let stack = NSStackView(views: [titleLabel, heightLabel, NSView(), hint])
         stack.spacing = 8
         stack.edgeInsets = NSEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -211,7 +211,7 @@ final class ScrollingPill: NSPanel {
     /// The height so far, or a warning when the page went by too fast to follow.
     func show(height points: Int, lost: Bool) {
         heightLabel.stringValue = lost || points == 0 ? "" : L.f("{0} px", points)
-        title.stringValue = lost ? L.t("Too fast: scroll back a little") : L.t("Scroll, then let go")
-        title.textColor = lost ? Theme.yellow : .white
+        titleLabel.stringValue = lost ? L.t("Too fast: scroll back a little") : L.t("Scroll, then let go")
+        titleLabel.textColor = lost ? Theme.yellow : .white
     }
 }
