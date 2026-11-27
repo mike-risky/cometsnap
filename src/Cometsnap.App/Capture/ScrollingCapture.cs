@@ -18,165 +18,333 @@ using Cometsnap.Core.Native;
 namespace Cometsnap.App.Capture;
 
 /// <summary>
-/// Scrolling capture: pick a window or an area, and Cometsnap scrolls it with the mouse wheel,
-/// grabbing a frame after every step and gluing them into one tall image. It stops by itself at
-/// the end of the page; Esc or moving the mouse stops it earlier. The result is delivered like any
-/// capture (clipboard, file, Copied card).
+/// Scrolling capture, the natural way: start an area selection, keep the mouse button held and
+/// turn the wheel. The overlay steps aside and the page under the area scrolls, wherever the
+/// mouse is: Cometsnap takes the wheel and hands it to the window under the area, a little at a
+/// time so it can follow. Every new row that comes into view is glued under the previous ones.
+/// Letting go of the button finishes; Esc cancels.
 /// </summary>
 public sealed class ScrollingCapture
 {
     /// <summary>Taller images get heavy to paste anywhere; stop there.</summary>
     public const int MaxHeight = 30000;
 
-    private const int MaxSteps = 400;
-    private const int MouseTolerance = 12;
+    /// <summary>The smallest area worth scrolling.</summary>
+    public const int MinWidth = 40, MinHeight = 60;
+
+    /// <summary>At most this much wheel (120 = one notch) is passed on between two grabs.</summary>
+    private const int MaxDeltaPerGrab = 240;
 
     private readonly CometApp _app;
     private ScrollingPill? _pill;
-    private bool _running;
-    private bool _stopRequested;
+    private RecordingFrame? _frame;
+    private volatile bool _running;
 
     public ScrollingCapture(CometApp app) => _app = app;
 
     public bool IsRunning => _running;
 
-    /// <summary>Hotkey / menu: pick what to scroll. Pressed again while running: stops.</summary>
+    /// <summary>
+    /// Hotkey / menu: opens the usual capture overlay with a reminder of how it works
+    /// (hold the button and scroll). Any capture can turn into a scrolling one.
+    /// </summary>
     public void Start()
     {
-        if (_running)
-        {
-            _stopRequested = true;
-            return;
-        }
-        _app.Capture.PickRegion(rect => _ = RunAsync(rect));
+        if (_running) return;
+        _app.Capture.StartRegion(scrollHint: true);
     }
 
-    private async Task RunAsync(PixelRect rect)
+    /// <summary>
+    /// Called by the overlay when the wheel turned while the button was held over <paramref name="rect"/>.
+    /// <paramref name="firstDelta"/> is that first wheel turn, which the overlay took: it is passed on to the page.
+    /// </summary>
+    public void RunHeld(PixelRect rect, int firstDelta, Action<BitmapSource, PixelRect>? deliver)
     {
         if (_running) return;
-        if (rect.Width < 40 || rect.Height < 60)
-        {
-            _app.Notify(L.T("Too small to scroll"), L.T("Pick a window or an area of at least 60 pixels high."));
-            return;
-        }
+        _ = RunAsync(rect, firstDelta, deliver);
+    }
 
+    private async Task RunAsync(PixelRect rect, int firstDelta, Action<BitmapSource, PixelRect>? deliver)
+    {
         _running = true;
-        _stopRequested = false;
-        var sw = Stopwatch.StartNew();
-        Win32.GetCursorPos(out var userCursor);
+        using var wheel = new WheelTap();
         try
         {
+            _frame ??= new RecordingFrame(SpaceTheme.CometBlue);
+            _frame.ShowAround(rect);
             _pill ??= new ScrollingPill();
             _pill.ShowFor(rect);
-            _app.SetTrayStatus(L.T("Cometsnap: scrolling capture. Esc to stop"));
+            _app.SetTrayStatus(L.T("Cometsnap: scrolling capture. Let go to finish"));
 
-            // The overlay just closed: let the screen repaint before the first frame.
-            await Task.Delay(150);
-            var stitcher = new ScrollStitcher(rect.Width, rect.Height);
-            var frame = await SettledFrameAsync(rect, null, minimumWait: 0);
-            stitcher.Add(frame);
+            // From now on the wheel is ours: it goes to the window under the area, wherever the mouse is.
+            wheel.Start();
+            wheel.Add(firstDelta);
+            await Task.Delay(30); // the overlay is gone: let the screen repaint
 
-            // The wheel scrolls whatever is under the mouse: park it in the middle of the area.
-            var parkX = rect.X + rect.Width / 2;
-            var parkY = rect.Y + rect.Height / 2;
-            Win32.SetCursorPos(parkX, parkY);
-            await Task.Delay(60);
+            var target = new WheelTarget(rect);
+            var pill = _pill;
+            var dispatcher = Application.Current.Dispatcher;
+            var job = await Task.Run(() => Follow(rect, wheel, target, (height, lost) =>
+                dispatcher.InvokeAsync(() => pill.Show(height, lost))));
 
-            var notches = 3;
-            var unchanged = 0;
-            var lost = false;
-            for (var step = 0; step < MaxSteps && !ShouldStop(parkX, parkY); step++)
+            HideChrome();
+            if (job is null)
             {
-                ScrollNative.Wheel(-notches);
-                frame = await SettledFrameAsync(rect, frame, minimumWait: 140);
-                if (ShouldStop(parkX, parkY)) break;
-
-                var result = stitcher.Add(frame);
-                if (result == StitchStep.Unchanged)
-                {
-                    // Slow pages scroll late: give it one more try before calling it the end.
-                    if (++unchanged >= 2) break;
-                    await Task.Delay(250);
-                    continue;
-                }
-                unchanged = 0;
-                if (result == StitchStep.Lost)
-                {
-                    lost = true;
-                    Log.Info($"Scrolling capture: frame {step} does not continue the page, stopping");
-                    break;
-                }
-
-                // Aim for about half of the scrolling part per step: fast, with plenty of overlap.
-                var target = Math.Max(20, stitcher.ScrollingHeight / 2);
-                var shift = Math.Max(1, stitcher.LastShift);
-                notches = Math.Clamp((int)Math.Round(notches * (double)target / shift), 1, 10);
-                if (stitcher.LastShift > stitcher.ScrollingHeight * 3 / 4) notches = Math.Max(1, notches - 1);
-
-                _pill.SetHeight(stitcher.Height);
-                if (stitcher.Height >= MaxHeight) break;
+                Log.Info("Scrolling capture cancelled");
+                return;
             }
 
-            var pixels = stitcher.Compose(out var height);
-            if (height > MaxHeight) height = MaxHeight;
+            var (pixels, height, log) = job.Value;
             var image = BitmapSource.Create(rect.Width, height, 96, 96, PixelFormats.Bgr32, null, pixels, rect.Width * 4);
             image.Freeze();
-            Log.Info($"Scrolling capture: {rect.Width}×{height} in {sw.ElapsedMilliseconds} ms (header {stitcher.Header}, footer {stitcher.Footer}, lost {lost})");
+            Log.Info($"Scrolling capture: {rect.Width}×{height}, {log}");
 
-            HidePill();
-            if (height <= rect.Height)
-                _app.Notify(L.T("Nothing scrolled"), L.T("Cometsnap kept what was visible. Pick the part of the window that scrolls, and keep the mouse still."));
-            _app.Capture.DeliverImage(image, rect);
+            if (deliver is not null) deliver(image, rect);
+            else _app.Capture.DeliverImage(image, rect);
         }
         catch (Exception ex)
         {
             Log.Error("Scrolling capture failed", ex);
-            HidePill();
+            HideChrome();
             _app.Notify(L.T("Scrolling capture failed"), ex.Message);
         }
         finally
         {
-            HidePill();
+            wheel.Dispose();
+            HideChrome();
             _running = false;
             _app.SetTrayStatus(null);
-            // Give the mouse back where the user left it.
-            Win32.SetCursorPos(userCursor.X, userCursor.Y);
         }
     }
 
-    private bool ShouldStop(int parkX, int parkY)
+    /// <summary>
+    /// The capture loop, off the UI thread: grab the area as often as the screen changes, glue
+    /// each frame, and pass the wheel on bit by bit. Null when cancelled with Esc.
+    /// </summary>
+    private static (byte[] Pixels, int Height, string Log)? Follow(PixelRect rect, WheelTap wheel, WheelTarget target, Action<int, bool> report)
     {
-        if (_stopRequested || Win32.IsKeyDown(0x1B /* VK_ESCAPE */)) return true;
-        Win32.GetCursorPos(out var p);
-        return Math.Abs(p.X - parkX) > MouseTolerance || Math.Abs(p.Y - parkY) > MouseTolerance;
-    }
+        var sw = Stopwatch.StartNew();
+        using var grabber = new AreaGrabber(rect);
+        var stitcher = new ScrollStitcher(rect.Width, rect.Height);
+        var frame = grabber.Grab();
+        stitcher.Add(frame);
+        var spare = new byte[frame.Length];
 
-    /// <summary>Grabs the area until two grabs in a row are the same (smooth scrolling has finished).</summary>
-    private static async Task<byte[]> SettledFrameAsync(PixelRect rect, byte[]? previous, int minimumWait)
-    {
-        if (minimumWait > 0) await Task.Delay(minimumWait);
-        var current = FrozenScreen.Capture(rect).Pixels;
-        var waited = minimumWait;
-        while (waited < 1500)
+        int frames = 0, appended = 0, lostFrames = 0;
+        long lostSince = -1;
+        var warned = false;
+        var lastSent = 0L;
+        while (true)
         {
-            await Task.Delay(70);
-            waited += 70;
-            var next = FrozenScreen.Capture(rect).Pixels;
-            var same = next.AsSpan().SequenceEqual(current);
-            current = next;
-            // Still equal to the frame before the scroll: the page may just be slow to react.
-            if (same && (previous is null || waited >= 400 || !next.AsSpan().SequenceEqual(previous))) break;
+            if (Win32.IsKeyDown(0x1B /* VK_ESCAPE */)) return null;
+            var released = !WheelTarget.PrimaryButtonDown();
+
+            // Pass the wheel on, a little at a time, so the page never runs away from the capture.
+            var delta = wheel.Take(MaxDeltaPerGrab);
+            if (delta != 0)
+            {
+                target.Scroll(delta);
+                lastSent = sw.ElapsedMilliseconds;
+            }
+
+            if (released)
+            {
+                // Let go: hand over what is left of the wheel, and let the page come to rest.
+                for (var rest = wheel.Take(MaxDeltaPerGrab); rest != 0; rest = wheel.Take(MaxDeltaPerGrab))
+                {
+                    target.Scroll(rest);
+                    Thread.Sleep(30);
+                    AddFrame();
+                }
+                var still = 0;
+                for (var t = 0; t < 40 && still < 3; t++) // at most ~0.6 s
+                {
+                    Thread.Sleep(15);
+                    still = AddFrame() ? 0 : still + 1;
+                }
+                break;
+            }
+
+            AddFrame();
+            if (stitcher.Height >= MaxHeight) break;
+            // Grab again soon: while the page moves, about every frame of the screen.
+            Thread.Sleep(sw.ElapsedMilliseconds - lastSent < 400 ? 4 : 15);
         }
-        return current;
+
+        var pixels = stitcher.Compose(out var height);
+        height = Math.Min(height, MaxHeight);
+        return (pixels, height, $"{frames} frames ({appended} glued, {lostFrames} lost) in {sw.ElapsedMilliseconds} ms, header {stitcher.Header}, footer {stitcher.Footer}");
+
+        // Grabs the area; true when it had changed.
+        bool AddFrame()
+        {
+            grabber.Grab(spare);
+            if (spare.AsSpan().SequenceEqual(frame)) return false;
+            (frame, spare) = (spare, frame);
+            frames++;
+            // The stitcher keeps the frames it glued: give it its own copy.
+            switch (stitcher.Add((byte[])frame.Clone()))
+            {
+                case StitchStep.Appended:
+                    appended++;
+                    lostSince = -1;
+                    if (warned) warned = false;
+                    report(stitcher.Height, false);
+                    break;
+                case StitchStep.Lost:
+                    lostFrames++;
+                    if (lostSince < 0) lostSince = sw.ElapsedMilliseconds;
+                    // A frame caught mid-paint is no reason to worry: only say so when it lasts.
+                    if (!warned && sw.ElapsedMilliseconds - lostSince > 250)
+                    {
+                        warned = true;
+                        report(stitcher.Height, true);
+                    }
+                    break;
+            }
+            return true;
+        }
     }
 
-    private void HidePill() => _pill?.HideNow();
+    private void HideChrome()
+    {
+        _pill?.HideNow();
+        _frame?.Hide();
+    }
 
-    private static class ScrollNative
+    /// <summary>Grabs one area of the screen again and again into reused buffers (no CAPTUREBLT: much faster).</summary>
+    private sealed class AreaGrabber : IDisposable
+    {
+        private readonly PixelRect _rect;
+        private readonly IntPtr _screenDc, _memDc, _dib, _old, _bits;
+
+        public AreaGrabber(PixelRect rect)
+        {
+            _rect = rect;
+            _screenDc = Win32.GetDC(IntPtr.Zero);
+            _memDc = Win32.CreateCompatibleDC(_screenDc);
+            var header = new Win32.BITMAPINFOHEADER
+            {
+                biSize = (uint)Marshal.SizeOf<Win32.BITMAPINFOHEADER>(),
+                biWidth = rect.Width,
+                biHeight = -rect.Height, // top-down
+                biPlanes = 1,
+                biBitCount = 32,
+            };
+            _dib = Win32.CreateDIBSection(_screenDc, ref header, 0, out _bits, IntPtr.Zero, 0);
+            if (_dib == IntPtr.Zero) throw new InvalidOperationException("CreateDIBSection failed");
+            _old = Win32.SelectObject(_memDc, _dib);
+        }
+
+        public byte[] Grab()
+        {
+            var pixels = new byte[_rect.Width * 4 * _rect.Height];
+            Grab(pixels);
+            return pixels;
+        }
+
+        public void Grab(byte[] into)
+        {
+            Win32.BitBlt(_memDc, 0, 0, _rect.Width, _rect.Height, _screenDc, _rect.X, _rect.Y, Win32.SRCCOPY);
+            Marshal.Copy(_bits, into, 0, into.Length);
+        }
+
+        public void Dispose()
+        {
+            Win32.SelectObject(_memDc, _old);
+            Win32.DeleteObject(_dib);
+            Win32.DeleteDC(_memDc);
+            Win32.ReleaseDC(IntPtr.Zero, _screenDc);
+        }
+    }
+
+    /// <summary>
+    /// Takes the real mouse wheel while the capture runs (a low-level mouse hook), so the user can
+    /// scroll with the mouse anywhere. The turns are kept and handed out with <see cref="Take"/>.
+    /// </summary>
+    private sealed class WheelTap : IDisposable
+    {
+        private const int WH_MOUSE_LL = 14;
+        private const int WM_MOUSEWHEEL = 0x020A;
+        private const uint LLMHF_INJECTED = 0x01;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MSLLHOOKSTRUCT
+        {
+            public int X, Y;
+            public uint mouseData, flags, time;
+            public IntPtr dwExtraInfo;
+        }
+
+        private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SetWindowsHookEx(int idHook, HookProc proc, IntPtr hMod, uint threadId);
+
+        [DllImport("user32.dll")]
+        private static extern bool UnhookWindowsHookEx(IntPtr hook);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetModuleHandle(string? name);
+
+        private readonly HookProc _proc;
+        private IntPtr _hook;
+        private int _pending;
+
+        public WheelTap() => _proc = OnMouse;
+
+        public void Start()
+        {
+            if (_hook != IntPtr.Zero) return;
+            _hook = SetWindowsHookEx(WH_MOUSE_LL, _proc, GetModuleHandle(null), 0);
+            if (_hook == IntPtr.Zero) Log.Info($"Mouse hook failed ({Marshal.GetLastWin32Error()}): the wheel scrolls what is under the mouse");
+        }
+
+        public void Add(int delta) => Interlocked.Add(ref _pending, delta);
+
+        /// <summary>Up to <paramref name="max"/> of the waiting wheel turn (either way); the rest keeps waiting.</summary>
+        public int Take(int max)
+        {
+            while (true)
+            {
+                var pending = Volatile.Read(ref _pending);
+                var take = Math.Clamp(pending, -max, max);
+                if (Interlocked.CompareExchange(ref _pending, pending - take, pending) == pending) return take;
+            }
+        }
+
+        private IntPtr OnMouse(int code, IntPtr wParam, IntPtr lParam)
+        {
+            if (code >= 0 && (int)wParam == WM_MOUSEWHEEL)
+            {
+                var info = Marshal.PtrToStructure<MSLLHOOKSTRUCT>(lParam);
+                if ((info.flags & LLMHF_INJECTED) == 0)
+                {
+                    Add((short)(info.mouseData >> 16));
+                    return 1; // ours: passed on to the area by the capture loop
+                }
+            }
+            return CallNextHookEx(_hook, code, wParam, lParam);
+        }
+
+        public void Dispose()
+        {
+            if (_hook == IntPtr.Zero) return;
+            UnhookWindowsHookEx(_hook);
+            _hook = IntPtr.Zero;
+        }
+    }
+
+    /// <summary>Scrolls the window under the area, whether the mouse is over it or not.</summary>
+    private sealed class WheelTarget
     {
         private const uint INPUT_MOUSE = 0;
         private const uint MOUSEEVENTF_WHEEL = 0x0800;
-        private const int WHEEL_DELTA = 120;
+        private const int SM_SWAPBUTTON = 23;
+        private const uint WM_MOUSEWHEEL = 0x020A;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct MOUSEINPUT
@@ -194,28 +362,75 @@ public sealed class ScrollingCapture
             public MOUSEINPUT mi;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X, Y;
+        }
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint SendInput(uint count, INPUT[] inputs, int size);
 
-        /// <summary>Turns the wheel: negative = down. One event per notch, like a real wheel.</summary>
-        public static void Wheel(int notches)
+        [DllImport("user32.dll")]
+        private static extern IntPtr WindowFromPoint(POINT point);
+
+        [DllImport("user32.dll")]
+        private static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetAncestor(IntPtr hwnd, uint flags);
+
+        private readonly PixelRect _rect;
+        private readonly int _cx, _cy;
+        private readonly IntPtr _window;
+
+        public WheelTarget(PixelRect rect)
         {
-            var count = Math.Abs(notches);
-            var inputs = new INPUT[count];
-            for (var i = 0; i < count; i++)
-                inputs[i] = new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { mouseData = Math.Sign(notches) * WHEEL_DELTA, dwFlags = MOUSEEVENTF_WHEEL } };
-            if (SendInput((uint)count, inputs, Marshal.SizeOf<INPUT>()) != count)
-                Log.Info($"SendInput (wheel) failed: {Marshal.GetLastWin32Error()}");
+            _rect = rect;
+            _cx = rect.X + rect.Width / 2;
+            _cy = rect.Y + rect.Height / 2;
+            _window = WindowFromPoint(new POINT { X = _cx, Y = _cy });
+            // Bring it to the front, so a real wheel turn over it scrolls it even when
+            // "Scroll inactive windows when hovering over them" is off.
+            if (_window != IntPtr.Zero)
+            {
+                var root = GetAncestor(_window, 2 /* GA_ROOT */);
+                Win32.SetForegroundWindow(root == IntPtr.Zero ? _window : root);
+            }
         }
+
+        public void Scroll(int delta)
+        {
+            Win32.GetCursorPos(out var p);
+            if (_rect.Contains(p.X, p.Y) || _window == IntPtr.Zero)
+            {
+                // Over the area: a real wheel turn, exactly as if the user did it (smooth scrolling and all).
+                var inputs = new[] { new INPUT { type = INPUT_MOUSE, mi = new MOUSEINPUT { mouseData = delta, dwFlags = MOUSEEVENTF_WHEEL } } };
+                if (SendInput(1, inputs, Marshal.SizeOf<INPUT>()) != 1)
+                    Log.Info($"SendInput (wheel) failed: {Marshal.GetLastWin32Error()}");
+            }
+            else
+            {
+                // Elsewhere: tell the window under the area that the wheel turned over its middle.
+                var wParam = (IntPtr)((delta & 0xFFFF) << 16);
+                var lParam = (IntPtr)((_cy & 0xFFFF) << 16 | (_cx & 0xFFFF));
+                PostMessage(_window, WM_MOUSEWHEEL, wParam, lParam);
+            }
+        }
+
+        /// <summary>Whether the primary button is still held (the physical right one when buttons are swapped).</summary>
+        public static bool PrimaryButtonDown() =>
+            Win32.IsKeyDown(Win32.GetSystemMetrics(SM_SWAPBUTTON) != 0 ? 0x02 /* VK_RBUTTON */ : 0x01 /* VK_LBUTTON */);
     }
 }
 
 /// <summary>The little pill shown while a scrolling capture runs. Kept out of the captured frames.</summary>
 internal sealed class ScrollingPill : Window
 {
-    private const double PillWidth = 250, PillHeight = 34, Gap = 8;
+    private const double PillWidth = 300, PillHeight = 34, Gap = 8;
 
     private readonly TextBlock _height;
+    private readonly TextBlock _title;
     private readonly Ellipse _dot;
     private IntPtr _hwnd;
 
@@ -234,9 +449,9 @@ internal sealed class ScrollingPill : Window
         Height = PillHeight;
 
         _dot = new Ellipse { Width = 10, Height = 10, Fill = SpaceTheme.CometBlueBrush, Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-        var title = new TextBlock
+        var title = _title = new TextBlock
         {
-            Text = L.T("Scrolling…"), Foreground = SpaceTheme.StarWhiteBrush, FontFamily = SpaceTheme.UiFont,
+            Text = L.T("Scroll, then let go"), Foreground = SpaceTheme.StarWhiteBrush, FontFamily = SpaceTheme.UiFont,
             FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
         };
         _height = new TextBlock
@@ -246,7 +461,7 @@ internal sealed class ScrollingPill : Window
         };
         var hint = new TextBlock
         {
-            Text = L.T("Esc to stop"), Foreground = SpaceTheme.DustBrush, FontFamily = SpaceTheme.UiFont,
+            Text = L.T("Esc cancels"), Foreground = SpaceTheme.DustBrush, FontFamily = SpaceTheme.UiFont,
             FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0),
         };
         var row = new DockPanel { LastChildFill = false };
@@ -270,6 +485,8 @@ internal sealed class ScrollingPill : Window
     public void ShowFor(PixelRect region)
     {
         _height.Text = "";
+        _title.Text = L.T("Scroll, then let go");
+        _dot.Fill = SpaceTheme.CometBlueBrush;
         if (_hwnd == IntPtr.Zero)
         {
             _hwnd = new WindowInteropHelper(this).EnsureHandle();
@@ -295,7 +512,13 @@ internal sealed class ScrollingPill : Window
         });
     }
 
-    public void SetHeight(int pixels) => _height.Text = L.F("{0:N0} px", pixels);
+    /// <summary>The height so far, or a warning when the page went by too fast to follow.</summary>
+    public void Show(int pixels, bool lost)
+    {
+        _height.Text = lost ? "" : L.F("{0:N0} px", pixels);
+        _title.Text = lost ? L.T("Too fast: scroll back a little") : L.T("Scroll, then let go");
+        _dot.Fill = lost ? SpaceTheme.SunBrush : SpaceTheme.CometBlueBrush;
+    }
 
     public void HideNow()
     {

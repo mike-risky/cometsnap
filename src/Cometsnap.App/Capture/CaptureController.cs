@@ -50,6 +50,14 @@ public sealed class CaptureController
         _overlay.Cancelled += () => { _pick = null; _pickImage = null; };
         _overlay.SaveRequested += image => { _pick = null; _pickImage = null; SaveAs(image); };
         _overlay.EditRequested += (image, doc) => { _pick = null; _pickImage = null; _app.OpenInEditor(image, doc); };
+        // Wheel with the button held: a scrolling capture (not while picking what to record).
+        _overlay.CanScroll = () => _pick is null && !_app.Scrolling.IsRunning;
+        _overlay.ScrollStarted += (rect, delta) =>
+        {
+            var pickImage = _pickImage; // "Copy text" reads the whole long page
+            _pickImage = null;
+            _app.Scrolling.RunHeld(rect, delta, pickImage);
+        };
         _overlay.Prewarm();
     }
 
@@ -98,7 +106,13 @@ public sealed class CaptureController
     public void DeliverImage(BitmapSource image, PixelRect from) => Deliver(image, from);
 
     /// <summary>Region / window capture with the frozen-screen overlay.</summary>
-    public void StartRegion()
+    public void StartRegion() => StartRegion(scrollHint: false);
+
+    /// <summary>
+    /// Region / window capture with the frozen-screen overlay. Holding the button and scrolling
+    /// turns it into a scrolling capture; <paramref name="scrollHint"/> says so on the size tag.
+    /// </summary>
+    public void StartRegion(bool scrollHint)
     {
         if (_overlay.IsCapturing) return;
         CancelDelay();
@@ -109,7 +123,7 @@ public sealed class CaptureController
             var grabbed = sw.ElapsedMilliseconds;
             var windows = WindowFinder.Snapshot(_pid);
             var monitors = Monitors.All();
-            _overlay.Begin(screen, windows, monitors, _app.Settings);
+            _overlay.Begin(screen, windows, monitors, _app.Settings, scrollHint);
             Log.Info($"Overlay ready in {sw.ElapsedMilliseconds} ms (grab {grabbed} ms, {windows.Count} windows, {screen.Bounds})");
         }
         catch (Exception ex)

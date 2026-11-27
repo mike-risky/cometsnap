@@ -176,6 +176,14 @@ internal sealed class OverlaySurface : Control
         _session.Release(x, y);
     }
 
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        if (_session is null) return;
+        e.Handled = true;
+        _session.Wheel(Math.Sign(e.Delta.Y));
+    }
+
     public void HandleKey(KeyEventArgs e, bool down)
     {
         var s = _session;
@@ -293,7 +301,7 @@ internal sealed class OverlaySurface : Control
             : s.Purpose == OverlayPurpose.Text
             ? T("Drag over the text to copy, or click a window · Esc cancel")
             : s.Purpose == OverlayPurpose.Scroll
-            ? T("Click the window to scroll, or drag over the part that scrolls · Esc cancel")
+            ? T("Hold the button and scroll to capture a long page")
             : s.WindowDetection
                 ? T("Click a window or drag an area · F full screen · C copy color · Esc cancel")
                 : T("Drag an area or click for the whole screen · C copy color · Esc cancel"));

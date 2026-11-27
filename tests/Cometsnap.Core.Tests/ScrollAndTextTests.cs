@@ -87,6 +87,70 @@ public class ScrollStitcherTests
     }
 
     [Fact]
+    public void Scrolling_back_up_by_hand_is_picked_up_again_further_down()
+    {
+        // Held-button scrolling: the user scrolls in small uneven steps, goes back up, then on.
+        const int pageHeight = 1400;
+        var page = Page(pageHeight);
+        var stitcher = new ScrollStitcher(W, H);
+        stitcher.Add(Frame(page, pageHeight, 0));
+        foreach (var at in new[] { 12, 40, 41, 95, 160 })
+            Assert.Equal(StitchStep.Appended, stitcher.Add(Frame(page, pageHeight, at)));
+        Assert.Equal(StitchStep.Lost, stitcher.Add(Frame(page, pageHeight, 100))); // back up
+        Assert.Equal(StitchStep.Unchanged, stitcher.Add(Frame(page, pageHeight, 160)));
+        Assert.Equal(StitchStep.Appended, stitcher.Add(Frame(page, pageHeight, 300)));
+
+        var image = stitcher.Compose(out var height);
+        Assert.Equal(H + 300, height);
+        for (var y = 0; y < 300 + H - Header - Footer; y++)
+        for (var x = 0; x < W - Scrollbar; x += 5)
+            Assert.Equal(page[(y * W + x) * 4], image[((Header + y) * W + x) * 4]);
+    }
+
+    /// <summary>A page of soft blocks (like text lines seen from afar), drawn at a fractional scroll position.</summary>
+    private static byte[] SoftFrame(int scrollTimes10, int seed = 3)
+    {
+        var rnd = new Random(seed);
+        var blocks = new byte[400, W / 16 + 1];
+        for (var by = 0; by < 400; by++)
+        for (var bx = 0; bx <= W / 16; bx++)
+            blocks[by, bx] = (byte)(by % 4 == 3 ? 250 : rnd.Next(30, 230));
+        double Page(double y, int x)
+        {
+            var by = y / 9;
+            var b0 = (int)Math.Floor(by);
+            var t = by - b0;
+            return blocks[b0, x / 16] * (1 - t) + blocks[b0 + 1, x / 16] * t;
+        }
+        var f = new byte[W * 4 * H];
+        for (var y = 0; y < H; y++)
+        for (var x = 0; x < W; x++)
+        {
+            var v = (byte)Math.Round(Page(y + scrollTimes10 / 10.0, x));
+            var i = (y * W + x) * 4;
+            f[i] = f[i + 1] = f[i + 2] = v;
+            f[i + 3] = 255;
+        }
+        return f;
+    }
+
+    [Fact]
+    public void Follows_fractional_smooth_scrolling_that_never_matches_exactly()
+    {
+        var stitcher = new ScrollStitcher(W, H, ignoreRight: 0);
+        stitcher.Add(SoftFrame(0));
+        var at = 0;
+        foreach (var stepTimes10 in new[] { 123, 457, 31, 806, 999, 52, 1500 })
+        {
+            at += stepTimes10;
+            Assert.Equal(StitchStep.Appended, stitcher.Add(SoftFrame(at)));
+        }
+        stitcher.Compose(out var height);
+        // Each step is rounded to a whole pixel: within a few pixels of the real distance.
+        Assert.InRange(height, H + at / 10 - 5, H + at / 10 + 5);
+    }
+
+    [Fact]
     public void Same_frame_is_unchanged()
     {
         var page = Page(800);

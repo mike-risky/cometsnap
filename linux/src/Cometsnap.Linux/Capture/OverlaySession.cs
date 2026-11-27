@@ -11,7 +11,7 @@ public enum OverlayPurpose
     Record,
     /// <summary>Pick the text to copy (OCR).</summary>
     Text,
-    /// <summary>Pick the window to scroll.</summary>
+    /// <summary>A screenshot, with a reminder that holding the button and scrolling makes a long one.</summary>
     Scroll,
 }
 
@@ -41,6 +41,12 @@ public sealed class OverlaySession
     public WindowInfo? HoverWindow { get; private set; }
     public LoupeCorner LoupeCorner { get; private set; }
     public string? Flash { get; private set; }
+
+    /// <summary>Set when the wheel turned with the button held: a scrolling capture of the result takes over (1 = up, -1 = down).</summary>
+    public int ScrollDelta { get; private set; }
+
+    /// <summary>Whether holding the button and scrolling may start a scrolling capture here.</summary>
+    public bool CanScroll { get; set; }
 
     private int _startX, _startY;
     private bool _moveMode;
@@ -153,6 +159,17 @@ public sealed class OverlaySession
         Pressed = false;
         if (Dragging && Selection is { IsEmpty: false } sel) Finish(sel);
         else if (HoverRect is { } hover) Finish(hover);
+    }
+
+    /// <summary>The wheel with the button still held (dragging an area, or pressing on a window).</summary>
+    public void Wheel(int direction)
+    {
+        if (_finished || !Pressed || !CanScroll || direction == 0) return;
+        var rect = Dragging ? Selection : HoverRect;
+        if (rect is not { } r || r.Width < ScrollingCapture.MinWidth || r.Height < ScrollingCapture.MinHeight) return;
+        ScrollDelta = direction;
+        Pressed = false;
+        Finish(r);
     }
 
     /// <summary>Right click / Esc: drop the drag first, close on the second press.</summary>

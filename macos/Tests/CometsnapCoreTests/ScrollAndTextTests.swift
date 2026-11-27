@@ -63,6 +63,41 @@ final class ScrollStitcherTests: XCTestCase {
         }
     }
 
+    /// Soft blocks (like text lines seen from afar), drawn at a fractional scroll position.
+    private func softFrame(_ scrollTimes10: Int) -> [UInt8] {
+        var state: UInt64 = 3
+        var blocks = [[UInt8]](repeating: [UInt8](repeating: 0, count: w / 16 + 1), count: 400)
+        for by in 0..<400 {
+            for bx in 0...(w / 16) {
+                state = state &* 6364136223846793005 &+ 1442695040888963407
+                blocks[by][bx] = by % 4 == 3 ? 250 : UInt8(30 + Int(state >> 33) % 200)
+            }
+        }
+        var f = [UInt8](repeating: 255, count: w * 4 * h)
+        for y in 0..<h {
+            let py = (Double(y) + Double(scrollTimes10) / 10) / 9
+            let b0 = Int(py.rounded(.down)), t = py - Double(b0)
+            for x in 0..<w {
+                let v = UInt8((Double(blocks[b0][x / 16]) * (1 - t) + Double(blocks[b0 + 1][x / 16]) * t).rounded())
+                let i = (y * w + x) * 4
+                f[i] = v; f[i + 1] = v; f[i + 2] = v
+            }
+        }
+        return f
+    }
+
+    func testFollowsFractionalSmoothScrolling() {
+        let s = ScrollStitcher(width: w, frameHeight: h, ignoreRight: 0)
+        _ = s.add(softFrame(0))
+        var at = 0
+        for step in [123, 457, 31, 806, 999, 52, 1500] {
+            at += step
+            XCTAssertEqual(s.add(softFrame(at)), .appended)
+        }
+        let (_, height) = s.compose()
+        XCTAssertTrue(abs(height - (h + at / 10)) <= 5, "\(height)")
+    }
+
     func testAFrameFromElsewhereIsLost() {
         let s = ScrollStitcher(width: w, frameHeight: h)
         _ = s.add(frame(page(1000), 1000, 0))

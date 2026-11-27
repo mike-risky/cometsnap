@@ -10,7 +10,7 @@ namespace Cometsnap.App.Recording;
 
 /// <summary>
 /// A thin red line drawn just outside the recorded region, so you always know what is being
-/// recorded. Click-through, never focused, and outside the region (and excluded from capture).
+/// recorded (blue around a scrolling capture). Click-through, never focused, and outside the region (and excluded from capture).
 /// </summary>
 internal sealed class RecordingFrame : Window
 {
@@ -20,7 +20,7 @@ internal sealed class RecordingFrame : Window
     private readonly Border _border;
     private IntPtr _hwnd;
 
-    public RecordingFrame()
+    public RecordingFrame(Color? color = null)
     {
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -37,7 +37,7 @@ internal sealed class RecordingFrame : Window
         Height = 1;
         _border = new Border
         {
-            BorderBrush = SpaceTheme.WithAlpha(SpaceTheme.RecordRed, 0xE6),
+            BorderBrush = SpaceTheme.WithAlpha(color ?? SpaceTheme.RecordRed, 0xE6),
             CornerRadius = new CornerRadius(1),
         };
         Content = _border;
