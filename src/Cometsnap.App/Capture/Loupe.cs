@@ -142,7 +142,7 @@ public sealed class Loupe : Border
         _swatch.BorderThickness = new Thickness(1);
         _swatch.Margin = new Thickness(0, 0, pad, 0);
         _hint.Margin = new Thickness(pad, 0, 0, 0);
-        _hint.Text = L.T("C copy");
+        ResetHint();
         _info.Margin = new Thickness(pad, pad, pad, pad / 2.0);
 
         BorderThickness = new Thickness(Math.Max(1, Math.Round(dpiScale)));
@@ -162,13 +162,25 @@ public sealed class Loupe : Border
     {
         _brush.Viewbox = new Rect(localX - Half, localY - Half, Cells, Cells);
         _position.Text = string.Create(CultureInfo.InvariantCulture, $"X {screenX}  Y {screenY}");
-        _size.Text = sizeText ?? " ";
+        _size.Text = sizeText ?? $"RGB {color.R}, {color.G}, {color.B}";
         _hex.Text = HexOf(color);
         _swatch.Background = new SolidColorBrush(color);
     }
 
     public void FlashHint(string text) => _hint.Text = text;
-    public void ResetHint() => _hint.Text = L.T("C copy");
+    public void ResetHint() => _hint.Text = _pickMode ? L.T("Click copy") : L.T("C copy");
+
+    private bool _pickMode;
+
+    /// <summary>Color picker mode: the hint says a click copies, and RGB shows instead of the size.</summary>
+    public void SetPickMode(bool on)
+    {
+        _pickMode = on;
+        ResetHint();
+    }
+
+    /// <summary>The border takes the capture theme's accent.</summary>
+    public void SetAccent(Brush accent) => BorderBrush = accent;
 
     public static string HexOf(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
 }

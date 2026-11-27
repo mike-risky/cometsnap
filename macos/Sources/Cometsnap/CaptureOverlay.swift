@@ -25,7 +25,7 @@ struct OverlayResult {
 /// the cursor (click grabs it), drag selects any area with edges snapping to windows, and a
 /// loupe in a corner shows the real pixels and dodges the cursor.
 final class CaptureOverlay {
-    enum Purpose { case screenshot, recording, text, scrolling }
+    enum Purpose { case screenshot, recording, text, scrolling, color }
 
     let purpose: Purpose
     let loupeCorner: LoupeCorner
@@ -33,6 +33,8 @@ final class CaptureOverlay {
     private var windows: [OverlayWindow] = []
     let windowList: [WindowInfo]
     private var completion: ((OverlayResult?) -> Void)?
+    /// Color picker: called after a click copied this color (#RRGGBB or rgb(...)) to the clipboard.
+    var onColor: ((PixelProbe.Color, String) -> Void)?
 
     // Shared state, AppKit global points.
     var mouse: CGPoint = NSEvent.mouseLocation
@@ -77,7 +79,7 @@ final class CaptureOverlay {
 
     /// The window (or whole screen) under the cursor when not dragging.
     var hovered: CGRect? {
-        guard !isDragging else { return nil }
+        guard !isDragging, purpose != .color else { return nil }
         guard let s = screen(containing: mouse) else { return nil }
         if detectWindows, let w = windowList.first(where: { $0.frame.contains(mouse) }) {
             let r = w.frame.intersection(s.frame)
@@ -112,6 +114,11 @@ final class CaptureOverlay {
     }
 
     func mouseDown(at p: CGPoint, snapping: Bool) {
+        if purpose == .color {
+            mouse = p
+            pickColor(rgb: NSEvent.modifierFlags.contains(.shift))
+            return
+        }
         let start = snapping ? EdgeSnapper.snap(p, toEdgesOf: snapCandidates()) : p
         dragStart = start
         dragCurrent = start
@@ -152,7 +159,7 @@ final class CaptureOverlay {
     /// The wheel with the button still held (dragging an area, or pressing on a window): hand
     /// over to the scrolling capture, which scrolls the real page under that area.
     func scrollWheel(_ deltaY: CGFloat, precise: Bool) {
-        guard dragStart != nil, purpose != .recording, deltaY != 0 else { return }
+        guard dragStart != nil, purpose != .recording, purpose != .color, deltaY != 0 else { return }
         guard let rect = isDragging ? selection : hovered,
               let f = frozenScreen(containing: CGPoint(x: rect.midX, y: rect.midY)) else { return }
         let clipped = rect.intersection(f.screen.frame).integral
@@ -170,6 +177,7 @@ final class CaptureOverlay {
     }
 
     func confirm() {
+        if purpose == .color { pickColor(rgb: NSEvent.modifierFlags.contains(.shift)); return }
         if let r = highlight { finish(r, near: isDragging ? (dragStart ?? mouse) : mouse) }
     }
 
@@ -185,6 +193,7 @@ final class CaptureOverlay {
     }
 
     func fullscreen() {
+        guard purpose != .color else { return }
         if let s = screen(containing: mouse) { finish(s.frame, near: mouse) }
     }
 
@@ -203,10 +212,22 @@ final class CaptureOverlay {
         if dragStart != nil { mouseDragged(to: p, snapping: false) } else { mouseMoved(to: p) }
     }
 
-    func copyColorUnderCursor() {
+    /// C (any time the loupe is up): #RRGGBB, or rgb(...) with Shift. In the color picker it also closes.
+    func copyColorUnderCursor(rgb: Bool) {
+        if purpose == .color { pickColor(rgb: rgb); return }
         guard let f = frozenScreen(containing: mouse), let c = PixelProbe.color(in: f, at: mouse) else { return }
-        Clipboard.copyText(c.hex)
-        for w in windows { w.overlayView.flash(L.f("Copied {0}", c.hex)) }
+        let text = rgb ? c.rgb : c.hex
+        Clipboard.copyText(text)
+        for w in windows { w.overlayView.flash(L.f("Copied {0}", text)) }
+    }
+
+    private func pickColor(rgb: Bool) {
+        guard let f = frozenScreen(containing: mouse), let c = PixelProbe.color(in: f, at: mouse) else { return }
+        let text = rgb ? c.rgb : c.hex
+        Clipboard.copyText(text)
+        let picked = onColor
+        close(with: nil)
+        picked?(c, text)
     }
 
     private func finish(_ rect: CGRect, near p: CGPoint) {
@@ -232,7 +253,8 @@ final class CaptureOverlay {
 
 enum PixelProbe {
     struct Color { let r: UInt8, g: UInt8, b: UInt8
-        var hex: String { String(format: "#%02X%02X%02X", r, g, b) }
+        var hex: String { ColorText.hex(r, g, b) }
+        var rgb: String { ColorText.rgb(r, g, b) }
         var ns: NSColor { NSColor(srgbRed: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1) }
     }
 
@@ -316,9 +338,9 @@ final class OverlayView: NSView {
         layer?.addSublayer(dimLayer)
 
         borderLayer.fillColor = nil
-        borderLayer.strokeColor = Theme.blue.cgColor
+        borderLayer.strokeColor = CaptureLook.accent.cgColor
         borderLayer.lineWidth = 2
-        borderLayer.shadowColor = Theme.blue.cgColor
+        borderLayer.shadowColor = CaptureLook.accent.cgColor
         borderLayer.shadowRadius = 8
         borderLayer.shadowOpacity = 0.9
         borderLayer.shadowOffset = .zero
@@ -332,17 +354,19 @@ final class OverlayView: NSView {
         case .recording: hint.text = L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
         case .text: hint.text = L.t("Drag over the text to copy, or click a window · Esc cancel")
         case .scrolling: hint.text = L.t("Drag over the part that scrolls, then keep the button held and scroll · Esc cancel")
+        case .color: hint.text = L.t("Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels")
         case .screenshot: hint.text = L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")
         }
         addSubview(hint)
         hint.sizeToFitText()
         hint.setFrameOrigin(CGPoint(x: (bounds.width - hint.frame.width) / 2, y: bounds.height - hint.frame.height - 40))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { [weak self] in
+        // The color picker keeps its hint up: it is the only thing telling what a click does.
+        if overlay.purpose != .color { DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) { [weak self] in
             NSAnimationContext.runAnimationGroup { ctx in
                 ctx.duration = 0.4
                 self?.hint.animator().alphaValue = 0
             }
-        }
+        } }
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -408,7 +432,7 @@ final class OverlayView: NSView {
             switch event.charactersIgnoringModifiers?.lowercased() {
             case "f": overlay.fullscreen()
             case "w": overlay.toggleDetection()
-            case "c": overlay.copyColorUnderCursor()
+            case "c": overlay.copyColorUnderCursor(rgb: event.modifierFlags.contains(.shift))
             default: break
             }
         }
@@ -496,7 +520,7 @@ final class TagView: NSView {
 
     private var attributes: [NSAttributedString.Key: Any] {
         switch style {
-        case .size: return [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .bold), .foregroundColor: Theme.night]
+        case .size: return [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .bold), .foregroundColor: CaptureLook.tagText]
         case .hint: return [.font: Theme.ui(13, .medium), .foregroundColor: NSColor.white]
         }
     }
@@ -508,7 +532,7 @@ final class TagView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let path = NSBezierPath(roundedRect: bounds, xRadius: style == .hint ? bounds.height / 2 : 5, yRadius: style == .hint ? bounds.height / 2 : 5)
-        (style == .hint ? Theme.night.withAlphaComponent(0.92) : Theme.yellow).setFill()
+        (style == .hint ? Theme.night.withAlphaComponent(0.92) : CaptureLook.tag).setFill()
         path.fill()
         if style == .hint {
             Theme.line.setStroke()
@@ -538,8 +562,9 @@ final class LoupeView: NSView {
         wantsLayer = true
         layer?.cornerRadius = 12
         layer?.backgroundColor = Theme.night.withAlphaComponent(0.95).cgColor
-        layer?.borderColor = Theme.line.cgColor
-        layer?.borderWidth = 1
+        // The classic blue look keeps its quiet border; the other themes show their color.
+        layer?.borderColor = (CaptureLook.theme.id == CaptureThemes.defaultID ? Theme.line : CaptureLook.accent).cgColor
+        layer?.borderWidth = CaptureLook.theme.id == CaptureThemes.defaultID ? 1 : 1.5
         layer?.shadowOpacity = 0.5
         layer?.shadowRadius = 10
     }
@@ -604,6 +629,10 @@ final class LoupeView: NSView {
             let s = "\(Int(selection.width.rounded())) × \(Int(selection.height.rounded()))" as NSString
             let w = s.size(withAttributes: white).width
             s.draw(at: CGPoint(x: bounds.width - 10 - w, y: y), withAttributes: [.font: mono, .foregroundColor: Theme.yellow])
+        } else if let color {
+            let s = "\(color.r), \(color.g), \(color.b)" as NSString
+            let w = s.size(withAttributes: muted).width
+            s.draw(at: CGPoint(x: bounds.width - 10 - w, y: y), withAttributes: muted)
         }
         y -= 18
         if let color {

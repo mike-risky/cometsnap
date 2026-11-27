@@ -35,8 +35,6 @@ public sealed class CaptureOverlay : Window
     private const int SnapDistance = 8;
 
     private static readonly SolidColorBrush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x8C, 0x07, 0x11, 0x3A)));
-    private static readonly SolidColorBrush GlowBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x55, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
-    private static readonly SolidColorBrush GuideBrush = Freeze(new SolidColorBrush(Color.FromArgb(0x70, SpaceTheme.CometBlue.R, SpaceTheme.CometBlue.G, SpaceTheme.CometBlue.B)));
 
     private readonly Canvas _root;
     private readonly ScaleTransform _scale = new(1, 1);
@@ -112,6 +110,11 @@ public sealed class CaptureOverlay : Window
     public event Action<PixelRect, int>? ScrollStarted;
 
     private bool _scrollHint;
+    private bool _pickColor;
+    private int _lookVersion = -1;
+
+    /// <summary>Color picker mode: a click copied this color (#RRGGBB or rgb(...)) to the clipboard.</summary>
+    public event Action<Color, string>? ColorPicked;
 
     public CaptureOverlay()
     {
@@ -139,13 +142,13 @@ public sealed class CaptureOverlay : Window
         dimGeometry.Children.Add(_hole);
         var dim = new Path { Data = dimGeometry, Fill = DimBrush, IsHitTestVisible = false };
 
-        _glow = new Rectangle { Stroke = GlowBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
-        _border = new Rectangle { Stroke = SpaceTheme.CometBlueBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
-        _guideH = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
-        _guideV = new Line { Stroke = GuideBrush, StrokeThickness = 1, IsHitTestVisible = false };
+        _glow = new Rectangle { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _border = new Rectangle { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _guideH = new Line { StrokeThickness = 1, IsHitTestVisible = false };
+        _guideV = new Line { StrokeThickness = 1, IsHitTestVisible = false };
 
-        _labelText = new TextBlock { Foreground = SpaceTheme.VoidBrush, FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.SemiBold };
-        _label = new Border { Child = _labelText, Background = SpaceTheme.SunBrush, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+        _labelText = new TextBlock { FontFamily = SpaceTheme.UiFont, FontWeight = FontWeights.SemiBold };
+        _label = new Border { Child = _labelText, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
 
         _loupe = new Loupe();
         _layer = new AnnotationLayer { Document = _doc, Clip = _layerClip };
@@ -192,13 +195,15 @@ public sealed class CaptureOverlay : Window
         Hide();
     }
 
-    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings, bool scrollHint = false)
+    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings, bool scrollHint = false, bool pickColor = false)
     {
         if (_hwnd == IntPtr.Zero) Prewarm();
         _scrollHint = scrollHint;
+        _pickColor = pickColor;
 
         _screen = screen;
         _settings = settings;
+        ApplyLook();
         _full = new PixelRect(0, 0, screen.Bounds.Width, screen.Bounds.Height);
         _windows = windows
             .Select(w => w with { Bounds = screen.ToLocal(w.Bounds).Intersect(_full) })
@@ -206,7 +211,7 @@ public sealed class CaptureOverlay : Window
             .ToList();
         _monitors = monitors.Select(screen.ToLocal).ToList();
         _snapper = new EdgeSnapper(_windows.Select(w => w.Bounds).Concat(_monitors), SnapDistance);
-        _detectWindows = settings.WindowDetection;
+        _detectWindows = settings.WindowDetection && !pickColor;
         _instant = settings.InstantCapture;
         _loupeCorner = settings.LoupeCorner;
         _hover = null;
@@ -238,6 +243,7 @@ public sealed class CaptureOverlay : Window
         _scale.ScaleY = 1 / VisualTreeHelper.GetDpi(this).DpiScaleY;
         ApplyDpiSizes();
         _loupe.Configure(screen.Image, _dpi);
+        _loupe.SetPickMode(pickColor);
         _bar.Configure(_dpi);
 
         Win32.GetCursorPos(out var p);
@@ -415,6 +421,11 @@ public sealed class CaptureOverlay : Window
     {
         if (_mode == Mode.Idle) return;
         e.Handled = true;
+        if (_pickColor)
+        {
+            PickColor(rgb: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+            return;
+        }
         _pressX = _cx;
         _pressY = _cy;
 
@@ -467,6 +478,7 @@ public sealed class CaptureOverlay : Window
     /// </summary>
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
+        if (_pickColor) return;
         if (_mode is not (Mode.Pressed or Mode.Dragging) || _screen is null) return;
         e.Handled = true;
         if (CanScroll?.Invoke() != true) return;
@@ -479,7 +491,7 @@ public sealed class CaptureOverlay : Window
 
     private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_mode == Mode.Idle) return;
+        if (_mode == Mode.Idle || _pickColor) return;
         e.Handled = true;
         if (IsMouseCaptured) ReleaseMouseCapture();
 
@@ -635,6 +647,10 @@ public sealed class CaptureOverlay : Window
                 SetColor(QuickBar.Palette[key - Key.NumPad1]);
                 return;
 
+            case Key.Enter or Key.Space or Key.C when _pickColor:
+                PickColor(rgb: shift);
+                return;
+
             case Key.Enter:
                 if (_mode == Mode.Hover && _hover is { } hover) _selection = hover;
                 Confirm();
@@ -645,14 +661,16 @@ public sealed class CaptureOverlay : Window
                 return;
 
             case Key.C:
+                // The color under the cursor, any time the loupe is up: C = #RRGGBB, Shift+C = rgb(...).
                 if (_screen is not null)
                 {
-                    var hex = Loupe.HexOf(_screen.ColorAt(_cx, _cy));
-                    if (Services.ClipboardService.SetText(hex)) _loupe.FlashHint(L.T("Copied!"));
+                    var c = _screen.ColorAt(_cx, _cy);
+                    var text = shift ? ColorText.Rgb(c.R, c.G, c.B) : ColorText.Hex(c.R, c.G, c.B);
+                    if (Services.ClipboardService.SetText(text)) _loupe.FlashHint(L.T("Copied!"));
                 }
                 return;
 
-            case Key.F:
+            case Key.F when !_pickColor:
                 _selection = Monitors.Containing(_monitors, _cx, _cy).Intersect(_full);
                 _mode = Mode.Selected;
                 if (_instant)
@@ -663,7 +681,7 @@ public sealed class CaptureOverlay : Window
                 Refresh();
                 return;
 
-            case Key.W:
+            case Key.W when !_pickColor:
                 _detectWindows = !_detectWindows;
                 if (_mode == Mode.Hover) UpdateHover();
                 Refresh();
@@ -728,7 +746,7 @@ public sealed class CaptureOverlay : Window
     {
         if (_screen is null) return;
 
-        PixelRect? target = _mode is Mode.Hover or Mode.Pressed ? _hover : _selection.IsEmpty ? null : _selection;
+        PixelRect? target = _pickColor ? null : _mode is Mode.Hover or Mode.Pressed ? _hover : _selection.IsEmpty ? null : _selection;
 
         if (target is { } r)
         {
@@ -751,13 +769,29 @@ public sealed class CaptureOverlay : Window
             Canvas.SetLeft(_label, Math.Max(0, r.X));
             Canvas.SetTop(_label, ly);
         }
+        else if (_pickColor)
+        {
+            // Color picker: the tag follows the cursor and says what a click does.
+            _hole.Rect = Rect.Empty;
+            _border.Visibility = _glow.Visibility = Visibility.Collapsed;
+            _labelText.Text = L.T("Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels");
+            _label.Visibility = Visibility.Visible;
+            _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var monitor = Monitors.Containing(_monitors, _cx, _cy);
+            var lx = _cx + 16 * _dpi;
+            var ly = _cy + 20 * _dpi;
+            if (lx + _label.DesiredSize.Width > monitor.Right) lx = _cx - 16 * _dpi - _label.DesiredSize.Width;
+            if (ly + _label.DesiredSize.Height > monitor.Bottom) ly = _cy - 20 * _dpi - _label.DesiredSize.Height;
+            Canvas.SetLeft(_label, Math.Max(monitor.X, lx));
+            Canvas.SetTop(_label, Math.Max(monitor.Y, ly));
+        }
         else
         {
             _hole.Rect = Rect.Empty;
             _border.Visibility = _glow.Visibility = _label.Visibility = Visibility.Collapsed;
         }
 
-        var showGuides = _mode is Mode.Hover or Mode.Pressed or Mode.Dragging;
+        var showGuides = _pickColor || _mode is Mode.Hover or Mode.Pressed or Mode.Dragging;
         _guideH.Visibility = _guideV.Visibility = showGuides ? Visibility.Visible : Visibility.Collapsed;
         if (showGuides)
         {
@@ -851,7 +885,7 @@ public sealed class CaptureOverlay : Window
             Foreground = Annotation.CreateBrush(_color),
             Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0x66),
             CaretBrush = SpaceTheme.StarWhiteBrush,
-            BorderBrush = SpaceTheme.CometBlueBrush,
+            BorderBrush = CaptureLook.AccentBrush,
             BorderThickness = new Thickness(Math.Max(1, Math.Round(_dpi))),
             Padding = new Thickness(0),
             MinWidth = 40 * _dpi,
@@ -896,6 +930,31 @@ public sealed class CaptureOverlay : Window
         if (_textBox is null) return;
         _root.Children.Remove(_textBox);
         _textBox = null;
+    }
+
+    /// <summary>Paints the overlay in the capture theme picked in Settings (only when it changed).</summary>
+    private void ApplyLook()
+    {
+        CaptureLook.Use(_settings.CaptureTheme);
+        if (_lookVersion == CaptureLook.Version) return;
+        _lookVersion = CaptureLook.Version;
+        _border.Stroke = CaptureLook.AccentBrush;
+        _glow.Stroke = CaptureLook.AccentWithAlpha(0x55);
+        _guideH.Stroke = _guideV.Stroke = CaptureLook.AccentWithAlpha(0x70);
+        _label.Background = CaptureLook.TagBrush;
+        _labelText.Foreground = CaptureLook.TagTextBrush;
+        _loupe.SetAccent(CaptureLook.AccentBrush);
+    }
+
+    /// <summary>Color picker: copy the pixel under the cursor and close.</summary>
+    private void PickColor(bool rgb)
+    {
+        if (_screen is null) return;
+        var c = _screen.ColorAt(_cx, _cy);
+        var text = rgb ? ColorText.Rgb(c.R, c.G, c.B) : ColorText.Hex(c.R, c.G, c.B);
+        if (!Services.ClipboardService.SetText(text)) return;
+        End();
+        ColorPicked?.Invoke(c, text);
     }
 
     private static void PlaceFrame(Rectangle frame, PixelRect r, double outset)

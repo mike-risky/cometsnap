@@ -93,10 +93,19 @@ internal sealed class OverlaySurface : Control
     private static readonly double LoupeSize = LoupeCells * LoupeZoom;
 
     private static readonly IBrush DimBrush = SpaceTheme.WithAlpha(SpaceTheme.Void, 0x8C);
-    private static readonly IPen BorderPen = new ImmutablePen(SpaceTheme.CometBlueBrush, 2);
-    private static readonly IPen GlowPen = new ImmutablePen(SpaceTheme.WithAlpha(SpaceTheme.CometBlue, 0x55), 8);
-    private static readonly IPen GuidePen = new ImmutablePen(SpaceTheme.WithAlpha(SpaceTheme.CometBlue, 0x70), 1);
-    private static readonly IPen LoupeFramePen = new ImmutablePen(SpaceTheme.CometBlueBrush, 2);
+    // Capture theme pens, rebuilt when the theme changes (see CaptureLook).
+    private static int _penLook = -1;
+    private static IPen BorderPen = null!, GlowPen = null!, GuidePen = null!, LoupeFramePen = null!;
+
+    private static void EnsurePens()
+    {
+        if (_penLook == CaptureLook.Version) return;
+        _penLook = CaptureLook.Version;
+        BorderPen = new ImmutablePen(CaptureLook.AccentBrush, 2);
+        GlowPen = new ImmutablePen(SpaceTheme.WithAlpha(CaptureLook.Accent, 0x55), 8);
+        GuidePen = new ImmutablePen(SpaceTheme.WithAlpha(CaptureLook.Accent, 0x70), 1);
+        LoupeFramePen = new ImmutablePen(CaptureLook.AccentBrush, 2);
+    }
     private static readonly IPen GridPen = new ImmutablePen(new ImmutableSolidColorBrush(Color.FromArgb(0x30, 0, 0, 0)), 1);
     private static readonly IPen CenterPen = new ImmutablePen(SpaceTheme.SunBrush, 1.5);
     private static readonly Typeface Ui = new(SpaceTheme.UiFont, FontStyle.Normal, FontWeight.SemiBold);
@@ -163,6 +172,11 @@ internal sealed class OverlaySurface : Control
             return;
         }
         if (!point.Properties.IsLeftButtonPressed) return;
+        if (_session.Purpose == OverlayPurpose.Color)
+        {
+            _session.PickColor(x, y, rgb: e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            return;
+        }
         e.Pointer.Capture(this);
         _session.Press(x, y);
     }
@@ -202,11 +216,15 @@ internal sealed class OverlaySurface : Control
             case Key.F: s.CaptureMonitor(); break;
             case Key.W: s.ToggleWindowDetection(); break;
             case Key.Space: s.SetMoveMode(true); break;
+            case Key.C when s.Purpose == OverlayPurpose.Color:
+                s.PickColor(s.CursorX, s.CursorY, rgb: shift);
+                break;
             case Key.C:
-                if (s.ColorUnderCursor() is { } hex)
+                // C = #RRGGBB, Shift+C = rgb(...)
+                if (s.ColorTextUnderCursor(shift) is { } text)
                 {
-                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(hex);
-                    s.ShowFlash(F("Copied {0}", hex));
+                    _ = TopLevel.GetTopLevel(this)?.Clipboard?.SetTextAsync(text);
+                    s.ShowFlash(F("Copied {0}", text));
                 }
                 break;
             case Key.Left: X11.MovePointer(-step, 0); break;
@@ -224,6 +242,7 @@ internal sealed class OverlaySurface : Control
     {
         var s = _session;
         var bounds = new Rect(Bounds.Size);
+        EnsurePens();
         if (s is null)
         {
             dc.FillRectangle(Brushes.Black, bounds);
@@ -282,7 +301,7 @@ internal sealed class OverlaySurface : Control
 
     private static void DrawSizeTag(DrawingContext dc, PixelRect sel, Rect local, Rect bounds)
     {
-        var t = Text($"{sel.Width} × {sel.Height}", 13, SpaceTheme.VoidBrush);
+        var t = Text($"{sel.Width} × {sel.Height}", 13, CaptureLook.TagTextBrush);
         var w = t.Width + 14;
         var h = t.Height + 6;
         var x = Math.Clamp(local.X, 4, bounds.Width - w - 4);
@@ -290,13 +309,15 @@ internal sealed class OverlaySurface : Control
         if (y < 4) y = local.Y + 6;
         if (y + h > bounds.Height - 4) y = bounds.Height - h - 4;
         var box = new Rect(x, y, w, h);
-        dc.DrawRectangle(SpaceTheme.SunBrush, null, box, 5, 5);
+        dc.DrawRectangle(CaptureLook.TagBrush, null, box, 5, 5);
         dc.DrawText(t, new Point(x + 7, y + 3));
     }
 
     private static void DrawHint(DrawingContext dc, OverlaySession s, Rect bounds, Point cursor)
     {
-        var text = s.Flash ?? (s.Purpose == OverlayPurpose.Record
+        var text = s.Flash ?? (s.Purpose == OverlayPurpose.Color
+            ? T("Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels")
+            : s.Purpose == OverlayPurpose.Record
             ? T("RECORD: click a window or drag an area · F full screen · Esc cancel")
             : s.Purpose == OverlayPurpose.Text
             ? T("Drag over the text to copy, or click a window · Esc cancel")
@@ -309,7 +330,7 @@ internal sealed class OverlaySurface : Control
         var w = t.Width + 28;
         var h = t.Height + 14;
         var box = new Rect((bounds.Width - w) / 2, 18, w, h);
-        if (s.Flash is null && box.Inflate(40).Contains(cursor)) return; // out of the way
+        if (s.Flash is null && s.Purpose != OverlayPurpose.Color && box.Inflate(40).Contains(cursor)) return; // out of the way
         dc.DrawRectangle(SpaceTheme.WithAlpha(SpaceTheme.Void, 0xE6), new ImmutablePen(s.Purpose == OverlayPurpose.Record ? SpaceTheme.RecordRedBrush : SpaceTheme.NavyLightBrush, 1), box, h / 2, h / 2);
         dc.DrawText(t, new Point(box.X + 14, box.Y + 7));
     }
@@ -348,7 +369,7 @@ internal sealed class OverlaySurface : Control
 
         // Position, size and color.
         var hex = s.ColorUnderCursor() ?? "#------";
-        var size = s.Highlight is { } h ? $"{h.Width} × {h.Height}" : "";
+        var size = s.Highlight is { } h ? $"{h.Width} × {h.Height}" : s.ColorTextUnderCursor(rgb: true)?.Replace("rgb", "") ?? "";
         var line1 = Text($"{s.CursorX - monitor.X}, {s.CursorY - monitor.Y}   {size}", 12, SpaceTheme.StarWhiteBrush, Mono);
         dc.DrawText(line1, new Point(panel.X + 8, zoomRect.Bottom + 6));
         if (Color.TryParse(hex, out var color))

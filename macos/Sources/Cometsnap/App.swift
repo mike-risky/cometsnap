@@ -18,6 +18,7 @@ struct HotkeyDisplay {
     let gif: String
     var text = "⌘⇧9"
     var scrolling = "⌘⇧0"
+    var color = "⌘⇧6"
 }
 
 /// Owns everything: settings, the menu bar item, the flyout, capture, recording and editors.
@@ -49,6 +50,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(at: paths.dataDirectory, withIntermediateDirectories: true)
         Log.file = paths.logFile
         settings = AppSettings.load(from: paths.settingsFile)
+        CaptureLook.use(settings.captureTheme)
         L.use(settings.language)
         Theme.registerFonts()
         NSApp.appearance = NSAppearance(named: .darkAqua)
@@ -92,6 +94,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         let old = settings
         change(&settings)
         settings.save(to: paths.settingsFile)
+        CaptureLook.use(settings.captureTheme)
         if old.takeOverSystemShortcut != settings.takeOverSystemShortcut {
             SystemShortcuts.setBuiltInShortcuts(enabled: !settings.takeOverSystemShortcut)
             registerHotkeys()
@@ -158,6 +161,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         hk.register(.gifCtrlShiftF13, action: gif)
         hk.register(.textCmdShift9, action: { [weak self] in self?.capture.startTextCapture() })
         hk.register(.scrollingCmdShift0, action: { [weak self] in self?.scrolling.start() })
+        hk.register(.colorCmdShift6, action: { [weak self] in self?.capture.startColorPicker() })
     }
 
     // MARK: copy text (OCR)

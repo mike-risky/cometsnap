@@ -40,6 +40,7 @@
     <Compile Include="..\..\..\src\Cometsnap.Core\Capture\ScrollStitcher.cs" Link="Core\Shared\ScrollStitcher.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Text\OcrText.cs" Link="Core\Shared\OcrText.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Storage\TraySelection.cs" Link="Core\Shared\TraySelection.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Settings\CaptureThemes.cs" Link="Core\Shared\CaptureThemes.cs" />
   </ItemGroup>
 
   <ItemGroup>

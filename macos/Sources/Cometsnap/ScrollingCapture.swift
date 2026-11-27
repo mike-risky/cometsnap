@@ -214,6 +214,7 @@ private final class WheelRedirect {
 final class ScrollingPill: NSPanel {
     private let heightLabel = NSTextField(labelWithString: "")
     private let titleLabel = NSTextField(labelWithString: "")
+    private var root: NSView?
 
     init() {
         super.init(contentRect: CGRect(x: 0, y: 0, width: 330, height: 34), styleMask: [.borderless, .nonactivatingPanel],
@@ -230,8 +231,9 @@ final class ScrollingPill: NSPanel {
         root.wantsLayer = true
         root.layer?.backgroundColor = Theme.night.withAlphaComponent(0.94).cgColor
         root.layer?.cornerRadius = 17
-        root.layer?.borderWidth = 1
-        root.layer?.borderColor = Theme.line.cgColor
+        root.layer?.borderWidth = 1.5
+        root.layer?.borderColor = CaptureLook.accent.cgColor
+        self.root = root
         titleLabel.stringValue = L.t("Scroll, then let go")
         titleLabel.font = Theme.ui(13, .semibold)
         titleLabel.textColor = .white
@@ -255,6 +257,7 @@ final class ScrollingPill: NSPanel {
     }
 
     func show(above rect: CGRect, on screen: NSScreen) {
+        root?.layer?.borderColor = CaptureLook.accent.cgColor
         show(height: 0, lost: false)
         let vf = screen.visibleFrame
         let x = min(max(rect.midX - frame.width / 2, vf.minX), vf.maxX - frame.width)

@@ -159,6 +159,8 @@ final class SettingsWindow: NSWindow {
     private let gifFps = NSPopUpButton()
     private let language = NSPopUpButton()
     private let folder = NSTextField(labelWithString: "")
+    private var themeButtons: [NSButton] = []
+    private let preview = ThemePreviewView(frame: CGRect(x: 0, y: 0, width: 460, height: 132))
 
     init(app: AppController) {
         self.app = app
@@ -192,6 +194,30 @@ final class SettingsWindow: NSWindow {
         let change = NSButton(title: L.t("Change…"), target: self, action: #selector(chooseFolder))
         let reveal = NSButton(title: L.t("Open"), target: self, action: #selector(openFolder))
 
+        // Capture colors: one radio per theme, with a dot of its color, and a live preview.
+        themeButtons = CaptureThemes.all.map { t in
+            let b = NSButton(radioButtonWithTitle: CaptureLook.name(t), target: self, action: #selector(themeChanged(_:)))
+            b.image = Self.dot(NSColor(hex: t.accent))
+            b.imagePosition = .imageLeading
+            b.font = Theme.ui(12)
+            return b
+        }
+        let themeRow = NSStackView(views: themeButtons)
+        themeRow.spacing = 10
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        preview.widthAnchor.constraint(equalToConstant: 460).isActive = true
+        preview.heightAnchor.constraint(equalToConstant: 132).isActive = true
+        let themeHint = NSTextField(wrappingLabelWithString: L.t("The crosshair, frames, loupe and size tag, in the comet's colors."))
+        themeHint.font = Theme.ui(11)
+        themeHint.textColor = Theme.muted
+        let themeLabel = NSTextField(labelWithString: L.t("Capture colors"))
+        themeLabel.font = Theme.ui(12, .semibold)
+        themeLabel.textColor = .white
+        let themeBox = NSStackView(views: [themeLabel, themeHint, themeRow, preview])
+        themeBox.orientation = .vertical
+        themeBox.alignment = .leading
+        themeBox.spacing = 6
+
         let title = NSTextField(labelWithAttributedString: Theme.wordmark(28))
         func row(_ label: String, _ v: NSView) -> NSView {
             let l = NSTextField(labelWithString: label)
@@ -211,7 +237,7 @@ final class SettingsWindow: NSWindow {
         keys.preferredMaxLayoutWidth = 460
 
         let stack = NSStackView(views: [title, login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal,
-                                        row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), row(L.t("Captures folder"), folderRow), keys])
+                                        row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), row(L.t("Captures folder"), folderRow), themeBox, keys])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 9
@@ -248,6 +274,8 @@ final class SettingsWindow: NSWindow {
         let fpsValues = [8, 10, 12, 15, 20, 25]
         gifFps.selectItem(at: fpsValues.firstIndex(of: s.gifFramesPerSecond) ?? 3)
         language.selectItem(at: (L.languages.firstIndex { $0.code == s.language }).map { $0 + 1 } ?? 0)
+        for (i, t) in CaptureThemes.all.enumerated() { themeButtons[i].state = t.id == s.captureTheme ? .on : .off }
+        preview.theme = CaptureThemes.get(s.captureTheme)
         folder.stringValue = app.capturesDirectory.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
     }
 
@@ -278,6 +306,21 @@ final class SettingsWindow: NSWindow {
         DispatchQueue.main.async { [app] in app.languageChanged() }
     }
 
+    @objc private func themeChanged(_ sender: NSButton) {
+        guard let i = themeButtons.firstIndex(of: sender) else { return }
+        let id = CaptureThemes.all[i].id
+        app.update { $0.captureTheme = id }
+        reload()
+    }
+
+    private static func dot(_ color: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: 12, height: 12), flipped: false) { r in
+            color.setFill()
+            NSBezierPath(ovalIn: r.insetBy(dx: 0.5, dy: 0.5)).fill()
+            return true
+        }
+    }
+
     @objc private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -292,4 +335,58 @@ final class SettingsWindow: NSWindow {
     }
 
     @objc private func openFolder() { app.openCapturesFolder() }
+}
+
+/// A small fake capture screen in the chosen colors: dimmed desktop, selection with glow, size tag and loupe.
+final class ThemePreviewView: NSView {
+    var theme = CaptureThemes.all[0] { didSet { needsDisplay = true } }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let accent = NSColor(hex: theme.accent)
+        let b = bounds
+        let clip = NSBezierPath(roundedRect: b, xRadius: 10, yRadius: 10)
+        clip.addClip()
+        NSGradient(starting: Theme.surface, ending: Theme.night)?.draw(in: b, angle: -90)
+        func window(_ r: CGRect, bar: NSColor) {
+            NSColor(hex: 0x2A3C8F).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 4, yRadius: 4).fill()
+            bar.setFill()
+            NSBezierPath(roundedRect: CGRect(x: r.minX, y: r.maxY - 12, width: r.width, height: 12), xRadius: 4, yRadius: 4).fill()
+        }
+        window(CGRect(x: 22, y: 18, width: 180, height: 96), bar: Theme.rock)
+        Theme.night.withAlphaComponent(0.55).setFill()
+        b.fill()
+        let sel = CGRect(x: 140, y: 14, width: 210, height: 84)
+        window(sel, bar: NSColor(hex: 0x1F2559))
+        // glow + frame
+        accent.withAlphaComponent(0.33).setStroke()
+        let glow = NSBezierPath(rect: sel.insetBy(dx: -4, dy: -4)); glow.lineWidth = 4; glow.stroke()
+        accent.setStroke()
+        let frame = NSBezierPath(rect: sel.insetBy(dx: -1, dy: -1)); frame.lineWidth = 2; frame.stroke()
+        // size tag
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .bold), .foregroundColor: NSColor(hex: theme.tagText)]
+        let text = "1280 × 720" as NSString
+        let ts = text.size(withAttributes: attrs)
+        let tag = CGRect(x: sel.minX, y: sel.maxY + 6, width: ts.width + 12, height: ts.height + 4)
+        NSColor(hex: theme.tag).setFill()
+        NSBezierPath(roundedRect: tag, xRadius: 4, yRadius: 4).fill()
+        text.draw(at: CGPoint(x: tag.minX + 6, y: tag.minY + 2), withAttributes: attrs)
+        // loupe
+        let loupe = CGRect(x: b.maxX - 100, y: 10, width: 88, height: 108)
+        Theme.night.withAlphaComponent(0.95).setFill()
+        let lp = NSBezierPath(roundedRect: loupe, xRadius: 8, yRadius: 8); lp.fill()
+        (theme.id == CaptureThemes.defaultID ? Theme.line : accent).setStroke()
+        lp.lineWidth = 1.5; lp.stroke()
+        let cell: CGFloat = 15
+        for i in 0..<5 { for j in 0..<5 {
+            let r = CGRect(x: loupe.minX + 6.5 + CGFloat(i) * cell, y: loupe.maxY - 6.5 - CGFloat(j + 1) * cell, width: cell, height: cell)
+            let v = CGFloat((i * 37 + j * 53) % 40) / 255
+            (i == 2 && j == 2 ? accent : NSColor(srgbRed: 0.13 + v, green: 0.19 + v, blue: 0.45 + v, alpha: 1)).setFill()
+            r.fill()
+        } }
+        NSColor.white.setStroke()
+        NSBezierPath(rect: CGRect(x: loupe.minX + 6.5 + 2 * cell, y: loupe.maxY - 6.5 - 3 * cell, width: cell, height: cell)).stroke()
+        let hex = String(format: "#%06X", theme.accent) as NSString
+        hex.draw(at: CGPoint(x: loupe.minX + 14, y: loupe.minY + 8), withAttributes: [.font: NSFont.monospacedSystemFont(ofSize: 11, weight: .medium), .foregroundColor: NSColor.white])
+    }
 }

@@ -30,6 +30,22 @@ public sealed class CometFlight : Window
     private DateTime _start;
     private bool _flying;
 
+    private readonly Polygon _tail;
+    private readonly Ellipse _glow;
+    private int _look = -1;
+
+    /// <summary>Tail and glow in the capture theme's accent (the classic icy blue for the blue theme).</summary>
+    private void Paint()
+    {
+        if (_look == CaptureLook.Version) return;
+        _look = CaptureLook.Version;
+        var classic = CaptureLook.Theme.Id == Cometsnap.Core.Settings.CaptureThemes.DefaultId;
+        var far = classic ? Color.FromRgb(79, 195, 255) : CaptureLook.Accent;
+        var near = classic ? Color.FromRgb(120, 200, 255) : CaptureLook.Accent;
+        _tail.Fill = new LinearGradientBrush(Color.FromArgb(0, far.R, far.G, far.B), Color.FromArgb(200, near.R, near.G, near.B), new Point(0, 0.5), new Point(1, 0.5));
+        _glow.Fill = new RadialGradientBrush(Color.FromArgb(170, near.R, near.G, near.B), Color.FromArgb(0, far.R, far.G, far.B));
+    }
+
     public CometFlight()
     {
         WindowStyle = WindowStyle.None;
@@ -47,13 +63,11 @@ public sealed class CometFlight : Window
         var tail = new Polygon
         {
             Points = new PointCollection { new(c, c - 9), new(c - 80, c - 2), new(c - 80, c + 2), new(c, c + 9) },
-            Fill = new LinearGradientBrush(Color.FromArgb(0, 79, 195, 255), Color.FromArgb(200, 120, 200, 255), new Point(0, 0.5), new Point(1, 0.5)),
         };
-        var glow = new Ellipse
-        {
-            Width = 34, Height = 34,
-            Fill = new RadialGradientBrush(Color.FromArgb(170, 120, 200, 255), Color.FromArgb(0, 79, 195, 255)),
-        };
+        var glow = new Ellipse { Width = 34, Height = 34 };
+        _tail = tail;
+        _glow = glow;
+        Paint();
         Canvas.SetLeft(glow, c - 17);
         Canvas.SetTop(glow, c - 17);
         var head = new Ellipse { Width = 14, Height = 14, Fill = SpaceTheme.StarWhiteBrush };
@@ -87,6 +101,7 @@ public sealed class CometFlight : Window
     /// <summary>Fly from one physical screen point to another, carrying <paramref name="image"/> if given.</summary>
     public void Launch(Point from, Point to, BitmapSource? image = null)
     {
+        Paint();
         if (image is not null)
         {
             var scale = ThumbMax / Math.Max(1, Math.Max(image.PixelWidth, image.PixelHeight));

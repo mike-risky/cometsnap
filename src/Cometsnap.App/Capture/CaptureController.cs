@@ -58,10 +58,13 @@ public sealed class CaptureController
             _pickImage = null;
             _app.Scrolling.RunHeld(rect, delta, pickImage);
         };
+        _overlay.ColorPicked += (color, text) => (_colorToast ??= new ColorToast()).ShowFor(color, text);
         _overlay.Prewarm();
     }
 
     public bool IsBusy => _overlay.IsCapturing;
+
+    private ColorToast? _colorToast;
 
     private Action<PixelRect>? _pick;
     private Action<BitmapSource, PixelRect>? _pickImage;
@@ -107,6 +110,22 @@ public sealed class CaptureController
 
     /// <summary>Region / window capture with the frozen-screen overlay.</summary>
     public void StartRegion() => StartRegion(scrollHint: false);
+
+    /// <summary>Color picker: the loupe opens on the frozen screen, a click copies the color as #RRGGBB.</summary>
+    public void StartColorPicker()
+    {
+        if (_overlay.IsCapturing) return;
+        CancelDelay();
+        try
+        {
+            _overlay.Begin(FrozenScreen.CaptureVirtualScreen(), Array.Empty<WindowInfo>(), Monitors.All(), _app.Settings, pickColor: true);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Color picker failed", ex);
+            _overlay.Cancel();
+        }
+    }
 
     /// <summary>
     /// Region / window capture with the frozen-screen overlay. Holding the button and scrolling

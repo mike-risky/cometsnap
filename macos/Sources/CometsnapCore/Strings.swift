@@ -271,6 +271,15 @@ enum Strings {
         "Copied {0} files ✓": "{0} fichiers copiés ✓",
         "Moved {0} files to the trash": "{0} fichiers mis à la corbeille",
         "{0}+click or drag a box to pick several": "{0}+clic ou tracez un cadre pour en choisir plusieurs",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "Cliquez pour copier la couleur  ·  Maj+clic : RVB  ·  Échap annule",
+        "Pick a color": "Pipette à couleur",
+        "Capture colors": "Couleurs de capture",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "Le viseur, les cadres, la loupe et l’étiquette de taille, aux couleurs de la comète.",
+        "Comet blue": "Bleu comète",
+        "Sun yellow": "Jaune soleil",
+        "Terracotta": "Terracotta",
+        "Flame orange": "Orange flamme",
+        "Stardust": "Poussière d’étoiles",
     ]
 
     static let german: [String: String] = [
@@ -529,6 +538,15 @@ enum Strings {
         "Copied {0} files ✓": "{0} Dateien kopiert ✓",
         "Moved {0} files to the trash": "{0} Dateien in den Papierkorb verschoben",
         "{0}+click or drag a box to pick several": "{0}+Klick oder Rahmen ziehen, um mehrere auszuwählen",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "Klicken kopiert die Farbe  ·  Umschalt+Klick: RGB  ·  Esc bricht ab",
+        "Pick a color": "Farbe aufnehmen",
+        "Capture colors": "Farben beim Aufnehmen",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "Fadenkreuz, Rahmen, Lupe und Größenanzeige in den Farben des Kometen.",
+        "Comet blue": "Kometenblau",
+        "Sun yellow": "Sonnengelb",
+        "Terracotta": "Terrakotta",
+        "Flame orange": "Flammenorange",
+        "Stardust": "Sternenstaub",
     ]
 
     static let italian: [String: String] = [
@@ -787,6 +805,15 @@ enum Strings {
         "Copied {0} files ✓": "{0} file copiati ✓",
         "Moved {0} files to the trash": "{0} file spostati nel cestino",
         "{0}+click or drag a box to pick several": "{0}+clic o trascina un riquadro per sceglierne più di una",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "Fai clic per copiare il colore  ·  Maiusc+clic: RGB  ·  Esc annulla",
+        "Pick a color": "Preleva un colore",
+        "Capture colors": "Colori di cattura",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "Mirino, cornici, lente e etichetta delle dimensioni, nei colori della cometa.",
+        "Comet blue": "Blu cometa",
+        "Sun yellow": "Giallo sole",
+        "Terracotta": "Terracotta",
+        "Flame orange": "Arancio fiamma",
+        "Stardust": "Polvere di stelle",
     ]
 
     static let spanish: [String: String] = [
@@ -1045,6 +1072,15 @@ enum Strings {
         "Copied {0} files ✓": "{0} archivos copiados ✓",
         "Moved {0} files to the trash": "{0} archivos movidos a la papelera",
         "{0}+click or drag a box to pick several": "{0}+clic o arrastra un recuadro para elegir varias",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "Haz clic para copiar el color  ·  Mayús+clic: RGB  ·  Esc cancela",
+        "Pick a color": "Tomar un color",
+        "Capture colors": "Colores de captura",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "La cruz, los marcos, la lupa y la etiqueta de tamaño, con los colores del cometa.",
+        "Comet blue": "Azul cometa",
+        "Sun yellow": "Amarillo sol",
+        "Terracotta": "Terracota",
+        "Flame orange": "Naranja llama",
+        "Stardust": "Polvo de estrellas",
     ]
 
     static let portuguese: [String: String] = [
@@ -1303,6 +1339,15 @@ enum Strings {
         "Copied {0} files ✓": "{0} arquivos copiados ✓",
         "Moved {0} files to the trash": "{0} arquivos movidos para a lixeira",
         "{0}+click or drag a box to pick several": "{0}+clique ou arraste uma caixa para escolher várias",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "Clique para copiar a cor  ·  Shift+clique: RGB  ·  Esc cancela",
+        "Pick a color": "Pegar uma cor",
+        "Capture colors": "Cores da captura",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "A mira, as molduras, a lupa e a etiqueta de tamanho, nas cores do cometa.",
+        "Comet blue": "Azul cometa",
+        "Sun yellow": "Amarelo sol",
+        "Terracotta": "Terracota",
+        "Flame orange": "Laranja chama",
+        "Stardust": "Poeira estelar",
     ]
 
     static let chinese: [String: String] = [
@@ -1561,6 +1606,15 @@ enum Strings {
         "Copied {0} files ✓": "已复制 {0} 个文件 ✓",
         "Moved {0} files to the trash": "已将 {0} 个文件移到废纸篓",
         "{0}+click or drag a box to pick several": "{0}+单击或拖出方框可多选",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "点击复制颜色  ·  Shift+点击：RGB  ·  Esc 取消",
+        "Pick a color": "取色",
+        "Capture colors": "截图配色",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "十字准线、边框、放大镜和尺寸标签，换上彗星的颜色。",
+        "Comet blue": "彗星蓝",
+        "Sun yellow": "太阳黄",
+        "Terracotta": "赤陶红",
+        "Flame orange": "火焰橙",
+        "Stardust": "星尘",
     ]
 
     static let hindi: [String: String] = [
@@ -1819,5 +1873,14 @@ enum Strings {
         "Copied {0} files ✓": "{0} फ़ाइलें कॉपी हुईं ✓",
         "Moved {0} files to the trash": "{0} फ़ाइलें ट्रैश में भेजी गईं",
         "{0}+click or drag a box to pick several": "कई चुनने के लिए {0}+क्लिक करें या बॉक्स खींचें",
+        "Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels": "रंग कॉपी करने के लिए क्लिक करें  ·  Shift+क्लिक: RGB  ·  Esc रद्द करता है",
+        "Pick a color": "रंग चुनें",
+        "Capture colors": "कैप्चर के रंग",
+        "The crosshair, frames, loupe and size tag, in the comet's colors.": "क्रॉसहेयर, फ़्रेम, लूप और साइज़ टैग, धूमकेतु के रंगों में।",
+        "Comet blue": "धूमकेतु नीला",
+        "Sun yellow": "सूरज पीला",
+        "Terracotta": "टेराकोटा",
+        "Flame orange": "लौ नारंगी",
+        "Stardust": "तारों की धूल",
     ]
 }

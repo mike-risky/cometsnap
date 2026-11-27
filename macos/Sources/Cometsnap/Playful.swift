@@ -420,7 +420,11 @@ final class CometFlight {
         // Comet pointing right (+x); rotated to the direction of travel each frame.
         comet.frame = root.bounds
         let tail = CAGradientLayer()
-        tail.colors = [NSColor(hex: 0x4FC3FF).withAlphaComponent(0).cgColor, NSColor(hex: 0x78C8FF).withAlphaComponent(0.8).cgColor]
+        // Classic icy blue for the blue theme, else the capture theme's accent.
+        let classic = CaptureLook.theme.id == CaptureThemes.defaultID
+        let far = classic ? NSColor(hex: 0x4FC3FF) : CaptureLook.accent
+        let near = classic ? NSColor(hex: 0x78C8FF) : CaptureLook.accent
+        tail.colors = [far.withAlphaComponent(0).cgColor, near.withAlphaComponent(0.8).cgColor]
         tail.startPoint = CGPoint(x: 0, y: 0.5)
         tail.endPoint = CGPoint(x: 1, y: 0.5)
         tail.frame = CGRect(x: c - 80, y: c - 9, width: 80, height: 18)
@@ -436,7 +440,7 @@ final class CometFlight {
         comet.addSublayer(tail)
         let glow = CAGradientLayer()
         glow.type = .radial
-        glow.colors = [NSColor(hex: 0x78C8FF).withAlphaComponent(0.67).cgColor, NSColor(hex: 0x4FC3FF).withAlphaComponent(0).cgColor]
+        glow.colors = [near.withAlphaComponent(0.67).cgColor, far.withAlphaComponent(0).cgColor]
         glow.startPoint = CGPoint(x: 0.5, y: 0.5)
         glow.endPoint = CGPoint(x: 1, y: 1)
         glow.frame = CGRect(x: c - 17, y: c - 17, width: 34, height: 34)

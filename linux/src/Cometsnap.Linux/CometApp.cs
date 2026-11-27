@@ -83,6 +83,7 @@ public sealed class CometApp : Application
         Log.Info($"Cometsnap {typeof(CometApp).Assembly.GetName().Version} starting · {DesktopSession.Describe()}");
         Settings = AppSettings.Load(Paths.SettingsFile);
         Loc.Use(Settings.Language);
+        Theme.CaptureLook.Use(Settings.CaptureTheme);
         Log.Info($"Language: {Loc.Language}");
         if (!File.Exists(Paths.SettingsFile)) SaveSettings();
 
@@ -153,6 +154,7 @@ public sealed class CometApp : Application
             case "fullscreen": Capture.CaptureFullscreen(); break;
             case "scroll": Scrolling.Start(); break;
             case "text": CopyText.Start(); break;
+            case "color": Capture.StartColorPicker(); break;
             case "delayed": Capture.StartDelayed(parts.Length > 1 && int.TryParse(parts[1], out var s) ? s : 3); break;
             case "record": Recorder.ToggleRegion(RecordingFormat.Mp4); break;
             case "record-gif": Recorder.ToggleRegion(RecordingFormat.Gif); break;
