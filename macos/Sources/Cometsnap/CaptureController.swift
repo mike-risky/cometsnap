@@ -38,6 +38,13 @@ final class CaptureController {
         }
     }
 
+    /// Color picker: the loupe opens on the frozen screen, a click copies the color as #RRGGBB.
+    func startColorPicker() {
+        openOverlay(purpose: .color, onColor: { color, text in
+            ColorToast.shared.show(color: color.ns, text: text)
+        }) { _ in }
+    }
+
     func captureFullscreen() {
         guard !isBusy else { return }
         guard ensurePermission() else { return }
@@ -61,13 +68,14 @@ final class CaptureController {
         app.statusItem.countdown(seconds) { [weak self] in self?.startRegion() }
     }
 
-    private func openOverlay(purpose: CaptureOverlay.Purpose, _ completion: @escaping (OverlayResult?) -> Void) {
+    private func openOverlay(purpose: CaptureOverlay.Purpose, onColor: ((PixelProbe.Color, String) -> Void)? = nil,
+                             _ completion: @escaping (OverlayResult?) -> Void) {
         guard !isBusy else { return }
         guard ensurePermission() else { return }
         let front = NSWorkspace.shared.frontmostApplication
         previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
         app.hidePanels()
-        let windows = ScreenGrabber.windows()
+        let windows = purpose == .color ? [] : ScreenGrabber.windows()
         starting = true
         Task { @MainActor in
             do {
@@ -87,6 +95,7 @@ final class CaptureController {
                     self.restoreFocus()
                     completion(result)
                 }
+                o.onColor = onColor
                 self.overlay = o
                 o.show()
             } catch {
@@ -195,7 +204,7 @@ final class EditCard: NSPanel {
         thumb.layer?.backgroundColor = NSColor.black.cgColor
 
         titleLabel.font = Theme.heading(15)
-        titleLabel.textColor = Theme.yellow
+        titleLabel.textColor = CaptureLook.tag
         detail.font = Theme.ui(11)
         detail.textColor = Theme.muted
         detail.lineBreakMode = .byTruncatingMiddle
@@ -316,6 +325,7 @@ final class EditCard: NSPanel {
     }
 
     private func present() {
+        titleLabel.textColor = CaptureLook.tag
         let screen = NSScreen.underMouse
         let vf = screen.visibleFrame
         let f = CGRect(x: vf.maxX - frame.width - 14, y: vf.minY + 14, width: frame.width, height: frame.height)
@@ -337,7 +347,7 @@ final class EditCard: NSPanel {
     }
 
     private func hover(_ inside: Bool) {
-        root?.layer?.borderColor = (inside ? Theme.blue : Theme.line).cgColor
+        root?.layer?.borderColor = (inside ? CaptureLook.accent : Theme.line).cgColor
         root?.layer?.borderWidth = inside ? 2 : 1
         if inside {
             hideTimer?.invalidate()

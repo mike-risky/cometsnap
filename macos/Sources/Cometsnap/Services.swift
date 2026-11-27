@@ -47,6 +47,7 @@ struct Hotkey: Equatable {
     static let gifCmdShift8 = Hotkey(keyCode: UInt32(kVK_ANSI_8), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧8")
     static let videoShiftF13 = Hotkey(keyCode: UInt32(kVK_F13), modifiers: UInt32(shiftKey), display: "⇧F13")
     static let textCmdShift9 = Hotkey(keyCode: UInt32(kVK_ANSI_9), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧9")
+    static let colorCmdShift6 = Hotkey(keyCode: UInt32(kVK_ANSI_6), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧6")
     static let scrollingCmdShift0 = Hotkey(keyCode: UInt32(kVK_ANSI_0), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧0")
     static let gifCtrlShiftF13 = Hotkey(keyCode: UInt32(kVK_F13), modifiers: UInt32(controlKey | shiftKey), display: "⌃⇧F13")
 }

@@ -27,13 +27,15 @@ public struct AppSettings: Codable, Equatable {
     public var snapCountSeeded = false
     /// "" = same as macOS, else one of the codes in L.languages.
     public var language = ""
+    /// Look of the capture screen: a CaptureThemes id ("blue" is the classic look).
+    public var captureTheme = CaptureThemes.defaultID
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
-             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language
+             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme
     }
 
     public init(from decoder: Decoder) throws {
@@ -57,6 +59,7 @@ public struct AppSettings: Codable, Equatable {
         snapMonthCount = max(0, (try? c.decodeIfPresent(Int.self, forKey: .snapMonthCount)) ?? 0)
         snapCountSeeded = (try? c.decodeIfPresent(Bool.self, forKey: .snapCountSeeded)) ?? false
         language = (try? c.decodeIfPresent(String.self, forKey: .language)) ?? ""
+        captureTheme = CaptureThemes.get(try? c.decodeIfPresent(String.self, forKey: .captureTheme)).id
         videoFramesPerSecond = min(60, max(10, (try? c.decodeIfPresent(Int.self, forKey: .videoFramesPerSecond)) ?? d.videoFramesPerSecond))
     }
 

@@ -1,5 +1,6 @@
 import AppKit
 import CoreText
+import CometsnapCore
 
 /// The "Electric" palette and the Bungee fonts (see assets/BRAND.md).
 enum Theme {
@@ -225,5 +226,26 @@ final class LinkLabel: NSTextField {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
         addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+}
+
+/// The capture screen's colors for the theme picked in Settings (CaptureThemes in the core).
+enum CaptureLook {
+    static private(set) var theme = CaptureThemes.all[0]
+    static var accent: NSColor { NSColor(hex: theme.accent) }
+    static var tag: NSColor { NSColor(hex: theme.tag) }
+    static var tagText: NSColor { NSColor(hex: theme.tagText) }
+
+    static func use(_ id: String) { theme = CaptureThemes.get(id) }
+
+    static func name(_ t: CaptureTheme) -> String {
+        switch t.id {
+        case "blue": return L.t("Comet blue")
+        case "yellow": return L.t("Sun yellow")
+        case "terracotta": return L.t("Terracotta")
+        case "orange": return L.t("Flame orange")
+        case "stardust": return L.t("Stardust")
+        default: return t.name
+        }
     }
 }
