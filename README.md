@@ -109,9 +109,10 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
   panel for anyone who knows ↑ ↑ ↓ ↓ ← → ← → B A
 - Fullscreen, active window and delayed captures (3, 5 or 10 s), multi-monitor and mixed DPI
 - **Screen recording**: MP4 with PC sound and microphone, or an animated GIF, of any area or the whole screen
-- **Scrolling capture** (Ctrl+Alt+Print Screen): click a window (or drag over the part that scrolls) and Cometsnap
-  scrolls it for you, gluing one tall image. Sticky headers and footers appear once. It stops at the end of the
-  page; press Esc or move the mouse to stop earlier
+- **Scrolling capture**: start any capture, drag over the part that scrolls (or press on a window) and, **while still
+  holding the button, scroll with the wheel**. The page scrolls as usual and Cometsnap glues one tall image; let go
+  to finish, Esc cancels. Sticky headers and footers appear once. Works with Copy text too, to read a whole long page.
+  Ctrl+Alt+Print Screen opens the capture with a reminder of how it works
 - **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
   button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
   Click the card to see the text and copy just a part
@@ -125,7 +126,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Anywhere | **Alt+Print Screen** | Active window |
 | Anywhere | **Shift+Print Screen** | Record a region / window to MP4 (press again, click the tray icon or ■ to stop) |
 | Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
-| Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (Esc or move the mouse to stop) |
+| Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (hold the button and scroll, let go to finish) |
 | Anywhere | **Ctrl+Alt+T** | Copy the text in an area (OCR) |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |

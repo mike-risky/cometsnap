@@ -87,6 +87,27 @@ public class ScrollStitcherTests
     }
 
     [Fact]
+    public void Scrolling_back_up_by_hand_is_picked_up_again_further_down()
+    {
+        // Held-button scrolling: the user scrolls in small uneven steps, goes back up, then on.
+        const int pageHeight = 1400;
+        var page = Page(pageHeight);
+        var stitcher = new ScrollStitcher(W, H);
+        stitcher.Add(Frame(page, pageHeight, 0));
+        foreach (var at in new[] { 12, 40, 41, 95, 160 })
+            Assert.Equal(StitchStep.Appended, stitcher.Add(Frame(page, pageHeight, at)));
+        Assert.Equal(StitchStep.Lost, stitcher.Add(Frame(page, pageHeight, 100))); // back up
+        Assert.Equal(StitchStep.Unchanged, stitcher.Add(Frame(page, pageHeight, 160)));
+        Assert.Equal(StitchStep.Appended, stitcher.Add(Frame(page, pageHeight, 300)));
+
+        var image = stitcher.Compose(out var height);
+        Assert.Equal(H + 300, height);
+        for (var y = 0; y < 300 + H - Header - Footer; y++)
+        for (var x = 0; x < W - Scrollbar; x += 5)
+            Assert.Equal(page[(y * W + x) * 4], image[((Header + y) * W + x) * 4]);
+    }
+
+    [Fact]
     public void Same_frame_is_unchanged()
     {
         var page = Page(800);

@@ -102,6 +102,17 @@ public sealed class CaptureOverlay : Window
 
     public bool IsCapturing => _mode != Mode.Idle;
 
+    /// <summary>Whether turning the wheel with the button held may start a scrolling capture now.</summary>
+    public Func<bool>? CanScroll { get; set; }
+
+    /// <summary>
+    /// The wheel turned while the button was held over an area: the overlay has closed and a
+    /// scrolling capture takes over. Gives the area (virtual screen) and that first wheel delta.
+    /// </summary>
+    public event Action<PixelRect, int>? ScrollStarted;
+
+    private bool _scrollHint;
+
     public CaptureOverlay()
     {
         Title = "Cometsnap capture";
@@ -165,6 +176,7 @@ public sealed class CaptureOverlay : Window
         MouseLeftButtonDown += OnMouseLeftButtonDown;
         MouseLeftButtonUp += OnMouseLeftButtonUp;
         MouseRightButtonUp += (_, e) => { e.Handled = true; Back(); };
+        MouseWheel += OnMouseWheel;
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
     }
@@ -180,9 +192,10 @@ public sealed class CaptureOverlay : Window
         Hide();
     }
 
-    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings)
+    public void Begin(FrozenScreen screen, IReadOnlyList<WindowInfo> windows, IReadOnlyList<PixelRect> monitors, AppSettings settings, bool scrollHint = false)
     {
         if (_hwnd == IntPtr.Zero) Prewarm();
+        _scrollHint = scrollHint;
 
         _screen = screen;
         _settings = settings;
@@ -448,6 +461,22 @@ public sealed class CaptureOverlay : Window
         Refresh();
     }
 
+    /// <summary>
+    /// The wheel with the button still held (dragging an area, or pressing on a window):
+    /// hand over to the scrolling capture, which scrolls the real page under that area.
+    /// </summary>
+    private void OnMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_mode is not (Mode.Pressed or Mode.Dragging) || _screen is null) return;
+        e.Handled = true;
+        if (CanScroll?.Invoke() != true) return;
+        var area = _mode == Mode.Dragging ? _selection : _hover ?? default;
+        if (area.Width < ScrollingCapture.MinWidth || area.Height < ScrollingCapture.MinHeight) return;
+        var rect = _screen.ToVirtual(area);
+        End();
+        ScrollStarted?.Invoke(rect, e.Delta);
+    }
+
     private void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (_mode == Mode.Idle) return;
@@ -711,7 +740,9 @@ public sealed class CaptureOverlay : Window
             // Once selected, the tag also tells what the keys do: drawing starts with a tool.
             _labelText.Text = _mode == Mode.Selected && _tool == AnnotationTool.None
                 ? $"{r.Width} × {r.Height}   ·   " + L.T("E circle  A arrow  T text  R box  ·  Enter copy")
-                : $"{r.Width} × {r.Height}";
+                : _scrollHint && _mode is Mode.Hover or Mode.Pressed or Mode.Dragging
+                    ? $"{r.Width} × {r.Height}   ·   " + L.T("Hold the button and scroll to capture a long page")
+                    : $"{r.Width} × {r.Height}";
             _label.Visibility = Visibility.Visible;
             _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             var lh = _label.DesiredSize.Height;
