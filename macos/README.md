@@ -18,6 +18,19 @@ Native Swift app (AppKit + ScreenCaptureKit), same feel and features as the Wind
 | Languages | English, French, German, Italian, Spanish, Brazilian Portuguese, Simplified Chinese and Hindi. Follows the Mac's language, with a Language picker in Settings that applies right away. |
 | Other | Start at login, sound off by default, captures in `~/Pictures/Cometsnap/yyyy-MM/`, settings in `~/Library/Application Support/Cometsnap/settings.json`. |
 
+## Install
+
+Paste in Terminal (downloads the latest build into Applications and opens it, no Gatekeeper detour;
+run it again to update):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mike-risky/cometsnap/main/macos/install.sh | bash
+```
+
+Or download [Cometsnap-macOS.dmg](https://github.com/mike-risky/cometsnap/releases/download/macos-nightly/Cometsnap-macOS.dmg)
+and follow [FIRST-LAUNCH.txt](FIRST-LAUNCH.txt). Opened from the disk image, Cometsnap offers to move
+itself into Applications.
+
 ## Build
 
 On a Mac with Xcode 15+:
@@ -33,6 +46,7 @@ publishes `macos-nightly` for `main` and `macos-test-prN` for pull requests.
 
 ## Signing
 
-Builds are ad-hoc signed. macOS therefore asks for Gatekeeper approval on first launch (see
-[FIRST-LAUNCH.txt](FIRST-LAUNCH.txt)) and may ask for screen access again after an update.
-A Developer ID certificate plus notarization would remove both.
+Builds are ad-hoc signed until signing secrets are added. macOS therefore asks for Gatekeeper
+approval on first launch (see [FIRST-LAUNCH.txt](FIRST-LAUNCH.txt)) and may ask for screen access
+again after an update. CI is ready for a Developer ID certificate plus notarization, which removes
+both: see [SIGNING.md](SIGNING.md).
