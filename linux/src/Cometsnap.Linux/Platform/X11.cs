@@ -108,6 +108,18 @@ internal static unsafe partial class X11
         }
     }
 
+    /// <summary>Whether the first (left) mouse button is held right now.</summary>
+    public static bool PrimaryButtonDown()
+    {
+        var d = Helper;
+        if (d == IntPtr.Zero) return false;
+        lock (HelperGate)
+        {
+            XQueryPointer(d, XDefaultRootWindow(d), out _, out _, out _, out _, out _, out _, out var mask);
+            return (mask & (1u << 8) /* Button1Mask */) != 0;
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     public struct XWindowAttributes
     {

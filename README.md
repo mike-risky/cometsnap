@@ -67,8 +67,8 @@ the comet and meteor showers need a compositing desktop, which almost every desk
 It speaks English, Spanish, Portuguese, French, German, Italian, Simplified Chinese and Hindi, following your desktop's language (change it in *Settings*).
 **Copy text** (Ctrl+Alt+T, or the tray menu): drag over any text and it lands on the clipboard. It uses Tesseract,
 offline: `sudo apt install tesseract-ocr` (plus e.g. `tesseract-ocr-fra` for other languages).
-**Scrolling capture** (Ctrl+Alt+Print Screen) scrolls the picked window for you and glues one tall image; it needs an
-X11 session for now, because Wayland does not let apps scroll other windows.
+**Scrolling capture**: in any capture, drag over the part that scrolls and, still holding the button, scroll; let go
+to finish (Ctrl+Alt+Print Screen opens the capture with this reminder). It needs an X11 session for now.
 Recordings open in a small trimmer (the **Trim** button on the Copied card, or double-click one in the tray panel):
 drag the yellow handles to cut the start and end, drag across the timeline and press Del to cut a part out.
 The untouched recording is kept, so every cut stays adjustable.

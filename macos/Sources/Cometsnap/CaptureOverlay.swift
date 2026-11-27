@@ -4,8 +4,12 @@ import CometsnapCore
 /// What the overlay hands back: the frozen screen and the chosen rectangle in AppKit global
 /// points (always inside that screen).
 struct OverlayResult {
+    struct ScrollDelta { let y: CGFloat; let precise: Bool }
+
     let frozen: FrozenScreen
     let rect: CGRect
+    /// Set when the wheel turned with the button held: a scrolling capture of `rect` takes over.
+    var scrollDelta: ScrollDelta? = nil
 
     /// The chosen pixels, cut out of the frozen screen.
     var image: CGImage? {
@@ -143,6 +147,21 @@ final class CaptureOverlay {
         dragStart = nil
         dragCurrent = nil
         isDragging = false
+    }
+
+    /// The wheel with the button still held (dragging an area, or pressing on a window): hand
+    /// over to the scrolling capture, which scrolls the real page under that area.
+    func scrollWheel(_ deltaY: CGFloat, precise: Bool) {
+        guard dragStart != nil, purpose != .recording, deltaY != 0 else { return }
+        guard let rect = isDragging ? selection : hovered,
+              let f = frozenScreen(containing: CGPoint(x: rect.midX, y: rect.midY)) else { return }
+        let clipped = rect.intersection(f.screen.frame).integral
+        guard !clipped.isNull, clipped.width >= ScrollingCapture.minSize.width,
+              clipped.height >= ScrollingCapture.minSize.height else { return }
+        dragStart = nil
+        dragCurrent = nil
+        isDragging = false
+        close(with: OverlayResult(frozen: f, rect: clipped, scrollDelta: .init(y: deltaY, precise: precise)))
     }
 
     func setSpace(_ held: Bool) {
@@ -312,7 +331,7 @@ final class OverlayView: NSView {
         switch overlay.purpose {
         case .recording: hint.text = L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
         case .text: hint.text = L.t("Drag over the text to copy, or click a window · Esc cancel")
-        case .scrolling: hint.text = L.t("Click the window to scroll, or drag over the part that scrolls · Esc cancel")
+        case .scrolling: hint.text = L.t("Drag over the part that scrolls, then keep the button held and scroll · Esc cancel")
         case .screenshot: hint.text = L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")
         }
         addSubview(hint)
@@ -370,6 +389,10 @@ final class OverlayView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) { overlay.escape() }
+
+    override func scrollWheel(with event: NSEvent) {
+        overlay.scrollWheel(event.scrollingDeltaY, precise: event.hasPreciseScrollingDeltas)
+    }
 
     override func keyDown(with event: NSEvent) {
         let step: CGFloat = event.modifierFlags.contains(.shift) ? 10 : 1

@@ -78,6 +78,12 @@ final class CaptureController {
                                        loupeCorner: self.app.settings.loupeCorner) { [weak self] result in
                     guard let self else { return }
                     self.overlay = nil
+                    if let result, result.scrollDelta != nil {
+                        // Wheel with the button held: the page under the area scrolls, Cometsnap glues it.
+                        self.previousApp = nil
+                        self.app.scrolling.runHeld(result, forText: purpose == .text)
+                        return
+                    }
                     self.restoreFocus()
                     completion(result)
                 }

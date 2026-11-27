@@ -128,24 +128,30 @@ public sealed class TextCapture
 }
 
 /// <summary>
-/// Scrolling capture (X11): pick a window or an area, Cometsnap turns the mouse wheel for you and
-/// glues the frames into one tall image. Stops at the end of the page, on Esc, or when the mouse moves.
-/// Wayland does not let apps scroll other windows, so there it says so.
+/// Scrolling capture (X11), the natural way: drag over an area (or press on a window) and, still
+/// holding the button, scroll. The overlay steps aside, the page scrolls as usual, and every new
+/// row is glued under the previous ones. Letting go finishes, Esc cancels. Wayland does not let
+/// apps grab the screen this fast or pass the wheel on, so there it says so.
 /// </summary>
 public sealed class ScrollingCapture
 {
     public const int MaxHeight = 30000;
+    public const int MinWidth = 40, MinHeight = 60;
     private readonly CometApp _app;
     private readonly ScreenGrabber _grabber = new();
     private bool _running;
-    private bool _stop;
 
     public ScrollingCapture(CometApp app) => _app = app;
 
+    public bool IsRunning => _running;
+
+    public static bool Supported => !DesktopSession.IsWayland || ScreenGrabber.ForceX11;
+
+    /// <summary>Hotkey / menu: the usual capture, with a reminder to hold the button and scroll.</summary>
     public void Start()
     {
-        if (_running) { _stop = true; return; }
-        if (DesktopSession.IsWayland && !ScreenGrabber.ForceX11)
+        if (_running) return;
+        if (!Supported)
         {
             _app.Toast(T("Scrolling capture needs an X11 session for now: Wayland does not let apps scroll other windows."), 6000);
             return;
@@ -155,51 +161,55 @@ public sealed class ScrollingCapture
 
     private async Task RunAsync()
     {
+        // Let go without scrolling: an ordinary screenshot.
         var picked = await _app.Capture.PickAsync(OverlayPurpose.Scroll);
-        if (picked is not { } p) return;
-        p.Screen.Dispose();
-        var rect = p.Rect;
-        if (rect.Width < 40 || rect.Height < 60)
-        {
-            _app.Toast(T("Pick a window or an area of at least 60 pixels high."), 4000);
-            return;
-        }
+        if (picked is { } p) _app.Capture.Deliver(p.Screen, p.Rect);
+    }
+
+    /// <summary>The wheel turned with the button held over <paramref name="rect"/> in the overlay.</summary>
+    public void RunHeld(PixelRect rect, int firstDirection, bool forText)
+    {
+        if (_running) return;
+        _ = RunHeldAsync(rect, firstDirection, forText);
+    }
+
+    private async Task RunHeldAsync(PixelRect rect, int firstDirection, bool forText)
+    {
         _running = true;
-        _stop = false;
-        var userPointer = X11.PointerPosition();
         try
         {
-            await Task.Delay(150);
-            var stitcher = new ScrollStitcher(rect.Width, rect.Height);
-            var frame = await SettledAsync(rect, null, 0);
-            if (frame is null) return;
-            stitcher.Add(frame);
-            _app.Toast(T("Scrolling…") + " · " + T("Esc to stop"), 1800);
-
-            var parkX = rect.CenterX;
-            var parkY = rect.CenterY;
-            XTest.Warp(parkX, parkY);
+            // The overlay just went away: let the screen repaint.
             await Task.Delay(60);
+            var frame = Grab(rect);
+            if (frame is null) return;
+            var stitcher = new ScrollStitcher(rect.Width, rect.Height);
+            stitcher.Add(frame);
+            XTest.Wheel(firstDirection); // the overlay took the first turn of the wheel
+            _app.Toast(T("Scroll, then let go") + " · " + T("Esc cancels"), 1800);
 
-            var clicks = 3;
-            var unchanged = 0;
-            for (var step = 0; step < 400 && !ShouldStop(parkX, parkY); step++)
+            var lost = false;
+            while (true)
             {
-                XTest.WheelDown(clicks);
-                frame = await SettledAsync(rect, frame, 140);
-                if (frame is null || ShouldStop(parkX, parkY)) break;
-                var result = stitcher.Add(frame);
-                if (result == StitchStep.Unchanged)
+                await Task.Delay(40);
+                if (XTest.EscapeDown())
                 {
-                    if (++unchanged >= 2) break;
-                    await Task.Delay(250);
-                    continue;
+                    Log.Info("Scrolling capture cancelled");
+                    return;
                 }
-                unchanged = 0;
-                if (result == StitchStep.Lost) break;
-                var target = Math.Max(20, stitcher.ScrollingHeight / 2);
-                clicks = Math.Clamp((int)Math.Round(clicks * (double)target / Math.Max(1, stitcher.LastShift)), 1, 10);
-                if (stitcher.Height >= MaxHeight) break;
+                var released = !X11.PrimaryButtonDown();
+                var next = released ? await SettledAsync(rect) : Grab(rect);
+                if (next is not null && !next.AsSpan().SequenceEqual(frame))
+                {
+                    frame = next;
+                    var step = stitcher.Add(next);
+                    if (step == StitchStep.Appended) lost = false;
+                    else if (step == StitchStep.Lost && !lost)
+                    {
+                        lost = true;
+                        _app.Toast(T("Too fast: scroll back a little"), 1500);
+                    }
+                }
+                if (released || stitcher.Height >= MaxHeight) break;
             }
 
             var pixels = stitcher.Compose(out var height);
@@ -207,9 +217,8 @@ public sealed class ScrollingCapture
             using var tall = new FrozenScreen(new PixelRect(0, 0, rect.Width, height), pixels, rect.Width * 4);
             var image = tall.Crop(new PixelRect(0, 0, rect.Width, height));
             Log.Info($"Scrolling capture: {rect.Width}×{height} (header {stitcher.Header}, footer {stitcher.Footer})");
-            if (height <= rect.Height)
-                _app.Toast(T("Nothing scrolled") + " · " + T("Cometsnap kept what was visible. Pick the part of the window that scrolls, and keep the mouse still."), 6000);
-            _app.OnCaptured(image, rect);
+            if (forText) await _app.CopyText.CopyTextAsync(image);
+            else _app.OnCaptured(image, rect);
         }
         catch (Exception ex)
         {
@@ -219,32 +228,22 @@ public sealed class ScrollingCapture
         finally
         {
             _running = false;
-            if (userPointer is { } u) XTest.Warp(u.X, u.Y);
         }
     }
 
-    private bool ShouldStop(int parkX, int parkY)
+    /// <summary>Grabs until two grabs in a row are the same (smooth scrolling has finished), at most ~0.6 s.</summary>
+    private async Task<byte[]?> SettledAsync(PixelRect rect)
     {
-        if (_stop || XTest.EscapeDown()) return true;
-        var pt = X11.PointerPosition();
-        return pt is { } q && (Math.Abs(q.X - parkX) > 12 || Math.Abs(q.Y - parkY) > 12);
-    }
-
-    private async Task<byte[]?> SettledAsync(PixelRect rect, byte[]? previous, int minimumWait)
-    {
-        if (minimumWait > 0) await Task.Delay(minimumWait);
         var current = Grab(rect);
         if (current is null) return null;
-        var waited = minimumWait;
-        while (waited < 1500)
+        for (var waited = 0; waited < 600; waited += 60)
         {
-            await Task.Delay(70);
-            waited += 70;
+            await Task.Delay(60);
             var next = Grab(rect);
             if (next is null) return current;
             var same = next.AsSpan().SequenceEqual(current);
             current = next;
-            if (same && (previous is null || waited >= 400 || !next.AsSpan().SequenceEqual(previous))) break;
+            if (same) break;
         }
         return current;
     }
@@ -258,30 +257,21 @@ public sealed class ScrollingCapture
         return pixels;
     }
 
-    /// <summary>Fake mouse wheel and pointer moves through the XTEST extension.</summary>
+    /// <summary>A fake wheel click through the XTEST extension, and the Esc key state.</summary>
     private static class XTest
     {
         [DllImport("libXtst.so.6")] private static extern int XTestFakeButtonEvent(IntPtr display, uint button, int isPress, ulong delay);
         [DllImport("libX11.so.6")] private static extern int XQueryKeymap(IntPtr display, byte[] keys);
         [DllImport("libX11.so.6")] private static extern byte XKeysymToKeycode(IntPtr display, ulong keysym);
 
-        public static void WheelDown(int clicks)
+        /// <summary>One click of the wheel: 1 = up (button 4), -1 = down (button 5).</summary>
+        public static void Wheel(int direction)
         {
             var d = X11.Helper;
-            if (d == IntPtr.Zero) return;
-            for (var i = 0; i < clicks; i++)
-            {
-                XTestFakeButtonEvent(d, 5, 1, 0);
-                XTestFakeButtonEvent(d, 5, 0, 0);
-            }
-            X11.XFlush(d);
-        }
-
-        public static void Warp(int x, int y)
-        {
-            var d = X11.Helper;
-            if (d == IntPtr.Zero) return;
-            X11.XWarpPointer(d, IntPtr.Zero, X11.XDefaultRootWindow(d), 0, 0, 0, 0, x, y);
+            if (d == IntPtr.Zero || direction == 0) return;
+            var button = direction > 0 ? 4u : 5u;
+            XTestFakeButtonEvent(d, button, 1, 0);
+            XTestFakeButtonEvent(d, button, 0, 0);
             X11.XFlush(d);
         }
 

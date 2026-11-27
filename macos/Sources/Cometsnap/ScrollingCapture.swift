@@ -2,63 +2,44 @@ import AppKit
 import CometsnapCore
 import ScreenCaptureKit
 
-/// Scrolling capture: pick a window or an area and Cometsnap scrolls it, grabbing a frame after
-/// every step and gluing them into one tall image. It stops by itself at the end of the page;
-/// Esc or moving the mouse stops it earlier. Scrolling for you needs the Accessibility permission
-/// (macOS asks for it once).
+/// Scrolling capture, the natural way: start an area selection, keep the mouse button held and
+/// scroll. The overlay steps aside, the page scrolls under the area as usual, and every new row
+/// that comes into view is glued under the previous ones. Letting go finishes; Esc cancels.
+/// Scrolling too fast (or back up) is fine: the page is picked up again once it lines up.
 final class ScrollingCapture {
     static let maxHeight = 30000
+    static let minSize = CGSize(width: 30, height: 40)
     private unowned let app: AppController
     private var pill: ScrollingPill?
     private(set) var isRunning = false
-    private var stopRequested = false
 
     init(app: AppController) { self.app = app }
 
+    /// Hotkey / menu: the usual overlay, with a reminder of how it works (hold the button and scroll).
     func start() {
-        if isRunning { stopRequested = true; return }
-        guard Self.canScroll() else { return }
+        guard !isRunning else { return }
         app.capture.pickRegion(purpose: .scrolling) { [weak self] result in
-            guard let self, let result else { return }
-            Task { @MainActor in await self.run(result) }
+            // Let go without scrolling: an ordinary screenshot.
+            guard let self, let result, let image = result.image else { return }
+            self.app.capture.deliver(image, scale: result.frozen.scale, from: result.rect)
         }
     }
 
-    /// Posting scroll events needs Accessibility. Asks once, then explains where to turn it on.
-    private static func canScroll() -> Bool {
-        if CGPreflightPostEventAccess() { return true }
-        if CGRequestPostEventAccess() { return true }
-        NSApp.activate()
-        let a = NSAlert()
-        a.icon = Theme.logo
-        a.messageText = L.t("Allow Cometsnap to scroll for you")
-        a.informativeText = L.t("Scrolling capture turns the scroll wheel for you. Turn on Cometsnap in System Settings › Privacy & Security › Accessibility, then try again.")
-        a.addButton(withTitle: L.t("Open System Settings"))
-        a.addButton(withTitle: L.t("Later"))
-        if a.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
-        }
-        return false
+    /// The wheel turned while the button was held over `picked.rect` in the overlay.
+    func runHeld(_ picked: OverlayResult, forText: Bool) {
+        guard !isRunning else { return }
+        Task { @MainActor in await self.run(picked, forText: forText) }
     }
 
     @MainActor
-    private func run(_ picked: OverlayResult) async {
+    private func run(_ picked: OverlayResult, forText: Bool) async {
         let screen = picked.frozen.screen
         let scale = picked.frozen.scale
-        // Whole pixels, so every frame has exactly the same size.
         let rect = picked.rect.integral
-        guard rect.height >= 40, rect.width >= 30 else {
-            alert(L.t("Too small to scroll"), L.t("Pick a window or an area of at least 60 pixels high."))
-            return
-        }
         isRunning = true
-        stopRequested = false
-        let userMouse = NSEvent.mouseLocation
         defer {
             pill?.orderOut(nil)
             isRunning = false
-            CGWarpMouseCursorPosition(Self.cgPoint(userMouse))
         }
         do {
             let content = try await ScreenGrabber.shared.content()
@@ -71,92 +52,85 @@ final class ScrollingCapture {
 
             if pill == nil { pill = ScrollingPill() }
             pill?.show(above: rect, on: screen)
-            try await Task.sleep(nanoseconds: 150_000_000)
 
-            var image = try await grab()
+            let image = try await grab()
             let w = image.width, h = image.height
             let stitcher = ScrollStitcher(width: w, frameHeight: h)
             var frame = Self.pixels(image, width: w, height: h)
             _ = stitcher.add(frame)
+            // The overlay took the first turn of the wheel: pass it on (only allowed with Accessibility).
+            if let delta = picked.scrollDelta { Self.repost(delta) }
 
-            let park = CGPoint(x: rect.midX, y: rect.midY)
-            CGWarpMouseCursorPosition(Self.cgPoint(park))
-            try await Task.sleep(nanoseconds: 60_000_000)
-
-            var stepPoints = max(20, Int(rect.height / 2))
-            var unchanged = 0
-            for _ in 0..<400 {
-                if shouldStop(park) { break }
-                Self.scroll(byPoints: stepPoints)
-                (image, frame) = try await settled(grab, previous: frame, width: w, height: h)
-                if shouldStop(park) { break }
-                switch stitcher.add(frame) {
-                case .unchanged:
-                    unchanged += 1
-                    if unchanged >= 2 { break }
-                    try await Task.sleep(nanoseconds: 250_000_000)
-                    continue
-                case .lost:
-                    Log.info("scrolling capture: frame does not continue the page, stopping")
-                    unchanged = 99
-                default:
-                    unchanged = 0
-                    let target = max(20, stitcher.scrollingHeight / 2)
-                    let shift = max(1, stitcher.lastShift)
-                    stepPoints = max(10, min(Int(rect.height), stepPoints * target / shift))
-                    pill?.setHeight(Int(CGFloat(stitcher.height) / scale))
+            var lost = false
+            var cancelled = false
+            while true {
+                try await Task.sleep(nanoseconds: 30_000_000)
+                if CGEventSource.keyState(.combinedSessionState, key: 0x35 /* Esc */) {
+                    cancelled = true
+                    break
                 }
-                if unchanged >= 2 || stitcher.height >= Self.maxHeight { break }
+                let released = NSEvent.pressedMouseButtons & 1 == 0
+                let next: [UInt8]
+                if released {
+                    // Let go: wait for the last turn of the wheel to finish scrolling.
+                    next = try await settled(grab, previous: frame, width: w, height: h).1
+                } else {
+                    next = Self.pixels(try await grab(), width: w, height: h)
+                }
+                if next != frame {
+                    frame = next
+                    switch stitcher.add(next) {
+                    case .appended:
+                        lost = false
+                        pill?.show(height: Int(CGFloat(stitcher.height) / scale), lost: false)
+                    case .lost where !lost:
+                        lost = true
+                        pill?.show(height: 0, lost: true)
+                    default: break
+                    }
+                }
+                if released || stitcher.height >= Self.maxHeight { break }
             }
+            pill?.orderOut(nil)
+            if cancelled { return }
 
             var (pixels, height) = stitcher.compose()
             height = min(height, Self.maxHeight)
             pixels = Array(pixels.prefix(w * 4 * height))
             guard let tall = Self.image(pixels, width: w, height: height) else { return }
-            pill?.orderOut(nil)
             Log.info("scrolling capture \(w)x\(height) header \(stitcher.header) footer \(stitcher.footer)")
-            if height <= h {
-                alert(L.t("Nothing scrolled"), L.t("Cometsnap kept what was visible. Pick the part of the window that scrolls, and keep the mouse still."))
-            }
-            app.capture.deliver(tall, scale: scale, from: rect)
+            if forText { app.copyText(tall, scale: scale, from: rect) }
+            else { app.capture.deliver(tall, scale: scale, from: rect) }
         } catch {
             app.report(error)
         }
     }
 
-    private func shouldStop(_ park: CGPoint) -> Bool {
-        if stopRequested || CGEventSource.keyState(.combinedSessionState, key: 0x35 /* Esc */) { return true }
-        let m = NSEvent.mouseLocation
-        return abs(m.x - park.x) > 8 || abs(m.y - park.y) > 8
-    }
-
-    /// Grabs until two grabs in a row are the same (smooth scrolling has finished).
+    /// Grabs until two grabs in a row are the same (smooth scrolling has finished), at most ~0.6 s.
     private func settled(_ grab: () async throws -> CGImage, previous: [UInt8], width: Int, height: Int) async throws -> (CGImage, [UInt8]) {
-        try await Task.sleep(nanoseconds: 140_000_000)
         var image = try await grab()
         var current = Self.pixels(image, width: width, height: height)
-        var waited = 140
-        while waited < 1500 {
-            try await Task.sleep(nanoseconds: 70_000_000)
-            waited += 70
+        var waited = 0
+        while waited < 600 {
+            try await Task.sleep(nanoseconds: 60_000_000)
+            waited += 60
             let nextImage = try await grab()
             let next = Self.pixels(nextImage, width: width, height: height)
             let same = next == current
             image = nextImage
             current = next
-            if same && (waited >= 400 || next != previous) { break }
+            if same { break }
         }
         return (image, current)
     }
 
-    private static func scroll(byPoints points: Int) {
-        let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(-points), wheel2: 0, wheel3: 0)
+    /// Posts the wheel turn the overlay swallowed, when macOS lets Cometsnap post events.
+    private static func repost(_ delta: OverlayResult.ScrollDelta) {
+        guard CGPreflightPostEventAccess() else { return }
+        let event = delta.precise
+            ? CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: Int32(delta.y.rounded()), wheel2: 0, wheel3: 0)
+            : CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: Int32(delta.y.rounded(.awayFromZero)), wheel2: 0, wheel3: 0)
         event?.post(tap: .cghidEventTap)
-    }
-
-    /// AppKit global (y up from the bottom of the main screen) to CG global (y down from its top).
-    private static func cgPoint(_ p: CGPoint) -> CGPoint {
-        CGPoint(x: p.x, y: (NSScreen.screens.first?.frame.height ?? 0) - p.y)
     }
 
     /// RGBA pixels of an image, redrawn at exactly width × height.
@@ -177,23 +151,15 @@ final class ScrollingCapture {
                        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
                        provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent)
     }
-
-    private func alert(_ title: String, _ text: String) {
-        NSApp.activate()
-        let a = NSAlert()
-        a.icon = Theme.logo
-        a.messageText = title
-        a.informativeText = text
-        a.runModal()
-    }
 }
 
 /// The little pill shown while a scrolling capture runs (Cometsnap's own windows are left out of the frames).
 final class ScrollingPill: NSPanel {
     private let heightLabel = NSTextField(labelWithString: "")
+    private let title = NSTextField(labelWithString: "")
 
     init() {
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 260, height: 34), styleMask: [.borderless, .nonactivatingPanel],
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 330, height: 34), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
         level = .statusBar
@@ -209,12 +175,12 @@ final class ScrollingPill: NSPanel {
         root.layer?.cornerRadius = 17
         root.layer?.borderWidth = 1
         root.layer?.borderColor = Theme.line.cgColor
-        let title = NSTextField(labelWithString: L.t("Scrolling…"))
+        title.stringValue = L.t("Scroll, then let go")
         title.font = Theme.ui(13, .semibold)
         title.textColor = .white
         heightLabel.font = Theme.ui(12)
         heightLabel.textColor = Theme.yellow
-        let hint = NSTextField(labelWithString: L.t("Esc to stop"))
+        let hint = NSTextField(labelWithString: L.t("Esc cancels"))
         hint.font = Theme.ui(11)
         hint.textColor = Theme.muted
         let stack = NSStackView(views: [title, heightLabel, NSView(), hint])
@@ -232,7 +198,7 @@ final class ScrollingPill: NSPanel {
     }
 
     func show(above rect: CGRect, on screen: NSScreen) {
-        heightLabel.stringValue = ""
+        show(height: 0, lost: false)
         let vf = screen.visibleFrame
         let x = min(max(rect.midX - frame.width / 2, vf.minX), vf.maxX - frame.width)
         var y = rect.maxY + 8
@@ -242,5 +208,10 @@ final class ScrollingPill: NSPanel {
         orderFrontRegardless()
     }
 
-    func setHeight(_ points: Int) { heightLabel.stringValue = L.f("{0} px", points) }
+    /// The height so far, or a warning when the page went by too fast to follow.
+    func show(height points: Int, lost: Bool) {
+        heightLabel.stringValue = lost || points == 0 ? "" : L.f("{0} px", points)
+        title.stringValue = lost ? L.t("Too fast: scroll back a little") : L.t("Scroll, then let go")
+        title.textColor = lost ? Theme.yellow : .white
+    }
 }

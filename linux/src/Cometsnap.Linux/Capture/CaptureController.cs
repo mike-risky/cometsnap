@@ -111,7 +111,10 @@ public sealed class CaptureController
             var windows = await windowsTask;
 
             EnsureOverlays(monitors);
-            var session = new OverlaySession(screen, windows, monitors, _app.Settings, purpose);
+            var session = new OverlaySession(screen, windows, monitors, _app.Settings, purpose)
+            {
+                CanScroll = purpose != OverlayPurpose.Record && ScrollingCapture.Supported && !_app.Scrolling.IsRunning,
+            };
             var done = new TaskCompletionSource<PixelRect?>();
             session.Finished += r => done.TrySetResult(r);
 
@@ -130,6 +133,13 @@ public sealed class CaptureController
             var rect = await done.Task;
             foreach (var o in _overlays) o.End();
             if (rect is not { IsEmpty: false } r) { screen.Dispose(); return null; }
+            if (session.ScrollDelta != 0)
+            {
+                // Wheel with the button held: the page under the area scrolls, Cometsnap glues it.
+                screen.Dispose();
+                _app.Scrolling.RunHeld(r, session.ScrollDelta, forText: purpose == OverlayPurpose.Text);
+                return null;
+            }
             return (screen, r);
         }
         catch (Exception ex)
@@ -142,7 +152,7 @@ public sealed class CaptureController
     }
 
     /// <summary>Copy + save + Edit card. The image is on the clipboard before the PNG reaches the disk.</summary>
-    private void Deliver(FrozenScreen screen, PixelRect rect)
+    public void Deliver(FrozenScreen screen, PixelRect rect)
     {
         Bitmap image;
         try { image = screen.Crop(rect); }
