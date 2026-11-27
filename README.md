@@ -41,8 +41,14 @@ One universal app for Apple Silicon and Intel Macs, macOS 14 Sonoma or newer.
 - **Latest build:** `Cometsnap-macOS.dmg` from the [Latest macOS build](https://github.com/mike-risky/cometsnap/releases/tag/macos-nightly) pre-release.
   Open the dmg and drag Cometsnap into Applications.
 - The app is not signed with a paid Apple certificate yet, so macOS blocks the first launch.
-  On macOS 15 and newer: **System Settings → Privacy & Security → Open Anyway**.
-  On macOS 14: **right-click Cometsnap → Open → Open**.
+  **Easiest:** open Terminal, paste this line and press Return, then open Cometsnap normally:
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/Cometsnap.app
+  ```
+  Or the click-through way: on macOS 15 and newer, **System Settings → Privacy & Security → Open Anyway**;
+  on macOS 14, **right-click Cometsnap → Open → Open**.
+- Even quicker, one line that downloads, installs and opens it (run it again to update):
+  `curl -fsSL https://raw.githubusercontent.com/mike-risky/cometsnap/main/macos/install.sh | bash`
 - Allow **Screen & System Audio Recording** when asked, then click **Quit & Reopen**.
 - Keys: **⌘⇧2** capture (Cometsnap offers to take over **⌘⇧4** too), **⌘⇧7** video, **⌘⇧8** GIF,
   and **Print Screen / F13** on PC keyboards. Source and build notes: [`macos/`](macos/README.md).
