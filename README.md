@@ -14,6 +14,7 @@ No paywall, no branding, no forced updates. 🌐 **[cometsnap.com](https://comet
 | **Linux** | [AppImage (x86_64)](https://github.com/mike-risky/cometsnap/releases/download/linux-nightly/Cometsnap-x86_64.AppImage) · [.deb](https://github.com/mike-risky/cometsnap/releases/download/linux-nightly/cometsnap_amd64.deb) | X11 and Wayland, ARM64 builds too |
 
 > 🚀 Early days and moving fast: these are the latest builds, updated with every change.
+> See what changed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Download
 
@@ -177,8 +178,8 @@ and **Ctrl+E** opens the selection in the editor.
 1. ✅ **Snappy core**: tray, hotkeys, capture overlay, loupe, quick annotations
 2. ✅ **Full editor**: all tools, re-editable captures (docs mode with PDF/DOCX/Markdown export comes later)
 3. ✅ **Video**: MP4/GIF recording with sound, trim and cut
-4. ✅ **Everywhere**: Windows, macOS and Linux apps, in English, French, German and Italian
-5. **Smart tools**: OCR, QR reader, scrolling capture
+4. ✅ **Everywhere**: Windows, macOS and Linux apps, in 8 languages
+5. **Smart tools**: ✅ OCR, ✅ scrolling capture, ✅ color picker, QR reader next
 6. **Share**: Imgur, SFTP, S3, OneDrive, Google Drive
 
 ## Building

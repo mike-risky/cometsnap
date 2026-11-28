@@ -274,7 +274,7 @@ jobs:
           gh release delete nightly --yes --cleanup-tag || true
           gh release create nightly rel/* --prerelease --target "${{ github.sha }}" \
             --title "Latest build (main)" \
-            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. Code signing policy: https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md"
+            --notes "Automatic build of the latest commit on main (${GITHUB_SHA::7}). Install: Cometsnap-Setup-x64.exe (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X). Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. What's new: https://github.com/mike-risky/cometsnap/blob/main/CHANGELOG.md. Code signing policy: https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md"
       - name: Update the test pre-release of this pull request
         if: github.event_name == 'pull_request'
         env:
@@ -296,6 +296,8 @@ jobs:
           NOTES: |
             Install: **Cometsnap-Setup-x64.exe** (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X).
             Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. SHA256SUMS.txt lists the checksums.
+
+            **What's new:** [CHANGELOG.md](https://github.com/mike-risky/cometsnap/blob/main/CHANGELOG.md) · [cometsnap.com/changelog](https://cometsnap.com/changelog)
 
             **Code signing policy:** free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
             Details: [CODE_SIGNING.md](https://github.com/mike-risky/cometsnap/blob/main/CODE_SIGNING.md).
