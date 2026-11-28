@@ -4,10 +4,10 @@ All the changes worth knowing about, newest first. The same list, in 8 languages
 lives on [cometsnap.com/changelog](https://cometsnap.com/changelog).
 
 Downloads are on the [Releases page](https://github.com/mike-risky/cometsnap/releases).
-"Latest build" means the change is already in the `nightly`, `macos-nightly` and `linux-nightly`
-builds and will be part of the next numbered release.
+Changes merged after the last release show up under "Latest build" first: they are already in the
+`nightly`, `macos-nightly` and `linux-nightly` builds and become part of the next numbered release.
 
-## Latest build (coming in the next release)
+## v1.3.0 — 28 November 2026
 
 ### New
 - **Change any shortcut, on every platform.** Settings has a shortcut editor on Windows, macOS and Linux:
