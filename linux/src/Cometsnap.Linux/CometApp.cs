@@ -1,3 +1,4 @@
+using Avalonia.Platform.Storage;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -181,23 +182,137 @@ public sealed class CometApp : Application
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.UIThread.Post(CountSnap, DispatcherPriority.ApplicationIdle);
         var when = DateTime.Now;
+        var ask = Settings.AskWhereToSave;
+        var save = Settings.AutoSave && !ask;
+        var edit = Settings.OpenEditorAfterCapture;
+        var pattern = Settings.FileNamePattern;
+        var ext = SnapNaming.ExtensionFor(Settings.ImageFormat);
+        var counter = save ? TakeNameCounter() : 0;
         _ = Task.Run(async () =>
         {
             try
             {
                 var png = CaptureStore.EncodePng(image);
                 if (copy) await Dispatcher.UIThread.InvokeAsync(() => Clipboard.SetPngAsync(png));
-                if (!Settings.AutoSave) return;
-                var path = Store.SavePng(png, when);
-                if (path is null) return;
-                Recent.Add(path);
-                Dispatcher.UIThread.Post(() => _card?.SetSaved(path, image));
+                if (ask)
+                {
+                    Dispatcher.UIThread.Post(() => _ = AskAndSaveAsync(image, png, edit));
+                    return;
+                }
+                var path = save ? Store.Save(png, when, pattern, ext, counter) : null;
+                if (path is not null)
+                {
+                    Recent.Add(path);
+                    Dispatcher.UIThread.Post(() => _card?.SetSaved(path, image));
+                }
+                if (edit) Dispatcher.UIThread.Post(() => OpenEditorFor(path, image));
             }
             catch (Exception ex)
             {
                 Log.Error("Delivering the capture failed", ex);
             }
         });
+    }
+
+    /// <summary>The saved capture in the editor, or the image itself when it was not saved.</summary>
+    private void OpenEditorFor(string? path, Bitmap image)
+    {
+        if (path is not null) OpenInEditor(path);
+        else new EditorWindow(this, image, new AnnotationDocument(), null).Show();
+    }
+
+    /// <summary>"Ask where to save each time": the Save dialog, after the clipboard copy.</summary>
+    private async Task AskAndSaveAsync(Bitmap image, byte[] png, bool edit)
+    {
+        string? path = null;
+        try
+        {
+            var jpg = SnapNaming.ExtensionFor(Settings.ImageFormat) == ".jpg";
+            var pngType = new Avalonia.Platform.Storage.FilePickerFileType(T("PNG image")) { Patterns = new[] { "*.png" } };
+            var jpgType = new Avalonia.Platform.Storage.FilePickerFileType(T("JPEG image")) { Patterns = new[] { "*.jpg", "*.jpeg" } };
+            Avalonia.Platform.Storage.IStorageFolder? start = null;
+            try { start = await Flyout.StorageProvider.TryGetFolderFromPathAsync(Directory.Exists(_lastSaveFolder) ? _lastSaveFolder! : CapturesFolder); }
+            catch { /* the dialog picks a folder itself */ }
+            var file = await Flyout.StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = T("Save capture"),
+                SuggestedFileName = SnapNaming.SuggestedName(Settings.FileNamePattern, DateTime.Now, PeekNameCounter()) + (jpg ? ".jpg" : ".png"),
+                DefaultExtension = jpg ? "jpg" : "png",
+                FileTypeChoices = jpg ? new[] { jpgType, pngType } : new[] { pngType, jpgType },
+                SuggestedStartLocation = start,
+            });
+            if (file?.TryGetLocalPath() is { } target)
+            {
+                CaptureStore.WriteAtomic(target, CaptureStore.ForPath(png, target));
+                _lastSaveFolder = Path.GetDirectoryName(target);
+                TakeNameCounter();
+                path = target;
+                Recent.Add(target);
+                _card?.SetSaved(target, image);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Save as failed", ex);
+            Toast($"{T("Could not save the capture:")} {ex.Message}", 4000);
+        }
+        if (edit) OpenEditorFor(path, image);
+    }
+
+    private string? _lastSaveFolder;
+
+    /// <summary>The {counter} value the next saved capture will get.</summary>
+    public int PeekNameCounter() => Math.Max(0, Settings.NameCounter) + 1;
+
+    /// <summary>Uses up a {counter} value (only when the name pattern has one) and returns it.</summary>
+    public int TakeNameCounter()
+    {
+        var next = PeekNameCounter();
+        if (Cometsnap.Core.Storage.FileNamePattern.UsesCounter(Settings.FileNamePattern))
+        {
+            Settings.NameCounter = next;
+            SaveSettings();
+        }
+        return next;
+    }
+
+    /// <summary>A free path for a new capture, under the user's name pattern and format.</summary>
+    public string NextCapturePath(DateTime when) =>
+        SnapNaming.NextFreePath(CapturesFolder, when, Settings.FileNamePattern, SnapNaming.ExtensionFor(Settings.ImageFormat), TakeNameCounter());
+
+    /// <summary>Sets the captures folder ("" = default) and reloads the recent list from it.</summary>
+    public void SetCapturesFolder(string folder)
+    {
+        Settings.CapturesFolder = string.Equals(folder, Paths.DefaultCapturesDirectory, StringComparison.Ordinal) ? "" : folder;
+        SaveSettings();
+        var root = CapturesFolder;
+        Task.Run(() => Recent.Load(root));
+    }
+
+    /// <summary>Grabs the shortcuts again (after the settings listened for new keys).</summary>
+    public void RestartHotkeys() => _ = StartHotkeysAsync();
+
+    /// <summary>
+    /// Applies changed shortcuts right away. When Print Screen was handed over through the desktop's
+    /// keyboard settings, those bindings are written again with the new keys.
+    /// </summary>
+    public void ApplyHotkeyChange()
+    {
+        if (Settings.ReplacedDesktopTool)
+        {
+            DesktopIntegration.GiveBackPrintScreen(Settings.DesktopShortcutsBackup);
+            if (DesktopIntegration.TakeOverPrintScreen(Settings, out var backup))
+            {
+                Settings.DesktopShortcutsBackup = backup;
+            }
+            else
+            {
+                Settings.ReplacedDesktopTool = false;
+                Settings.DesktopShortcutsBackup = "";
+            }
+            SaveSettings();
+        }
+        _ = StartHotkeysAsync();
     }
 
     private void ShowCard(Bitmap image, PixelRect rect, bool copied)
@@ -326,7 +441,7 @@ public sealed class CometApp : Application
             try
             {
                 if (Directory.Exists(folder))
-                    foreach (var f in Directory.EnumerateFiles(folder, "*.png", SearchOption.AllDirectories))
+                    foreach (var f in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(MediaKinds.IsImage))
                     {
                         if (f.Contains(".cometsnap", StringComparison.Ordinal)) continue; // edit sidecars
                         times.Add(File.GetLastWriteTime(f));

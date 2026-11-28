@@ -29,13 +29,28 @@ public struct AppSettings: Codable, Equatable {
     public var language = ""
     /// Look of the capture screen: a CaptureThemes id ("blue" is the classic look).
     public var captureTheme = CaptureThemes.defaultID
+    /// Save each capture in the captures folder (the clipboard copy is separate).
+    public var saveEveryCapture = true
+    /// Name of each saved capture, with {date}, {time}… tokens; "/" makes subfolders (see FileNamePattern).
+    public var fileNamePattern = FileNamePattern.defaultPattern
+    /// "png" (sharp, lossless) or "jpg" (smaller files).
+    public var imageFormat = "png"
+    /// After each capture, ask where to save it (the clipboard copy still happens first).
+    public var askWhereToSave = false
+    /// Open every capture in the editor right away.
+    public var openEditorAfterCapture = false
+    /// Last number used for {counter} in the file name pattern.
+    public var nameCounter = 0
+    /// Shortcuts the user changed, by action id (see HotkeyAction). Missing = the built-in one.
+    public var hotkeys: [String: HotkeySpec] = [:]
 
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
-             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme
+             celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme,
+             saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,6 +76,14 @@ public struct AppSettings: Codable, Equatable {
         language = (try? c.decodeIfPresent(String.self, forKey: .language)) ?? ""
         captureTheme = CaptureThemes.get(try? c.decodeIfPresent(String.self, forKey: .captureTheme)).id
         videoFramesPerSecond = min(60, max(10, (try? c.decodeIfPresent(Int.self, forKey: .videoFramesPerSecond)) ?? d.videoFramesPerSecond))
+        saveEveryCapture = (try? c.decodeIfPresent(Bool.self, forKey: .saveEveryCapture)) ?? d.saveEveryCapture
+        let pattern = (try? c.decodeIfPresent(String.self, forKey: .fileNamePattern)) ?? nil
+        fileNamePattern = FileNamePattern.isUsable(pattern) ? pattern! : d.fileNamePattern
+        imageFormat = SnapNaming.fileExtension(for: (try? c.decodeIfPresent(String.self, forKey: .imageFormat)) ?? nil)
+        askWhereToSave = (try? c.decodeIfPresent(Bool.self, forKey: .askWhereToSave)) ?? d.askWhereToSave
+        openEditorAfterCapture = (try? c.decodeIfPresent(Bool.self, forKey: .openEditorAfterCapture)) ?? d.openEditorAfterCapture
+        nameCounter = max(0, (try? c.decodeIfPresent(Int.self, forKey: .nameCounter)) ?? 0)
+        hotkeys = ((try? c.decodeIfPresent([String: HotkeySpec].self, forKey: .hotkeys)) ?? nil) ?? [:]
     }
 
     public static func load(from url: URL) -> AppSettings {
@@ -77,6 +100,24 @@ public struct AppSettings: Codable, Equatable {
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
     }
+}
+
+/// A keyboard shortcut the user picked: the Carbon key code and modifiers, plus how to show it ("⌘⇧2").
+public struct HotkeySpec: Codable, Equatable {
+    public var keyCode: UInt32
+    public var modifiers: UInt32
+    public var display: String
+
+    public init(keyCode: UInt32, modifiers: UInt32, display: String) {
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.display = display
+    }
+}
+
+/// The actions whose shortcut can be changed in Settings.
+public enum HotkeyAction: String, CaseIterable {
+    case capture, video, gif, text, scrolling, color
 }
 
 /// Standard folders.

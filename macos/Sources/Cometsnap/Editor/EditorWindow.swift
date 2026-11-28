@@ -315,12 +315,12 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
     func save(close: Bool) {
         canvas.commitText()
         guard let img = flattened else { return }
-        let target = url ?? SnapNaming.nextFreeURL(root: app.capturesDirectory, date: Date())
+        let target = url ?? app.nextCaptureURL()
         do {
             let original = EditSidecar.original(for: target)
             if !FileManager.default.fileExists(atPath: original.path) { try PNG.write(base, to: original) }
             if let data = canvas.doc.encoded() { try data.write(to: EditSidecar.annotations(for: target), options: .atomic) }
-            try PNG.write(img, to: target)
+            try PNG.writeImage(img, to: target)
             url = target
             savedDoc = canvas.doc
             app.capturesChanged()
@@ -334,11 +334,13 @@ final class EditorWindow: NSWindow, NSWindowDelegate {
         canvas.commitText()
         guard let img = flattened else { return }
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = url?.lastPathComponent ?? "snap.png"
+        let ext = SnapNaming.fileExtension(for: app.settings.imageFormat)
+        panel.allowedContentTypes = ext == "jpg" ? [.jpeg, .png] : [.png, .jpeg]
+        panel.nameFieldStringValue = url?.lastPathComponent
+            ?? SnapNaming.suggestedName(pattern: app.settings.fileNamePattern, date: Date(), counter: app.nextNameCounter) + "." + ext
         panel.beginSheetModal(for: self) { [weak self] resp in
             guard resp == .OK, let dest = panel.url else { return }
-            do { try PNG.write(img, to: dest) } catch { self?.app.report(error) }
+            do { try PNG.writeImage(img, to: dest) } catch { self?.app.report(error) }
         }
     }
 

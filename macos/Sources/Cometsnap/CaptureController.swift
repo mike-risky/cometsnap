@@ -1,5 +1,6 @@
 import AppKit
 import CometsnapCore
+import UniformTypeIdentifiers
 
 /// Hotkey → freeze → overlay → copy + save on release. No toolbar in the way: editing is
 /// optional, from the small Edit card or the flyout.
@@ -124,18 +125,66 @@ final class CaptureController {
         if settings.cometAnimation { CometFlight.fly(from: rect, to: app.statusItem.buttonFrame, image: image) }
         let card = settings.showEditCard ? app.editCard : nil
         card?.show(image: image, scale: scale, copied: settings.copyToClipboard)
-        let url = SnapNaming.nextFreeURL(root: app.capturesDirectory, date: Date())
+        if settings.askWhereToSave {
+            DispatchQueue.main.async { [weak self] in self?.askAndSave(image, scale: scale, card: card) }
+            return
+        }
+        guard settings.saveEveryCapture else {
+            app.countSnap()
+            if settings.openEditorAfterCapture { app.openEditor(url: nil, image: image, scale: scale) }
+            return
+        }
+        let url = app.nextCaptureURL()
+        let edit = settings.openEditorAfterCapture
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             do {
-                try PNG.write(image, to: url)
+                try PNG.writeImage(image, to: url)
                 DispatchQueue.main.async {
                     card?.setSaved(url, for: image)
                     self?.app.capturesChanged()
                     self?.app.countSnap()
                     Log.info("saved \(url.lastPathComponent) \(image.width)x\(image.height)")
+                    if edit { self?.app.openEditor(url: url) }
                 }
             } catch {
-                DispatchQueue.main.async { self?.app.report(error) }
+                DispatchQueue.main.async {
+                    self?.app.report(error)
+                    if edit { self?.app.openEditor(url: nil, image: image, scale: scale) }
+                }
+            }
+        }
+    }
+
+    private var lastSaveFolder: URL?
+
+    /// "Ask where to save each time": a Save panel right after the clipboard copy.
+    private func askAndSave(_ image: CGImage, scale: CGFloat, card: EditCard?) {
+        let s = app.settings
+        let ext = SnapNaming.fileExtension(for: s.imageFormat)
+        let panel = NSSavePanel()
+        panel.title = L.t("Save capture")
+        panel.allowedContentTypes = ext == "jpg" ? [.jpeg, .png] : [.png, .jpeg]
+        panel.canCreateDirectories = true
+        panel.directoryURL = lastSaveFolder ?? app.capturesDirectory
+        panel.nameFieldStringValue = SnapNaming.suggestedName(pattern: s.fileNamePattern, date: Date(), counter: app.nextNameCounter) + "." + ext
+        NSApp.activate()
+        panel.begin { [weak self] resp in
+            guard let self else { return }
+            guard resp == .OK, let url = panel.url else {
+                self.app.countSnap()
+                if s.openEditorAfterCapture { self.app.openEditor(url: nil, image: image, scale: scale) }
+                return
+            }
+            do {
+                try PNG.writeImage(image, to: url)
+                self.lastSaveFolder = url.deletingLastPathComponent()
+                _ = self.app.takeNameCounter()
+                card?.setSaved(url, for: image)
+                self.app.capturesChanged()
+                self.app.countSnap()
+                if s.openEditorAfterCapture { self.app.openEditor(url: url) }
+            } catch {
+                self.app.report(error)
             }
         }
     }

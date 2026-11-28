@@ -287,33 +287,37 @@ public sealed class CaptureController
         _app.SetTrayStatus(null);
     }
 
-    /// <summary>Copies like a normal capture, then asks where to save an extra copy.</summary>
-    private void SaveAs(BitmapSource image)
+    /// <summary>Copies like a normal capture, then asks where to save it.</summary>
+    private void SaveAs(BitmapSource image) => Deliver(image, null, askWhere: true);
+
+    /// <summary>The Save dialog, after the clipboard copy. The file joins the recent captures.</summary>
+    private void AskAndSave(BitmapSource image)
     {
-        Deliver(image, null);
+        var settings = _app.Settings;
+        var jpgFirst = SnapNaming.ExtensionFor(settings.ImageFormat) == ".jpg";
+        var png = L.T("PNG image") + " (*.png)|*.png";
+        var jpg = L.T("JPEG image") + " (*.jpg)|*.jpg";
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = L.T("Save capture"),
-            FileName = SnapNaming.BaseName(DateTime.Now),
-            DefaultExt = ".png",
-            Filter = L.T("PNG image") + " (*.png)|*.png|" + L.T("JPEG image") + " (*.jpg)|*.jpg",
-            InitialDirectory = _app.CapturesFolder,
+            FileName = SnapNaming.SuggestedName(settings.FileNamePattern, DateTime.Now, _app.PeekNameCounter()),
+            DefaultExt = jpgFirst ? ".jpg" : ".png",
+            Filter = jpgFirst ? jpg + "|" + png : png + "|" + jpg,
+            InitialDirectory = Directory.Exists(_app.LastSaveFolder) ? _app.LastSaveFolder : _app.CapturesFolder,
         };
-        if (dialog.ShowDialog() != true) return;
+        if (dialog.ShowDialog() != true)
+        {
+            if (settings.OpenEditorAfterCapture) _app.OpenInEditor(image, new Cometsnap.Editor.AnnotationDocument());
+            return;
+        }
         try
         {
-            if (dialog.FileName.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
-                || dialog.FileName.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase))
-            {
-                var encoder = new JpegBitmapEncoder { QualityLevel = 92 };
-                encoder.Frames.Add(BitmapFrame.Create(image));
-                using var fs = File.Create(dialog.FileName);
-                encoder.Save(fs);
-            }
-            else
-            {
-                CaptureStore.SavePng(image, dialog.FileName);
-            }
+            CaptureStore.SaveImage(image, dialog.FileName);
+            _app.LastSaveFolder = Path.GetDirectoryName(dialog.FileName);
+            _app.TakeNameCounter();
+            CaptureSaved?.Invoke(dialog.FileName);
+            CaptureStored?.Invoke(dialog.FileName, image);
+            if (settings.OpenEditorAfterCapture) _app.OpenInEditor(dialog.FileName);
         }
         catch (Exception ex)
         {
@@ -322,7 +326,7 @@ public sealed class CaptureController
         }
     }
 
-    private void Deliver(BitmapSource image, PixelRect? from)
+    private void Deliver(BitmapSource image, PixelRect? from, bool askWhere = false)
     {
         var settings = _app.Settings;
         var sw = Stopwatch.StartNew();
@@ -331,17 +335,30 @@ public sealed class CaptureController
         Log.Info($"Capture {image.PixelWidth}×{image.PixelHeight} on clipboard in {sw.ElapsedMilliseconds} ms");
 
         if (from is { } rect) CaptureTaken?.Invoke(image, rect);
-        if (settings.AutoSave) _ = SaveAndAnnounce(image);
+
+        // The card and the comet show first; the dialog or the editor come right after.
+        if (askWhere || settings.AskWhereToSave)
+            _app.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => AskAndSave(image));
+        else if (settings.AutoSave)
+            _ = SaveAndAnnounce(image, settings.OpenEditorAfterCapture);
+        else if (settings.OpenEditorAfterCapture)
+            _app.Dispatcher.BeginInvoke(DispatcherPriority.Background, () => _app.OpenInEditor(image, new Cometsnap.Editor.AnnotationDocument()));
     }
 
-    private async Task SaveAndAnnounce(BitmapSource image)
+    private async Task SaveAndAnnounce(BitmapSource image, bool thenEdit)
     {
-        var path = await _store.SaveAsync(image, DateTime.Now);
-        if (path is null) return;
+        var s = _app.Settings;
+        var path = await _store.SaveAsync(image, DateTime.Now, s.FileNamePattern, SnapNaming.ExtensionFor(s.ImageFormat), _app.TakeNameCounter());
+        if (path is null)
+        {
+            if (thenEdit) await _app.Dispatcher.InvokeAsync(() => _app.OpenInEditor(image, new Cometsnap.Editor.AnnotationDocument()));
+            return;
+        }
         await _app.Dispatcher.InvokeAsync(() =>
         {
             CaptureSaved?.Invoke(path);
             CaptureStored?.Invoke(path, image);
+            if (thenEdit) _app.OpenInEditor(path);
         });
     }
 }

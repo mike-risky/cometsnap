@@ -801,7 +801,7 @@ public sealed class EditorWindow : Window
     {
         try
         {
-            var path = _path ?? SnapNaming.NextFreePath(_app.CapturesFolder, DateTime.Now);
+            var path = _path ?? _app.NextCapturePath(DateTime.Now);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             if (_doc.IsEmpty)
             {
@@ -812,7 +812,7 @@ public sealed class EditorWindow : Window
                 EditSidecar.EnsureFolder(path);
                 CaptureStore.SavePng(_base, EditSidecar.OriginalFor(path));
             }
-            CaptureStore.SavePng(image, path);
+            CaptureStore.SaveImage(image, path);
             if (!_doc.IsEmpty) File.WriteAllText(EditSidecar.AnnotationsFor(path), _doc.ToJson());
 
             _path = path;
@@ -837,7 +837,7 @@ public sealed class EditorWindow : Window
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = L.T("Save a copy"),
-            FileName = _path is null ? SnapNaming.BaseName(DateTime.Now) : Path.GetFileNameWithoutExtension(_path) + "-edited",
+            FileName = _path is null ? SnapNaming.SuggestedName(_app.Settings.FileNamePattern, DateTime.Now, _app.PeekNameCounter()) : Path.GetFileNameWithoutExtension(_path) + "-edited",
             DefaultExt = ".png",
             Filter = L.T("PNG image") + " (*.png)|*.png|" + L.T("JPEG image") + " (*.jpg)|*.jpg",
             InitialDirectory = _path is null ? _app.CapturesFolder : Path.GetDirectoryName(_path),

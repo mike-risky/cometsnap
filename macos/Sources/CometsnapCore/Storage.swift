@@ -49,6 +49,30 @@ public enum SnapNaming {
         }
         return candidate
     }
+
+    /// A free path under the user's name pattern and format ("png" or "jpg"), e.g. `<root>/2026-11/snap_….png`.
+    public static func nextFreeURL(root: URL, date: Date, pattern: String?, ext: String, counter: Int = 1,
+                                   exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> URL {
+        let stem = root.appendingPathComponent(FileNamePattern.expand(pattern, date: date, counter: counter))
+        var candidate = stem.appendingPathExtension(ext)
+        var i = 2
+        while exists(candidate) {
+            candidate = stem.deletingLastPathComponent().appendingPathComponent("\(stem.lastPathComponent)_\(i).\(ext)")
+            i += 1
+        }
+        return candidate
+    }
+
+    /// The file name (no folders, no extension) the pattern gives, for Save dialogs.
+    public static func suggestedName(pattern: String?, date: Date, counter: Int = 1) -> String {
+        (FileNamePattern.expand(pattern, date: date, counter: counter) as NSString).lastPathComponent
+    }
+
+    /// "jpg" for "jpg"/"jpeg", otherwise "png".
+    public static func fileExtension(for format: String?) -> String {
+        let f = (format ?? "").lowercased()
+        return f == "jpg" || f == "jpeg" ? "jpg" : "png"
+    }
 }
 
 /// Where the editor keeps what it needs to re-open a capture with its shapes still editable:
@@ -116,8 +140,17 @@ public enum RecentCaptures {
         guard let top = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else {
             return []
         }
+        // The folder itself and its subfolders, as deep as a name pattern can go ("2026/11/…").
         var folders: [URL] = [root]
-        for u in top where (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true { folders.append(u) }
+        var level = top.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        for depth in 1...FileNamePattern.maxFolders {
+            folders.append(contentsOf: level)
+            guard depth < FileNamePattern.maxFolders else { break }
+            level = level.flatMap { dir in
+                ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])) ?? [])
+                    .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            }
+        }
         for folder in folders {
             guard let files = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { continue }
             for f in files {

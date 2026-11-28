@@ -14,16 +14,20 @@ public sealed class CaptureStore
 
     public CaptureStore(Func<string> root) => _root = root;
 
-    public Task<string?> SaveAsync(BitmapSource image, DateTime when)
+    public Task<string?> SaveAsync(BitmapSource image, DateTime when) =>
+        SaveAsync(image, when, FileNamePattern.Default, SnapNaming.Extension, 1);
+
+    /// <summary>Saves under the user's name pattern, as PNG or JPEG (from the extension).</summary>
+    public Task<string?> SaveAsync(BitmapSource image, DateTime when, string? pattern, string extension, int counter)
     {
         if (!image.IsFrozen) image.Freeze();
         return Task.Run(() =>
         {
             try
             {
-                var path = SnapNaming.NextFreePath(_root(), when);
+                var path = SnapNaming.NextFreePath(_root(), when, pattern, extension, counter);
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                SavePng(image, path);
+                SaveImage(image, path);
                 Saved?.Invoke(path);
                 return path;
             }
@@ -35,9 +39,14 @@ public sealed class CaptureStore
         });
     }
 
-    public static void SavePng(BitmapSource image, string path)
+    public static void SavePng(BitmapSource image, string path) => Write(image, path, new PngBitmapEncoder());
+
+    /// <summary>PNG, or JPEG (quality 92) when the path ends in .jpg / .jpeg.</summary>
+    public static void SaveImage(BitmapSource image, string path) =>
+        Write(image, path, MediaKinds.IsJpeg(path) ? new JpegBitmapEncoder { QualityLevel = 92 } : new PngBitmapEncoder());
+
+    private static void Write(BitmapSource image, string path, BitmapEncoder encoder)
     {
-        var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(image));
         var tmp = path + ".part";
         using (var fs = File.Create(tmp))

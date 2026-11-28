@@ -159,6 +159,16 @@ final class SettingsWindow: NSWindow {
     private let gifFps = NSPopUpButton()
     private let language = NSPopUpButton()
     private let folder = NSTextField(labelWithString: "")
+    private let saveBox = NSButton(checkboxWithTitle: L.t("Save every capture"), target: nil, action: nil)
+    private let askBox = NSButton(checkboxWithTitle: L.t("Ask where to save each time"), target: nil, action: nil)
+    private let editorBox = NSButton(checkboxWithTitle: L.t("Open in the editor right away"), target: nil, action: nil)
+    private let nameField = NSTextField(string: "")
+    private let nameExample = NSTextField(labelWithString: "")
+    private let tags = NSPopUpButton(frame: .zero, pullsDown: true)
+    private let format = NSPopUpButton()
+    private var hotkeyButtons: [HotkeyAction: NSButton] = [:]
+    private var listening: HotkeyAction?
+    private var keyMonitor: Any?
     private var themeButtons: [NSButton] = []
     private let preview = ThemePreviewView(frame: CGRect(x: 0, y: 0, width: 460, height: 132))
 
@@ -174,7 +184,7 @@ final class SettingsWindow: NSWindow {
     }
 
     private func build() {
-        for b in [login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal] {
+        for b in [login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal, saveBox, askBox, editorBox] {
             b.target = self
             b.action = #selector(changed)
         }
@@ -191,6 +201,18 @@ final class SettingsWindow: NSWindow {
         folder.textColor = Theme.muted
         folder.lineBreakMode = .byTruncatingMiddle
         folder.font = Theme.ui(12)
+        format.addItems(withTitles: ["PNG", "JPG"])
+        format.target = self
+        format.action = #selector(changed)
+        nameField.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+        nameField.delegate = self
+        nameField.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        nameExample.font = Theme.ui(11)
+        nameExample.textColor = Theme.muted
+        tags.addItem(withTitle: "{ }")
+        FileNamePattern.tokens.forEach { tags.addItem(withTitle: $0) }
+        tags.target = self
+        tags.action = #selector(insertTag)
         let change = NSButton(title: L.t("Change…"), target: self, action: #selector(chooseFolder))
         let reveal = NSButton(title: L.t("Open"), target: self, action: #selector(openFolder))
 
@@ -231,31 +253,90 @@ final class SettingsWindow: NSWindow {
         let folderRow = NSStackView(views: [folder, change, reveal])
         folderRow.spacing = 8
         folder.widthAnchor.constraint(equalToConstant: 250).isActive = true
-        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧2 capture (with the option above also ⌘⇧4, ⌘⇧3 whole screen and ⌘⇧5 panel, plus Print Screen / F13) · ⌘⇧7 video · ⌘⇧8 GIF · press again to stop.") + "\n" + L.t("In the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels."))
+        let keys = NSTextField(wrappingLabelWithString: L.t("In the overlay: click a window or drag · arrows nudge 1 px (⇧ 10 px) · Space moves the selection · F whole screen · W window detection · C copies the color · Esc cancels."))
         keys.font = Theme.ui(11)
         keys.textColor = Theme.muted
         keys.preferredMaxLayoutWidth = 460
 
-        let stack = NSStackView(views: [title, login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal,
-                                        row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), row(L.t("Captures folder"), folderRow), themeBox, keys])
+        func heading(_ text: String) -> NSTextField {
+            let h = NSTextField(labelWithString: text)
+            h.font = Theme.ui(13, .semibold)
+            h.textColor = .white
+            return h
+        }
+        func hint(_ text: String) -> NSTextField {
+            let h = NSTextField(wrappingLabelWithString: text)
+            h.font = Theme.ui(11)
+            h.textColor = Theme.muted
+            h.preferredMaxLayoutWidth = 460
+            return h
+        }
+        let nameRow = NSStackView(views: [nameField, tags])
+        nameRow.spacing = 8
+        let nameBox = NSStackView(views: [nameRow, nameExample, hint(L.t("Click a tag to add it. A / makes a subfolder."))])
+        nameBox.orientation = .vertical
+        nameBox.alignment = .leading
+        nameBox.spacing = 4
+
+        var hotkeyRows: [NSView] = []
+        for action in HotkeyAction.allCases {
+            let b = NSButton(title: "", target: self, action: #selector(recordHotkey(_:)))
+            b.bezelStyle = .rounded
+            b.tag = HotkeyAction.allCases.firstIndex(of: action) ?? 0
+            b.widthAnchor.constraint(equalToConstant: 170).isActive = true
+            hotkeyButtons[action] = b
+            let reset = NSButton(title: "↺", target: self, action: #selector(resetHotkey(_:)))
+            reset.bezelStyle = .rounded
+            reset.tag = b.tag
+            reset.toolTip = L.t("Back to default")
+            let l = NSTextField(labelWithString: action.title)
+            l.textColor = Theme.muted
+            l.font = Theme.ui(12)
+            l.widthAnchor.constraint(equalToConstant: 230).isActive = true
+            let r = NSStackView(views: [l, b, reset])
+            r.spacing = 8
+            hotkeyRows.append(r)
+        }
+
+        var views: [NSView] = [title, login, takeOver, card, comet, sound, audio, celebrations, seasonal]
+        views += [row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), themeBox]
+        views += [heading(L.t("Where captures go")), copyBox, saveBox, askBox, editorBox]
+        views += [row(L.t("Captures folder"), folderRow), row(L.t("File name"), nameBox), row(L.t("File format"), format)]
+        views.append(hint(L.t("PNG keeps every pixel sharp. JPG files are smaller.")))
+        views += [heading(L.t("Keyboard shortcuts")), hint(L.t("Click a shortcut, then press the new keys. Esc cancels."))]
+        views += hotkeyRows
+        views.append(keys)
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 9
         stack.setCustomSpacing(16, after: title)
         stack.setCustomSpacing(16, after: seasonal)
         stack.translatesAutoresizingMaskIntoConstraints = false
-        let root = NSView()
-        root.addSubview(stack)
-        contentView = root
+        // Everything in one scrolling page, so it fits small screens too.
+        let doc = FlippedView()
+        doc.translatesAutoresizingMaskIntoConstraints = false
+        doc.addSubview(stack)
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.documentView = doc
+        contentView = scroll
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 18),
-            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 24),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -24),
+            doc.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
+            doc.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
+            doc.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            stack.topAnchor.constraint(equalTo: doc.topAnchor, constant: 18),
+            stack.leadingAnchor.constraint(equalTo: doc.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: doc.trailingAnchor, constant: -24),
+            stack.bottomAnchor.constraint(equalTo: doc.bottomAnchor, constant: -18),
             keys.widthAnchor.constraint(equalToConstant: 470),
         ])
-        // Fit the longest line (French and German run longer).
+        // Fit the longest line (French and German run longer), at most most of the screen tall.
         let fit = stack.fittingSize
-        setContentSize(NSSize(width: max(560, fit.width + 48), height: max(470, fit.height + 36)))
+        let maxHeight = (NSScreen.main?.visibleFrame.height ?? 900) * 0.85
+        setContentSize(NSSize(width: max(560, fit.width + 64), height: min(maxHeight, max(470, fit.height + 36))))
         center()
     }
 
@@ -277,6 +358,88 @@ final class SettingsWindow: NSWindow {
         for (i, t) in CaptureThemes.all.enumerated() { themeButtons[i].state = t.id == s.captureTheme ? .on : .off }
         preview.theme = CaptureThemes.get(s.captureTheme)
         folder.stringValue = app.capturesDirectory.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+        saveBox.state = s.saveEveryCapture ? .on : .off
+        askBox.state = s.askWhereToSave ? .on : .off
+        editorBox.state = s.openEditorAfterCapture ? .on : .off
+        format.selectItem(at: SnapNaming.fileExtension(for: s.imageFormat) == "jpg" ? 1 : 0)
+        if nameField.currentEditor() == nil { nameField.stringValue = s.fileNamePattern }
+        refreshExample()
+        for (action, b) in hotkeyButtons where action != listening { b.title = s.hotkey(action).display }
+    }
+
+    private func refreshExample() {
+        let s = app.settings
+        let name = FileNamePattern.expand(nameField.stringValue, date: Date(), counter: app.nextNameCounter) + "." + SnapNaming.fileExtension(for: s.imageFormat)
+        nameExample.stringValue = L.f("Example: {0}", name)
+    }
+
+    @objc private func insertTag() {
+        let i = tags.indexOfSelectedItem
+        guard i > 0 else { return }
+        let token = FileNamePattern.tokens[i - 1]
+        if let editor = nameField.currentEditor() {
+            editor.insertText(token)
+        } else {
+            nameField.stringValue += token
+        }
+        patternChanged()
+    }
+
+    private func patternChanged() {
+        let text = nameField.stringValue.trimmingCharacters(in: .whitespaces)
+        app.update { $0.fileNamePattern = FileNamePattern.isUsable(text) ? text : FileNamePattern.defaultPattern }
+        refreshExample()
+    }
+
+    // MARK: shortcuts
+
+    @objc private func recordHotkey(_ sender: NSButton) {
+        stopListening()
+        let action = HotkeyAction.allCases[sender.tag]
+        listening = action
+        sender.title = L.t("Press the new keys…")
+        app.pauseHotkeys() // so the current shortcut reaches this window too
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { [weak self] event in
+            guard let self, let action = self.listening else { return event }
+            if event.keyCode == 53 { // Esc
+                self.stopListening()
+                return nil
+            }
+            guard let spec = HotkeyRecorder.spec(for: event) else { NSSound.beep(); return nil }
+            let taken = HotkeyAction.allCases.contains { other in
+                other != action && self.app.settings.hotkey(other).keyCode == spec.keyCode && self.app.settings.hotkey(other).modifiers == spec.modifiers
+            }
+            if taken { NSSound.beep(); return nil }
+            self.app.update { $0.hotkeys[action.rawValue] = spec }
+            self.stopListening()
+            return nil
+        }
+    }
+
+    @objc private func resetHotkey(_ sender: NSButton) {
+        stopListening()
+        let action = HotkeyAction.allCases[sender.tag]
+        app.update { $0.hotkeys[action.rawValue] = nil }
+        reload()
+    }
+
+    private func stopListening() {
+        if let m = keyMonitor { NSEvent.removeMonitor(m) }
+        keyMonitor = nil
+        guard listening != nil else { return }
+        listening = nil
+        app.registerHotkeys()
+        reload()
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        stopListening()
+    }
+
+    override func close() {
+        stopListening()
+        super.close()
     }
 
     @objc private func changed() {
@@ -293,7 +456,12 @@ final class SettingsWindow: NSWindow {
             s.seasonalLooks = seasonal.state == .on
             s.loupeCorner = LoupeCorner.allCases[max(0, loupe.indexOfSelectedItem)]
             s.gifFramesPerSecond = fpsValues[max(0, gifFps.indexOfSelectedItem)]
+            s.saveEveryCapture = saveBox.state == .on
+            s.askWhereToSave = askBox.state == .on
+            s.openEditorAfterCapture = editorBox.state == .on
+            s.imageFormat = format.indexOfSelectedItem == 1 ? "jpg" : "png"
         }
+        refreshExample()
         if sound.state == .on { Sound.snap() }
     }
 
@@ -335,6 +503,13 @@ final class SettingsWindow: NSWindow {
     }
 
     @objc private func openFolder() { app.openCapturesFolder() }
+}
+
+extension SettingsWindow: NSTextFieldDelegate {
+    func controlTextDidChange(_ obj: Notification) {
+        guard (obj.object as? NSTextField) === nameField else { return }
+        patternChanged()
+    }
 }
 
 /// A small fake capture screen in the chosen colors: dimmed desktop, selection with glow, size tag and loupe.
