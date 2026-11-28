@@ -42,8 +42,12 @@ public sealed class CaptureStore
     public static void SavePng(BitmapSource image, string path) => Write(image, path, new PngBitmapEncoder());
 
     /// <summary>PNG, or JPEG (quality 92) when the path ends in .jpg / .jpeg.</summary>
-    public static void SaveImage(BitmapSource image, string path) =>
-        Write(image, path, MediaKinds.IsJpeg(path) ? new JpegBitmapEncoder { QualityLevel = 92 } : new PngBitmapEncoder());
+    public static void SaveImage(BitmapSource image, string path)
+    {
+        // JPEG has no transparency: a styled capture without a backdrop goes on white, not black.
+        if (MediaKinds.IsJpeg(path)) Write(Styling.StyledBitmaps.Flatten(image), path, new JpegBitmapEncoder { QualityLevel = 92 });
+        else Write(image, path, new PngBitmapEncoder());
+    }
 
     private static void Write(BitmapSource image, string path, BitmapEncoder encoder)
     {

@@ -31,6 +31,9 @@ public sealed class EditCard : Window
     private readonly Border _editButton;
     private readonly Border _cardBorder;
     private readonly Border _textButton;
+    private readonly Border _styleButton;
+    private BitmapSource? _raw;           // the capture before any style, for the ✨ button
+    private bool _canStyle;
     private string? _recording;           // set while the card shows a recording
     private string? _text;                // set while the card shows recognized text
     private readonly DispatcherTimer _timer;
@@ -47,6 +50,9 @@ public sealed class EditCard : Window
 
     /// <summary>Raised with the capture when its Text button is clicked (read the text in it).</summary>
     public event Action<BitmapSource>? TextRequested;
+
+    /// <summary>Raised with the saved path (if known) and the raw capture when ✨ Style is clicked.</summary>
+    public event Action<string?, BitmapSource>? StyleRequested;
 
     /// <summary>Raised with the recognized text when the card of a text capture is clicked.</summary>
     public event Action<string>? ShowTextRequested;
@@ -120,6 +126,27 @@ public sealed class EditCard : Window
             TextRequested?.Invoke(image);
         };
 
+        // ✨ Style: this one capture, share-ready (rounded corners, shadow, backdrop).
+        _styleButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 6, 11, 6),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            ToolTip = L.T("Style this capture: rounded corners, shadow, backdrop"),
+            Child = new TextBlock { Text = "✨ " + L.T("Style"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 13 },
+        };
+        _styleButton.MouseEnter += (_, _) => _styleButton.Background = CaptureLook.AccentBrush;
+        _styleButton.MouseLeave += (_, _) => _styleButton.Background = SpaceTheme.NavyBrush;
+        _styleButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _raw is not { } raw) return;
+            _timer.Stop();
+            _styleButton.Visibility = Visibility.Collapsed;
+            _title.Text = L.T("STYLING…");
+            StyleRequested?.Invoke(_path, raw);
+        };
+
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -130,6 +157,7 @@ public sealed class EditCard : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
+        row.Children.Add(_styleButton);
         row.Children.Add(_textButton);
         row.Children.Add(edit);
         row.Children.Add(close);
@@ -189,8 +217,10 @@ public sealed class EditCard : Window
     }
 
     /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area.</summary>
-    public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied)
+    public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied, BitmapSource? raw = null, bool canStyle = false)
     {
+        _raw = raw ?? image;
+        _canStyle = canStyle;
         SetMode(recording: null, text: null);
         _image = image;
         _path = null;
@@ -215,6 +245,7 @@ public sealed class EditCard : Window
     /// </summary>
     public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied, Rect workAreaDip)
     {
+        _canStyle = false;
         SetMode(path, text: null);
         _image = poster;
         _path = path;
@@ -240,6 +271,7 @@ public sealed class EditCard : Window
         var video = recording is not null;
         var reading = text is not null;
         _textButton.Visibility = video || reading ? Visibility.Collapsed : Visibility.Visible;
+        _styleButton.Visibility = video || reading || !_canStyle ? Visibility.Collapsed : Visibility.Visible;
         _editButton.Visibility = reading && text!.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         _editIcon.Data = Geometry.Parse(video ? ScissorsIcon : reading ? EyeIcon : PenIcon);
         _editLabel.Text = video ? L.T("Trim") : reading ? L.T("Show") : L.T("Edit");
@@ -289,6 +321,22 @@ public sealed class EditCard : Window
         Top = workAreaDip.Bottom - ActualHeight - 4;
         _timer.Stop();
         if (fadeLater) _timer.Start();
+    }
+
+    /// <summary>
+    /// The ✨ Style button finished: the card now holds the styled capture (already on the
+    /// clipboard), and Edit or a drag use the styled file when there is one.
+    /// </summary>
+    public void ShowStyled(BitmapSource raw, BitmapSource styled, string? path, bool copied)
+    {
+        if (!ReferenceEquals(raw, _raw) || _recording is not null || _text is not null || !IsVisible) return;
+        _image = styled;
+        _path = path;
+        _thumb.Source = styled;
+        _title.Text = copied ? L.T("STYLED & COPIED!") : L.T("STYLED!");
+        _detail.Text = $"{styled.PixelWidth} × {styled.PixelHeight}" + (path is null ? "" : " · " + Path.GetFileName(path));
+        _timer.Stop();
+        if (!IsMouseOver) _timer.Start();
     }
 
     /// <summary>The capture reached the disk: Edit will now open the file.</summary>

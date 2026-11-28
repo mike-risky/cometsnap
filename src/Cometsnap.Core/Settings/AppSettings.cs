@@ -72,6 +72,18 @@ public sealed class AppSettings
     /// <summary>Look of the capture screen: a <see cref="CaptureThemes"/> id ("blue" is the classic look).</summary>
     public string CaptureTheme { get; set; } = CaptureThemes.DefaultId;
 
+    /// <summary>Share-ready look (rounded corners, shadow, backdrop): a <see cref="Styling.SnapStyles"/> id.</summary>
+    public string SnapStyle { get; set; } = Styling.SnapStyles.DefaultId;
+
+    /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
+    public bool StyleOnCopy { get; set; }
+
+    /// <summary>Save the styled capture (the file you drag out of the tray). Off: the file is the raw capture.</summary>
+    public bool StyleOnExport { get; set; }
+
+    /// <summary>Show a ✨ Style button on the Copied card, to style just that capture.</summary>
+    public bool StylePerShot { get; set; } = true;
+
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;
     /// <summary>A soft click on capture. Off by default.</summary>

@@ -17,6 +17,7 @@ using Cometsnap.Core.Fun;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
 using Cometsnap.Core.Storage;
+using Cometsnap.Core.Styling;
 using Cometsnap.Core.Takeover;
 using Cometsnap.Editor;
 using Cometsnap.Video;
@@ -388,10 +389,50 @@ public sealed class CometApp : Application
     private void OnCaptureTaken(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect from)
     {
         if (Settings.PlaySounds) _sounds?.Snap();
-        if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
+        if (Settings.ShowEditCard)
+        {
+            // ✨ has nothing to add when both the copy and the file are styled already.
+            var canStyle = Settings.StylePerShot && !(Settings.StyleOnCopy && Settings.StyleOnExport);
+            _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture, Capture.LastRawCapture, canStyle);
+        }
         LaunchComet(new Point(from.CenterX, from.CenterY), image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
+    }
+
+    // ------------------------------------------------------------------ share-ready style
+
+    /// <summary>
+    /// The ✨ Style button of the Copied card: styles this one capture, puts it on the clipboard
+    /// and saves it beside the original ("name-styled.png"), which stays untouched.
+    /// </summary>
+    public async Task StyleOneShotAsync(string? path, System.Windows.Media.Imaging.BitmapSource raw)
+    {
+        try
+        {
+            var settings = Settings;
+            var styled = await Task.Run(() => SnapStyler.Apply(raw, settings));
+            var copied = ClipboardService.SetImage(styled);
+            string? styledPath = null;
+            if (path is not null)
+            {
+                if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
+                else
+                {
+                    styledPath = SnapStyles.StyledPath(path);
+                    var target = styledPath;
+                    await Task.Run(() => CaptureStore.SaveImage(styled, target));
+                    Capture.AnnounceSaved(target, styled);
+                }
+            }
+            _card?.ShowStyled(raw, styled, styledPath, copied);
+            if (!Settings.ShowEditCard) Notify(L.T("Styled capture copied"), styledPath is null ? "" : Path.GetFileName(styledPath));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Styling one capture failed", ex);
+            Notify(L.T("Could not style the capture"), ex.Message);
+        }
     }
 
     // ------------------------------------------------------------------ copy text (OCR)
@@ -552,6 +593,7 @@ public sealed class CometApp : Application
         };
         card.TrimRequested += OpenTrimmer;
         card.TextRequested += image => _ = CopyTextAsync(image, null);
+        card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
         card.ShowTextRequested += ShowRecognizedText;
         return card;
     }

@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Cometsnap.App.Theme;
+using Cometsnap.Core.Styling;
 using Cometsnap.Core.Input;
 using Cometsnap.Core.Localization;
 using Cometsnap.Core.Native;
@@ -104,6 +105,18 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(Switch(L.T("Show the Edit card after a capture"), L.T("A small card in the corner to edit or drag the capture."), S.ShowEditCard, v => S.ShowEditCard = v));
         stack.Children.Add(Switch(L.T("Comet animation"), L.T("The comet flies your capture into the tray."), S.ShowCometAnimation, v => S.ShowCometAnimation = v));
         stack.Children.Add(Switch(L.T("Detect windows under the mouse"), L.T("Click a window to capture just that window."), S.WindowDetection, v => S.WindowDetection = v));
+
+        // ---- share-ready style
+        Section(stack, L.T("Share-ready style"));
+        stack.Children.Add(new TextBlock
+        {
+            Text = L.T("Rounded corners, a soft shadow and a backdrop, ready for social posts and docs. The backdrop and glow follow your capture colors."),
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -4, 0, 10),
+        });
+        stack.Children.Add(StylePicker());
+        stack.Children.Add(Switch(L.T("Style on copy"), L.T("The clipboard gets the styled capture. Off: the raw capture."), S.StyleOnCopy, v => S.StyleOnCopy = v));
+        stack.Children.Add(Switch(L.T("Style on export"), L.T("Saved files (and what you drag out of the tray) are styled. Off: the raw capture."), S.StyleOnExport, v => S.StyleOnExport = v));
+        stack.Children.Add(Switch(L.T("Style per shot"), L.T("A ✨ Style button on the Copied card styles just that capture."), S.StylePerShot, v => S.StylePerShot = v));
 
         // ---- where captures go
         Section(stack, L.T("Where captures go"));
@@ -250,6 +263,86 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(wrap);
         panel.Children.Add(ThemePreview(current));
         return panel;
+    }
+
+    // ------------------------------------------------------------------ share-ready style
+
+    /// <summary>English names of the styles, here so the translation check sees them.</summary>
+    private static string StyleName(SnapStyle st) => st.Id switch
+    {
+        "clean" => L.T("Clean"),
+        "showcase" => L.T("Showcase"),
+        "frosted" => L.T("Frosted"),
+        "comet" => L.T("Comet"),
+        "laser" => L.T("Laser"),
+        _ => st.Name,
+    };
+
+    private static BitmapSource? _sample;
+
+    /// <summary>Style chips plus a live preview: a small fake window drawn in the chosen style.</summary>
+    private UIElement StylePicker()
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var current = SnapStyles.Get(S.SnapStyle);
+        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+        foreach (var style in SnapStyles.All)
+        {
+            var st = style;
+            wrap.Children.Add(Chip(StyleName(st), st.Id == current.Id, () =>
+            {
+                if (S.SnapStyle == st.Id) return;
+                S.SnapStyle = st.Id;
+                _app.TrySaveSettings();
+                Build();
+            }));
+        }
+        panel.Children.Add(wrap);
+
+        var preview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
+        try { preview.Source = StyledBitmaps.Apply(_sample ??= SampleCapture(), current, CaptureLook.Theme.Accent); }
+        catch { preview.Visibility = Visibility.Collapsed; }
+        // A checkerboard behind it, so see-through corners and shadows show as such.
+        var checker = new DrawingBrush
+        {
+            TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute,
+            Drawing = new GeometryDrawing(SpaceTheme.WithAlpha(Colors.White, 0x14), null, Geometry.Parse("M0,0 H8 V8 H0 Z M8,8 H16 V16 H8 Z")),
+        };
+        checker.Freeze();
+        panel.Children.Add(new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            Background = checker, Padding = new Thickness(16), Child = preview,
+        });
+        return panel;
+    }
+
+    /// <summary>A pretend screenshot (a little app window) for the style preview, at real pixel size.</summary>
+    private static BitmapSource SampleCapture()
+    {
+        const int w = 640, h = 380;
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xF7, 0xF8, 0xFC)), null, new Rect(0, 0, w, h));
+            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xF3)), null, new Rect(0, 0, w, 44));
+            var dots = new[] { Color.FromRgb(0xE2, 0x55, 0x3A), Color.FromRgb(0xFF, 0xD6, 0x0A), Color.FromRgb(0x3D, 0x6B, 0xFF) };
+            for (var i = 0; i < 3; i++) dc.DrawEllipse(new SolidColorBrush(dots[i]), null, new Point(24 + i * 22, 22), 7, 7);
+            var ink = new SolidColorBrush(Color.FromRgb(0x07, 0x11, 0x3A));
+            dc.DrawRoundedRectangle(ink, null, new Rect(36, 76, 260, 26), 6, 6);
+            var soft = new SolidColorBrush(Color.FromRgb(0xC9, 0xCF, 0xE3));
+            for (var i = 0; i < 4; i++) dc.DrawRoundedRectangle(soft, null, new Rect(36, 126 + i * 30, 300 - i * 40, 14), 7, 7);
+            dc.DrawRoundedRectangle(new LinearGradientBrush(Color.FromRgb(0x3D, 0x6B, 0xFF), Color.FromRgb(0xE2, 0x55, 0x3A), 45), null, new Rect(376, 76, 228, 166), 12, 12);
+            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x0A)), null, new Point(490, 159), 34, 34);
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0xE2, 0x55, 0x3A)), null, new Rect(36, 280, 140, 44), 10, 10);
+            dc.DrawRoundedRectangle(soft, null, new Rect(376, 270, 228, 14), 7, 7);
+            dc.DrawRoundedRectangle(soft, null, new Rect(376, 300, 170, 14), 7, 7);
+        }
+        var bmp = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        bmp.Render(visual);
+        bmp.Freeze();
+        return bmp;
     }
 
     /// <summary>A small fake capture screen: dimmed desktop, crosshair, selection with glow, size tag and loupe.</summary>
