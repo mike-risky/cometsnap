@@ -7,7 +7,7 @@ Downloads are on the [Releases page](https://github.com/mike-risky/cometsnap/rel
 Changes merged after the last release show up under "Latest build" first: they are already in the
 `nightly`, `macos-nightly` and `linux-nightly` builds and become part of the next numbered release.
 
-## Latest build (coming in the next release)
+## Latest build
 
 ### New
 - **Share-ready style.** Rounded corners, a soft shadow and a backdrop, the way screenshots look in social
@@ -16,6 +16,12 @@ Changes merged after the last release show up under "Latest build" first: they a
   Three switches, mix them as you like: **Style on copy** (clipboard), **Style on export** (saved files and
   what you drag out of the tray), and **Style per shot**, a ✨ button on the Copied card that styles just that
   capture. Copy and export stay raw by default, so capture is as instant as ever. Windows, macOS and Linux.
+
+### Improved
+- **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains
+  Cometsnap in four short lines (press, let go and it's copied and saved, click the Copied card to edit, find
+  your snaps in the tray) plus the handy shortcuts: video, GIF, copy text and the color picker. It shows the
+  keys you actually have, on Windows, macOS and Linux, in all 8 languages.
 
 ## v1.3.0 — 28 November 2026
 
