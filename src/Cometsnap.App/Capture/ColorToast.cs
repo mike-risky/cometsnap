@@ -5,13 +5,14 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Cometsnap.App.Editing;
+using Cometsnap.App.Services;
 using Cometsnap.App.Theme;
 using Cometsnap.Core.Localization;
 
 namespace Cometsnap.App.Capture;
 
 /// <summary>
-/// "Copied #FFAA00" with a swatch, bottom-right, after the color picker. Click-through, never
+/// "Copied #FFAA00" with a swatch, bottom-right of the screen you are on, after the color picker. Click-through, never
 /// takes focus, fades out by itself.
 /// </summary>
 internal sealed class ColorToast : Window
@@ -21,6 +22,7 @@ internal sealed class ColorToast : Window
     private readonly TextBlock _value;
     private readonly Border _card;
     private readonly DispatcherTimer _timer;
+    private readonly CornerPlacement _corner;
 
     public ColorToast()
     {
@@ -64,6 +66,7 @@ internal sealed class ColorToast : Window
             Child = row,
         };
         Content = _card;
+        _corner = new CornerPlacement(this);
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.2) };
         _timer.Tick += (_, _) => FadeOut();
@@ -88,10 +91,7 @@ internal sealed class ColorToast : Window
         Opacity = 1;
         if (!IsVisible) Show();
         EditorUi.Entrance(_card, lift: 14, ms: 180);
-        UpdateLayout();
-        var work = SystemParameters.WorkArea;
-        Left = work.Right - ActualWidth - 4;
-        Top = work.Bottom - ActualHeight - 4;
+        _corner.PlaceNearCursor();
         _timer.Stop();
         _timer.Start();
     }

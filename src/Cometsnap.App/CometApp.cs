@@ -374,7 +374,7 @@ public sealed class CometApp : Application
     public bool ShowRecordingCard(string path, System.Windows.Media.Imaging.BitmapSource? poster, string detail, bool copied)
     {
         if (!Settings.ShowEditCard || _card is null) return false;
-        _card.ShowForRecording(path, poster, detail, copied, SystemParameters.WorkArea);
+        _card.ShowForRecording(path, poster, detail, copied);
         return true;
     }
 
@@ -388,7 +388,7 @@ public sealed class CometApp : Application
     private void OnCaptureTaken(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect from)
     {
         if (Settings.PlaySounds) _sounds?.Snap();
-        if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
+        if (Settings.ShowEditCard) _card?.ShowFor(image, Settings.CopyToClipboardOnCapture);
         LaunchComet(new Point(from.CenterX, from.CenterY), image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
@@ -409,7 +409,7 @@ public sealed class CometApp : Application
         try
         {
             var sw = Stopwatch.StartNew();
-            if (Settings.ShowEditCard) _card?.ShowReading(image, SystemParameters.WorkArea);
+            if (Settings.ShowEditCard) _card?.ShowReading(image);
             var outcome = await OcrService.RecognizeAsync(image);
             Log.Info($"OCR: {outcome.Lines} lines, {outcome.Text.Length} chars in {sw.ElapsedMilliseconds} ms ({outcome.Language})");
             if (outcome.EngineMissing)
@@ -420,7 +420,7 @@ public sealed class CometApp : Application
             }
             if (outcome.Found && !ClipboardService.SetText(outcome.Text))
                 Log.Error("Could not copy the text to the clipboard");
-            if (Settings.ShowEditCard && _card is not null) _card.ShowText(image, outcome.Text, outcome.Lines, SystemParameters.WorkArea);
+            if (Settings.ShowEditCard && _card is not null) _card.ShowText(image, outcome.Text, outcome.Lines);
             else if (outcome.Found) Notify(L.T("Text copied"), Preview(outcome.Text));
             else Notify(L.T("No text found"), L.T("Try a bigger area, or zoom in on small text."));
             if (outcome.Found && from is { } rect) LaunchComet(new Point(rect.CenterX, rect.CenterY));
