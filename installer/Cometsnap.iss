@@ -15,6 +15,10 @@
 #ifndef SourceExe
   #define SourceExe "..\out\" + Arch + "\Cometsnap.exe"
 #endif
+; Cometsnap.exe in Setup is framework-dependent: it needs this .NET Desktop Runtime, which
+; Setup downloads from Microsoft and installs once when the PC does not have it yet.
+#define DotnetMajor "10"
+#define DotnetRuntimeUrl "https://aka.ms/dotnet/" + DotnetMajor + ".0/windowsdesktop-runtime-win-" + Arch + ".exe"
 #define AppId "F967EC12-96EC-4899-8998-A59765E250CA"
 ; AppId in [Setup] must stay the same GUID.
 #define AppIdBraced "{" + AppId + "}"
@@ -250,6 +254,22 @@ es.MemoThen=Después, Cometsnap te ofrece sustituir tu vieja herramienta de capt
 pt.MemoThen=Depois, o Cometsnap oferece trocar sua velha ferramenta de captura
 zh.MemoThen=然后 Cometsnap 会帮你换掉旧的截图工具
 hi.MemoThen=फिर Cometsnap आपका पुराना स्क्रीन कैप्चर टूल बदलने का सुझाव देता है
+en.MemoRuntime=Downloads and installs Microsoft .NET Desktop Runtime {#DotnetMajor}, which Cometsnap needs (once, about 60 MB; Windows asks for permission)
+fr.MemoRuntime=Télécharge et installe Microsoft .NET Desktop Runtime {#DotnetMajor}, dont Cometsnap a besoin (une seule fois, environ 60 Mo ; Windows demande l’autorisation)
+de.MemoRuntime=Lädt Microsoft .NET Desktop Runtime {#DotnetMajor} herunter und installiert es, Cometsnap braucht es (einmalig, etwa 60 MB; Windows fragt nach der Erlaubnis)
+it.MemoRuntime=Scarica e installa Microsoft .NET Desktop Runtime {#DotnetMajor}, che serve a Cometsnap (una sola volta, circa 60 MB; Windows chiede il permesso)
+es.MemoRuntime=Descarga e instala Microsoft .NET Desktop Runtime {#DotnetMajor}, que Cometsnap necesita (una sola vez, unos 60 MB; Windows pide permiso)
+pt.MemoRuntime=Baixa e instala o Microsoft .NET Desktop Runtime {#DotnetMajor}, de que o Cometsnap precisa (uma vez só, cerca de 60 MB; o Windows pede permissão)
+zh.MemoRuntime=下载并安装 Cometsnap 需要的 Microsoft .NET Desktop Runtime {#DotnetMajor}（只需一次，约 60 MB；Windows 会请求许可）
+hi.MemoRuntime=Microsoft .NET Desktop Runtime {#DotnetMajor} डाउनलोड करके इंस्टॉल करता है, जिसकी Cometsnap को ज़रूरत है (सिर्फ़ एक बार, लगभग 60 MB; Windows अनुमति माँगेगा)
+en.RuntimeFailed=Cometsnap needs Microsoft .NET Desktop Runtime {#DotnetMajor}, and it could not be installed.%n%nYou can install it from https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 and run Setup again, or use the portable Cometsnap-{#Arch}.exe, which needs nothing installed.
+fr.RuntimeFailed=Cometsnap a besoin de Microsoft .NET Desktop Runtime {#DotnetMajor}, qui n’a pas pu être installé.%n%nVous pouvez l’installer depuis https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 puis relancer l’installation, ou utiliser la version portable Cometsnap-{#Arch}.exe, qui n’a besoin de rien.
+de.RuntimeFailed=Cometsnap braucht Microsoft .NET Desktop Runtime {#DotnetMajor}, und es konnte nicht installiert werden.%n%nSie können es von https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 installieren und Setup erneut starten, oder das portable Cometsnap-{#Arch}.exe nutzen, das nichts zusätzlich braucht.
+it.RuntimeFailed=Cometsnap ha bisogno di Microsoft .NET Desktop Runtime {#DotnetMajor}, che non è stato possibile installare.%n%nPuoi installarlo da https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 e rilanciare l’installazione, oppure usare la versione portatile Cometsnap-{#Arch}.exe, che non richiede nulla.
+es.RuntimeFailed=Cometsnap necesita Microsoft .NET Desktop Runtime {#DotnetMajor} y no se pudo instalar.%n%nPuedes instalarlo desde https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 y volver a ejecutar el instalador, o usar la versión portable Cometsnap-{#Arch}.exe, que no necesita nada.
+pt.RuntimeFailed=O Cometsnap precisa do Microsoft .NET Desktop Runtime {#DotnetMajor}, e não foi possível instalá-lo.%n%nVocê pode instalá-lo em https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 e rodar a instalação de novo, ou usar a versão portátil Cometsnap-{#Arch}.exe, que não precisa de nada.
+zh.RuntimeFailed=Cometsnap 需要 Microsoft .NET Desktop Runtime {#DotnetMajor}，但无法安装。%n%n你可以从 https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 安装后重新运行安装程序，或者使用无需安装任何东西的便携版 Cometsnap-{#Arch}.exe。
+hi.RuntimeFailed=Cometsnap को Microsoft .NET Desktop Runtime {#DotnetMajor} चाहिए, और यह इंस्टॉल नहीं हो सका।%n%nआप इसे https://dotnet.microsoft.com/download/dotnet/{#DotnetMajor}.0 से इंस्टॉल करके सेटअप फिर से चला सकते हैं, या पोर्टेबल Cometsnap-{#Arch}.exe इस्तेमाल कर सकते हैं, जिसे कुछ इंस्टॉल करने की ज़रूरत नहीं।
 en.ButtonUpdate=Update
 fr.ButtonUpdate=Mettre à jour
 de.ButtonUpdate=Aktualisieren
@@ -332,6 +352,8 @@ const
 var
   PreviousVersion: String;
   Mode: Integer;
+  NeedsRuntime: Boolean;
+  DownloadPage: TDownloadWizardPage;
 
 function OpenEvent(dwDesiredAccess: DWORD; bInheritHandle: BOOL; lpName: String): THandle;
   external 'OpenEventW@kernel32.dll stdcall';
@@ -377,6 +399,41 @@ begin
     '', SW_HIDE, ewWaitUntilTerminated, Code);
 end;
 
+{ True when the .NET Desktop Runtime Cometsnap needs is installed for this architecture.
+  x64 runtimes on an Arm64 PC live in dotnet\x64. }
+function DesktopRuntimeInstalled: Boolean;
+var
+  Root: String;
+  FindRec: TFindRec;
+begin
+  Root := ExpandConstant('{commonpf64}\dotnet');
+#if Arch == "x64"
+  if IsArm64 then Root := Root + '\x64';
+#endif
+  Result := FindFirst(Root + '\shared\Microsoft.WindowsDesktop.App\{#DotnetMajor}.*', FindRec);
+  if Result then
+  begin
+    Result := FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY <> 0;
+    FindClose(FindRec);
+  end;
+end;
+
+{ Runs the downloaded Microsoft installer. It asks Windows for permission (UAC) on its own. }
+function InstallRuntime: Boolean;
+var
+  Code: Integer;
+  Ui: String;
+begin
+  { Shows Microsoft's own progress bar, or nothing in a silent install (winget). }
+  if WizardSilent then Ui := '/quiet' else Ui := '/passive';
+  if Exec(ExpandConstant('{tmp}\windowsdesktop-runtime.exe'), '/install ' + Ui + ' /norestart', '',
+    SW_SHOW, ewWaitUntilTerminated, Code) then
+    Log(Format('.NET Desktop Runtime installer exit code: %d', [Code]))
+  else
+    Log(Format('.NET Desktop Runtime installer did not start: %s', [SysErrorMessage(Code)]));
+  Result := DesktopRuntimeInstalled;
+end;
+
 function InitializeSetup: Boolean;
 begin
   PreviousVersion := '';
@@ -387,11 +444,13 @@ begin
     Mode := ModeReinstall
   else
     Mode := ModeUpdate;
+  NeedsRuntime := not DesktopRuntimeInstalled;
   Result := True;
 end;
 
 procedure InitializeWizard;
 begin
+  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), nil);
   case Mode of
     ModeFresh:
       begin
@@ -421,7 +480,10 @@ begin
     Result := FmtMessage(CustomMessage('MemoReinstall'), ['{#AppVersion}']);
   end;
   Result := Result + NewLine + NewLine + CustomMessage('MemoWhat') + NewLine +
-    Space + CustomMessage('MemoClose') + NewLine +
+    Space + CustomMessage('MemoClose') + NewLine;
+  if NeedsRuntime then
+    Result := Result + Space + CustomMessage('MemoRuntime') + NewLine;
+  Result := Result +
     Space + FmtMessage(CustomMessage('MemoInstallIn'), [ExpandConstant('{app}')]) + NewLine +
     Space + CustomMessage('MemoStart') + NewLine;
   if Mode <> ModeFresh then
@@ -450,10 +512,41 @@ begin
   end;
 end;
 
+{ Downloads the .NET Desktop Runtime when the PC needs it, after the Ready page. }
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpReady) and NeedsRuntime then
+  begin
+    DownloadPage.Clear;
+    DownloadPage.Add('{#DotnetRuntimeUrl}', 'windowsdesktop-runtime.exe', '');
+    DownloadPage.Show;
+    try
+      try
+        DownloadPage.Download;
+      except
+        if DownloadPage.AbortedByUser then
+          Log('Runtime download cancelled.')
+        else
+          SuppressibleMsgBox(CustomMessage('RuntimeFailed') + #13#10#13#10 + GetExceptionMessage,
+            mbCriticalError, MB_OK, IDOK);
+        Result := False;
+      end;
+    finally
+      DownloadPage.Hide;
+    end;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   CloseCometsnap;
   Result := '';
+  if NeedsRuntime and not DesktopRuntimeInstalled then
+  begin
+    if not InstallRuntime then
+      Result := CustomMessage('RuntimeFailed');
+  end;
 end;
 
 function InitializeUninstall: Boolean;

@@ -11,18 +11,30 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <TieredPGO>true</TieredPGO>
     <!-- The Windows 10 SDK projection gives access to Windows' built-in OCR (Windows.Media.Ocr). -->
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
-  <!-- Portable single-file exe. CI passes -r win-x64 / win-arm64. -->
+  <!-- Single-file Cometsnap.exe. CI passes -r win-x64 / win-arm64, and -p:CometsnapFlavor=Installed
+       for the exe that goes into Cometsnap-Setup. -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
-    <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishReadyToRun>true</PublishReadyToRun>
     <DebugType>embedded</DebugType>
     <SatelliteResourceLanguages>en;fr</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- Installed (Cometsnap-Setup): framework-dependent, so the exe holds only Cometsnap itself.
+       Setup installs Microsoft's .NET Desktop Runtime once when the PC does not have it. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(CometsnapFlavor)' == 'Installed'">
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <!-- Portable (default): carries its own .NET runtime, compressed inside the exe. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(CometsnapFlavor)' != 'Installed'">
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
   <!-- The projection is big and only a few OCR calls use it: keep it as IL (smaller exe). -->
