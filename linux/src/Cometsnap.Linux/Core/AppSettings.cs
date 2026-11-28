@@ -54,8 +54,9 @@ public sealed class AppSettings
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
 
-    /// <summary>Share-ready look (rounded corners, shadow, backdrop): a SnapStyles id (shared with Windows).</summary>
-    public string SnapStyle { get; set; } = Cometsnap.Core.Styling.SnapStyles.DefaultId;
+    /// <summary>Share-ready look built in the Style studio (corners, border, shadow, glow, backdrop; shared with Windows).</summary>
+    [JsonConverter(typeof(Cometsnap.Core.Styling.SnapStyleJsonConverter))]
+    public Cometsnap.Core.Styling.SnapStyle SnapStyle { get; set; } = new();
 
     /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
     public bool StyleOnCopy { get; set; }

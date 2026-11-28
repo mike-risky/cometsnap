@@ -3,7 +3,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Cometsnap.Core.Styling;
 using Cometsnap.Linux.Core;
-using Cometsnap.Linux.Theme;
 
 namespace Cometsnap.Linux.Services;
 
@@ -11,16 +10,16 @@ namespace Cometsnap.Linux.Services;
 public static class SnapStyler
 {
     public static Bitmap Apply(Bitmap image, AppSettings settings) =>
-        Apply(image, SnapStyles.Get(settings.SnapStyle), CaptureLook.Theme.Accent);
+        Apply(image, settings.SnapStyle ?? new SnapStyle());
 
-    public static unsafe Bitmap Apply(Bitmap image, SnapStyle style, uint accent)
+    public static unsafe Bitmap Apply(Bitmap image, SnapStyle style, double scale = 1)
     {
         var w = image.PixelSize.Width;
         var h = image.PixelSize.Height;
         var pixels = new byte[w * h * 4];
         fixed (byte* p = pixels)
             image.CopyPixels(new Avalonia.PixelRect(0, 0, w, h), (IntPtr)p, pixels.Length, w * 4);
-        var styled = StyleRenderer.Render(pixels, w, h, w * 4, style, accent);
+        var styled = StyleRenderer.Render(pixels, w, h, w * 4, style, scale);
 
         // Avalonia draws premultiplied pixels best: convert the renderer's straight alpha.
         var px = styled.Bgra;

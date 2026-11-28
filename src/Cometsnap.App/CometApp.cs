@@ -306,6 +306,22 @@ public sealed class CometApp : Application
         _settingsWindow.Activate();
     }
 
+    private StyleStudioWindow? _styleStudio;
+
+    /// <summary>The Style studio (one at a time): builds the share-ready look with a live preview.</summary>
+    public void OpenStyleStudio()
+    {
+        if (_styleStudio is null)
+        {
+            _styleStudio = new StyleStudioWindow(this);
+            _styleStudio.StyleChanged += () => _settingsWindow?.RefreshStylePreview();
+            _styleStudio.Closed += (_, _) => _styleStudio = null;
+            _styleStudio.Show();
+        }
+        if (_styleStudio.WindowState == WindowState.Minimized) _styleStudio.WindowState = WindowState.Normal;
+        _styleStudio.Activate();
+    }
+
     /// <summary>Moves new captures to another folder ("" = the default) and reloads the recent list.</summary>
     public void SetCapturesFolder(string folder)
     {
@@ -419,7 +435,7 @@ public sealed class CometApp : Application
                 if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
                 else
                 {
-                    styledPath = SnapStyles.StyledPath(path);
+                    styledPath = StyledFiles.StyledPath(path);
                     var target = styledPath;
                     await Task.Run(() => CaptureStore.SaveImage(styled, target));
                     Capture.AnnounceSaved(target, styled);

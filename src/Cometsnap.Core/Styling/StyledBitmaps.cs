@@ -6,10 +6,10 @@ namespace Cometsnap.Core.Styling;
 /// <summary>WPF side of <see cref="StyleRenderer"/>: styles and flattens <see cref="BitmapSource"/>s. Safe on any thread.</summary>
 public static class StyledBitmaps
 {
-    public static BitmapSource Apply(BitmapSource image, SnapStyle style, uint accent)
+    public static BitmapSource Apply(BitmapSource image, SnapStyle style, double scale = 1)
     {
         var (pixels, w, h) = Pixels(image);
-        var styled = StyleRenderer.Render(pixels, w, h, w * 4, style, accent);
+        var styled = StyleRenderer.Render(pixels, w, h, w * 4, style, scale);
         return ToBitmap(styled);
     }
 

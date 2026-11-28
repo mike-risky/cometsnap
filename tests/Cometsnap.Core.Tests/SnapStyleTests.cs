@@ -12,14 +12,7 @@ public class SnapStyleTests
         return p;
     }
 
-    [Fact]
-    public void Unknown_ids_fall_back_to_clean()
-    {
-        Assert.Equal("clean", SnapStyles.Get(null).Id);
-        Assert.Equal("clean", SnapStyles.Get("nope").Id);
-        Assert.Equal("comet", SnapStyles.Get("COMET").Id);
-        Assert.Equal(SnapStyles.All.Count, SnapStyles.All.Select(s => s.Id).Distinct().Count());
-    }
+    private static byte[] Px(StyledPixels o, int x, int y) => o.Bgra[((y * o.Width + x) * 4)..((y * o.Width + x) * 4 + 4)];
 
     [Fact]
     public void Defaults_keep_captures_raw_but_offer_the_button()
@@ -28,43 +21,66 @@ public class SnapStyleTests
         Assert.False(s.StyleOnCopy);
         Assert.False(s.StyleOnExport);
         Assert.True(s.StylePerShot);
-        Assert.Equal(SnapStyles.DefaultId, s.SnapStyle);
+        Assert.NotNull(s.SnapStyle);
     }
 
-    [Theory]
-    [InlineData("clean")]
-    [InlineData("showcase")]
-    [InlineData("frosted")]
-    [InlineData("comet")]
-    [InlineData("laser")]
-    public void Every_style_keeps_the_capture_intact_in_the_middle(string id)
+    [Fact]
+    public void Every_preset_keeps_the_capture_intact_in_the_middle()
     {
         const int w = 300, h = 200;
-        var style = SnapStyles.Get(id);
-        var output = StyleRenderer.Render(Solid(w, h, 10, 20, 30), w, h, w * 4, style, 0x3D6BFF);
-        var m = StyleRenderer.Measure(w, h, style);
-        Assert.Equal(m.Width, output.Width);
-        Assert.Equal(m.Height, output.Height);
-        Assert.True(output.Width > w && output.Height > h);
+        foreach (var (id, _) in SnapStylePresets.All)
+        {
+            var style = SnapStylePresets.Get(id);
+            var output = StyleRenderer.Render(Solid(w, h, 10, 20, 30), w, h, w * 4, style);
+            var m = StyleRenderer.Measure(w, h, style);
+            Assert.Equal(m.Width, output.Width);
+            Assert.True(output.Width > w && output.Height > h, id);
+            Assert.Equal(new byte[] { 10, 20, 30, 255 }, Px(output, m.ImageX + w / 2, m.ImageY + h / 2));
+            Assert.Equal(new byte[] { 10, 20, 30, 255 }, Px(output, m.ImageX + 3, m.ImageY + h / 2));
+        }
+    }
 
-        var center = ((m.ImageY + h / 2) * output.Width + m.ImageX + w / 2) * 4;
-        Assert.Equal(new byte[] { 10, 20, 30, 255 }, output.Bgra[center..(center + 4)]);
-        // A pixel just inside a straight edge is the capture too.
-        var edge = ((m.ImageY + h / 2) * output.Width + m.ImageX + 3) * 4;
-        Assert.Equal(new byte[] { 10, 20, 30, 255 }, output.Bgra[edge..(edge + 4)]);
+    [Fact]
+    public void Shadow_offset_makes_room_on_its_side_only()
+    {
+        var style = new SnapStyle { ShadowX = 20, ShadowY = 30, ShadowBlur = 0, ShadowOpacity = 100, CornerRadius = 0 };
+        var m = StyleRenderer.Measure(100, 100, style);
+        Assert.Equal(0, m.ImageX);
+        Assert.Equal(0, m.ImageY);
+        Assert.True(m.Width >= 120 && m.Height >= 130);
+        var o = StyleRenderer.Render(Solid(100, 100, 200, 200, 200), 100, 100, 400, style);
+        Assert.Equal(new byte[] { 0, 0, 0, 255 }, Px(o, 110, 120)); // hard black shadow bottom right
+        Assert.Equal(0, Px(o, 5, 115)[3]);                         // nothing below-left of it
+    }
+
+    [Fact]
+    public void Shadow_border_and_glow_use_their_colors()
+    {
+        var style = new SnapStyle
+        {
+            CornerRadius = 0, Shadow = true, ShadowX = 0, ShadowY = 0, ShadowBlur = 0, ShadowOpacity = 100, ShadowColor = "#FF0000",
+            Border = true, BorderWidth = 4, BorderColor = "#00FF00",
+        };
+        var o = StyleRenderer.Render(Solid(50, 50, 9, 9, 9), 50, 50, 200, style);
+        var m = StyleRenderer.Measure(50, 50, style);
+        Assert.Equal(new byte[] { 0, 255, 0, 255 }, Px(o, m.ImageX - 2, m.ImageY + 25)); // green border
+        Assert.Equal(new byte[] { 9, 9, 9, 255 }, Px(o, m.ImageX, m.ImageY));           // square corner kept
+
+        var glow = new SnapStyle { Shadow = false, Glow = true, GlowColor = "#FF2BD6", GlowSize = 20, GlowStrength = 100 };
+        var g = StyleRenderer.Render(Solid(80, 60, 0, 0, 0), 80, 60, 320, glow);
+        var gm = StyleRenderer.Measure(80, 60, glow);
+        var p = Px(g, gm.ImageX - 1, gm.ImageY + 30);
+        Assert.True(p[2] > 200 && p[0] > 150 && p[3] > 200); // pink line right outside the edge
     }
 
     [Fact]
     public void Corners_are_rounded_and_transparent_without_a_backdrop()
     {
         const int w = 400, h = 300;
-        var style = SnapStyles.Get("clean");
-        var output = StyleRenderer.Render(Solid(w, h, 200, 200, 200), w, h, w * 4, style, 0x3D6BFF);
+        var style = SnapStylePresets.Get("clean");
+        var output = StyleRenderer.Render(Solid(w, h, 200, 200, 200), w, h, w * 4, style);
         var m = StyleRenderer.Measure(w, h, style);
-        // The very corner pixel of the capture is cut by the rounding.
-        var corner = (m.ImageY * output.Width + m.ImageX) * 4;
-        Assert.NotEqual(200, output.Bgra[corner]);
-        // The canvas corner is (almost) transparent.
+        Assert.NotEqual(200, Px(output, m.ImageX, m.ImageY)[0]);
         Assert.True(output.Bgra[3] < 10);
         Assert.True(StyleRenderer.HasTransparency(output));
         Assert.False(StyleRenderer.HasTransparency(StyleRenderer.Flatten(output, 0xFFFFFF)));
@@ -73,27 +89,37 @@ public class SnapStyleTests
     [Fact]
     public void Backdrops_are_opaque()
     {
-        const int w = 120, h = 80;
-        foreach (var id in new[] { "showcase", "frosted", "comet" })
+        foreach (var b in new[] { StyleBackdrop.Color, StyleBackdrop.Gradient, StyleBackdrop.Blur, StyleBackdrop.Space })
         {
-            var output = StyleRenderer.Render(Solid(w, h, 1, 2, 3), w, h, w * 4, SnapStyles.Get(id), 0xE2553A);
-            Assert.False(StyleRenderer.HasTransparency(output), id);
+            var output = StyleRenderer.Render(Solid(120, 80, 1, 2, 3), 120, 80, 480, new SnapStyle { Backdrop = b });
+            Assert.False(StyleRenderer.HasTransparency(output), b.ToString());
         }
     }
 
     [Fact]
-    public void Tiny_and_tall_captures_work()
+    public void Scale_doubles_every_size()
     {
-        var tiny = StyleRenderer.Render(Solid(3, 2, 5, 5, 5), 3, 2, 12, SnapStyles.Get("comet"), 0x3D6BFF);
+        var style = new SnapStyle { Backdrop = StyleBackdrop.Color, Padding = 40 };
+        Assert.Equal(40, StyleRenderer.Measure(100, 100, style).ImageX);
+        Assert.Equal(80, StyleRenderer.Measure(100, 100, style, 2).ImageX);
+    }
+
+    [Fact]
+    public void Odd_values_are_tamed()
+    {
+        var s = new SnapStyle { CornerRadius = -5, ShadowOpacity = 400, GlowColor = "nope", BorderColor = "f00" }.Normalized();
+        Assert.Equal(0, s.CornerRadius);
+        Assert.Equal(100, s.ShadowOpacity);
+        Assert.Equal("#3D6BFF", s.GlowColor);
+        Assert.Equal("#FF0000", s.BorderColor);
+        var tiny = StyleRenderer.Render(Solid(3, 2, 5, 5, 5), 3, 2, 12, SnapStylePresets.Get("neon"));
         Assert.True(tiny.Width > 3);
-        var tall = StyleRenderer.Measure(800, 20000, SnapStyles.Get("showcase"));
-        Assert.True(tall.ImageX <= 120); // the frame does not explode on scrolling captures
     }
 
     [Fact]
     public void Styled_copy_sits_beside_the_original()
     {
         var path = Path.Combine("C:", "Snaps", "2026-11", "snap_1.png");
-        Assert.Equal(Path.Combine("C:", "Snaps", "2026-11", "snap_1-styled.png"), SnapStyles.StyledPath(path));
+        Assert.Equal(Path.Combine("C:", "Snaps", "2026-11", "snap_1-styled.png"), StyledFiles.StyledPath(path));
     }
 }

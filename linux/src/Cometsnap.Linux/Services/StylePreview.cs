@@ -11,10 +11,10 @@ public static class StylePreview
     private const int W = 640, H = 380;
     private static byte[]? _sample;
 
-    public static unsafe Bitmap Render(SnapStyle style, uint accent)
+    public static unsafe Bitmap Render(SnapStyle style)
     {
         var src = _sample ??= Sample();
-        var styled = StyleRenderer.Render(src, W, H, W * 4, style, accent);
+        var styled = StyleRenderer.Render(src, W, H, W * 4, style);
         var px = styled.Bgra;
         for (var i = 0; i < px.Length; i += 4)
         {

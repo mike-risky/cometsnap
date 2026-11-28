@@ -163,6 +163,7 @@ public sealed class CometApp : Application
             case "stop": Recorder.Stop(); break;
             case "flyout" or "show": Flyout.Toggle(); break;
             case "settings": OpenSettings(); break;
+            case "style-studio": OpenStyleStudio(); break;
             case "edit" when parts.Length > 1: OpenInEditor(parts[1]); break;
             case "trim" when parts.Length > 1: OpenTrimmer(parts[1]); break;
             case "quit": Quit(); break;
@@ -176,6 +177,7 @@ public sealed class CometApp : Application
     /// <summary>A capture is done: copy it, save it, show the Edit card.</summary>
     public void OnCaptured(Bitmap raw, PixelRect rect)
     {
+        LastRawCapture = raw;
         var copy = Settings.CopyToClipboardOnCapture;
         // Share-ready style: the copy and the saved file can each be raw or styled.
         Bitmap? styled = null;
@@ -354,7 +356,7 @@ public sealed class CometApp : Application
                 if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
                 else
                 {
-                    var target = Cometsnap.Core.Styling.SnapStyles.StyledPath(path);
+                    var target = Cometsnap.Core.Styling.StyledFiles.StyledPath(path);
                     await Task.Run(() => CaptureStore.WriteAtomic(target, CaptureStore.ForPath(png, target)));
                     Recent.Add(target);
                     styledPath = target;
@@ -606,6 +608,24 @@ public sealed class CometApp : Application
             _toast = null;
         }
         _tray?.Rebuild();
+    }
+
+    /// <summary>The newest capture, unstyled: the Style studio can preview on it.</summary>
+    public Bitmap? LastRawCapture { get; private set; }
+
+    private StyleStudioWindow? _styleStudio;
+
+    /// <summary>The Style studio (one at a time): builds the share-ready look with a live preview.</summary>
+    public void OpenStyleStudio()
+    {
+        if (_styleStudio is { IsVisible: true })
+        {
+            _styleStudio.Activate();
+            return;
+        }
+        _styleStudio = new StyleStudioWindow(this);
+        _styleStudio.StyleChanged += () => _settingsWindow?.RefreshStylePreview();
+        _styleStudio.Show();
     }
 
     public void OpenSettings()

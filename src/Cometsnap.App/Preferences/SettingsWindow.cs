@@ -110,7 +110,7 @@ public sealed class SettingsWindow : Window
         Section(stack, L.T("Share-ready style"));
         stack.Children.Add(new TextBlock
         {
-            Text = L.T("Rounded corners, a soft shadow and a backdrop, ready for social posts and docs. The backdrop and glow follow your capture colors."),
+            Text = L.T("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio."),
             Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -4, 0, 10),
         });
         stack.Children.Add(StylePicker());
@@ -267,82 +267,35 @@ public sealed class SettingsWindow : Window
 
     // ------------------------------------------------------------------ share-ready style
 
-    /// <summary>English names of the styles, here so the translation check sees them.</summary>
-    private static string StyleName(SnapStyle st) => st.Id switch
-    {
-        "clean" => L.T("Clean"),
-        "showcase" => L.T("Showcase"),
-        "frosted" => L.T("Frosted"),
-        "comet" => L.T("Comet"),
-        "laser" => L.T("Laser"),
-        _ => st.Name,
-    };
+    private Image? _stylePreview;
 
-    private static BitmapSource? _sample;
-
-    /// <summary>Style chips plus a live preview: a small fake window drawn in the chosen style.</summary>
+    /// <summary>A small preview of the current style and the button that opens the Style studio.</summary>
     private UIElement StylePicker()
     {
         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-        var current = SnapStyles.Get(S.SnapStyle);
-        var wrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
-        foreach (var style in SnapStyles.All)
-        {
-            var st = style;
-            wrap.Children.Add(Chip(StyleName(st), st.Id == current.Id, () =>
-            {
-                if (S.SnapStyle == st.Id) return;
-                S.SnapStyle = st.Id;
-                _app.TrySaveSettings();
-                Build();
-            }));
-        }
-        panel.Children.Add(wrap);
-
-        var preview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
-        RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
-        try { preview.Source = StyledBitmaps.Apply(_sample ??= SampleCapture(), current, CaptureLook.Theme.Accent); }
-        catch { preview.Visibility = Visibility.Collapsed; }
-        // A checkerboard behind it, so see-through corners and shadows show as such.
-        var checker = new DrawingBrush
-        {
-            TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 16, 16), ViewportUnits = BrushMappingMode.Absolute,
-            Drawing = new GeometryDrawing(SpaceTheme.WithAlpha(Colors.White, 0x14), null, Geometry.Parse("M0,0 H8 V8 H0 Z M8,8 H16 V16 H8 Z")),
-        };
-        checker.Freeze();
-        panel.Children.Add(new Border
+        _stylePreview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        RenderOptions.SetBitmapScalingMode(_stylePreview, BitmapScalingMode.HighQuality);
+        RefreshStylePreview();
+        var frame = new Border
         {
             CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
-            Background = checker, Padding = new Thickness(16), Child = preview,
-        });
+            Background = StyleSample.Checker(), Padding = new Thickness(16), Child = _stylePreview, Cursor = Cursors.Hand,
+            ToolTip = L.T("Open the Style studio"),
+        };
+        frame.MouseLeftButtonUp += (_, e) => { e.Handled = true; _app.OpenStyleStudio(); };
+        panel.Children.Add(frame);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+        row.Children.Add(Pill("✨ " + L.T("Open the Style studio"), primary: true, _app.OpenStyleStudio));
+        panel.Children.Add(row);
         return panel;
     }
 
-    /// <summary>A pretend screenshot (a little app window) for the style preview, at real pixel size.</summary>
-    private static BitmapSource SampleCapture()
+    /// <summary>Redraws the small preview (the Style studio calls this after each change).</summary>
+    public void RefreshStylePreview()
     {
-        const int w = 640, h = 380;
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen())
-        {
-            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xF7, 0xF8, 0xFC)), null, new Rect(0, 0, w, h));
-            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0xE6, 0xE9, 0xF3)), null, new Rect(0, 0, w, 44));
-            var dots = new[] { Color.FromRgb(0xE2, 0x55, 0x3A), Color.FromRgb(0xFF, 0xD6, 0x0A), Color.FromRgb(0x3D, 0x6B, 0xFF) };
-            for (var i = 0; i < 3; i++) dc.DrawEllipse(new SolidColorBrush(dots[i]), null, new Point(24 + i * 22, 22), 7, 7);
-            var ink = new SolidColorBrush(Color.FromRgb(0x07, 0x11, 0x3A));
-            dc.DrawRoundedRectangle(ink, null, new Rect(36, 76, 260, 26), 6, 6);
-            var soft = new SolidColorBrush(Color.FromRgb(0xC9, 0xCF, 0xE3));
-            for (var i = 0; i < 4; i++) dc.DrawRoundedRectangle(soft, null, new Rect(36, 126 + i * 30, 300 - i * 40, 14), 7, 7);
-            dc.DrawRoundedRectangle(new LinearGradientBrush(Color.FromRgb(0x3D, 0x6B, 0xFF), Color.FromRgb(0xE2, 0x55, 0x3A), 45), null, new Rect(376, 76, 228, 166), 12, 12);
-            dc.DrawEllipse(new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0x0A)), null, new Point(490, 159), 34, 34);
-            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0xE2, 0x55, 0x3A)), null, new Rect(36, 280, 140, 44), 10, 10);
-            dc.DrawRoundedRectangle(soft, null, new Rect(376, 270, 228, 14), 7, 7);
-            dc.DrawRoundedRectangle(soft, null, new Rect(376, 300, 170, 14), 7, 7);
-        }
-        var bmp = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-        bmp.Render(visual);
-        bmp.Freeze();
-        return bmp;
+        if (_stylePreview is null) return;
+        try { _stylePreview.Source = StyledBitmaps.Apply(StyleSample.Sample, S.SnapStyle ?? new SnapStyle()); }
+        catch { _stylePreview.Visibility = Visibility.Collapsed; }
     }
 
     /// <summary>A small fake capture screen: dimmed desktop, crosshair, selection with glow, size tag and loupe.</summary>

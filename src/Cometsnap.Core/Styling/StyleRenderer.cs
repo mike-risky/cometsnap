@@ -7,79 +7,103 @@ public sealed record StyledPixels(int Width, int Height, byte[] Bgra)
 }
 
 /// <summary>
-/// Draws a capture in a <see cref="SnapStyle"/>: backdrop, shadow or glow, then the capture with
-/// rounded corners. Plain pixel code with no UI framework, shared by Windows and Linux (the Mac
-/// draws the same look with Core Graphics). Sizes grow with the capture, so a small snippet and a
-/// 4K screen both look balanced. Fast enough for every capture: the inside of the capture is a
-/// straight row copy, and only the frame around it is computed pixel by pixel.
+/// Draws a capture in a <see cref="SnapStyle"/>: backdrop, drop shadow, glow, border, then the
+/// capture with rounded corners. Plain pixel code with no UI framework, shared by Windows and
+/// Linux (the Mac has a line-by-line Swift port). The inside of the capture is a straight row
+/// copy; only the frame around it is computed pixel by pixel, so it is fast enough for every capture.
 /// </summary>
 public static class StyleRenderer
 {
-    /// <summary>The measurements of a styled capture.</summary>
-    public readonly record struct Layout(int Width, int Height, int ImageX, int ImageY, double Radius, double ShadowBlur, double ShadowOffset, double GlowSize, double LineWidth);
+    /// <summary>The measurements of a styled capture, in output pixels.</summary>
+    public readonly record struct Layout(int Width, int Height, int ImageX, int ImageY);
 
-    /// <summary>Works out the canvas size and where the capture sits, for a capture of this size.</summary>
-    public static Layout Measure(int width, int height, SnapStyle style)
+    /// <summary>
+    /// Canvas size and where the capture sits. <paramref name="scale"/> multiplies every size of the
+    /// style (2 on a Retina Mac, so 10 px of shadow looks the same as on a normal screen).
+    /// </summary>
+    public static Layout Measure(int width, int height, SnapStyle style, double scale = 1)
     {
-        // Scale on the area, so a tall scrolling capture does not get a huge frame.
-        var k = Math.Clamp(Math.Sqrt((double)width * height) / 1100.0, 0.5, 2.0);
-        var radius = style.Corners ? Math.Min(12 * k, Math.Min(width, height) / 4.0) : 0;
-        var blur = style.Shadow ? 16 * k : 0;
-        var offset = style.Shadow ? 6 * k : 0;
-        var glow = style.Glow ? 20 * k : 0;
-        var line = style.Glow ? Math.Max(1.5, 2 * k) : 0;
-
-        int pad;
-        if (style.Backdrop != StyleBackdrop.None) pad = Math.Max(40, (int)Math.Round(56 * k));
-        else pad = (int)Math.Ceiling(Math.Max(blur * 2.2 + offset, glow * 1.6));
-        pad = Math.Max(pad, 0);
-        return new Layout(width + 2 * pad, height + 2 * pad, pad, pad, radius, blur, offset, glow, line);
+        var st = style.Normalized();
+        var bw = st.Border ? st.BorderWidth * scale : 0;
+        double left, right, top, bottom;
+        if (st.Backdrop != StyleBackdrop.None)
+        {
+            left = right = top = bottom = st.Padding * scale + bw;
+        }
+        else
+        {
+            var glow = st.Glow ? st.GlowSize * scale * 1.3 + LineWidth(st, scale) : 0;
+            var shadow = st.Shadow && st.ShadowOpacity > 0 ? st.ShadowBlur * scale * 1.6 + 1 : 0;
+            var sx = st.Shadow ? st.ShadowX * scale : 0;
+            var sy = st.Shadow ? st.ShadowY * scale : 0;
+            left = bw + Math.Max(glow, shadow > 0 ? shadow - sx : 0);
+            right = bw + Math.Max(glow, shadow > 0 ? shadow + sx : 0);
+            top = bw + Math.Max(glow, shadow > 0 ? shadow - sy : 0);
+            bottom = bw + Math.Max(glow, shadow > 0 ? shadow + sy : 0);
+        }
+        int L(double v) => (int)Math.Ceiling(Math.Max(0, v));
+        return new Layout(width + L(left) + L(right), height + L(top) + L(bottom), L(left), L(top));
     }
+
+    /// <summary>Width of the bright line of a glow: thin, like a laser, whatever the reach.</summary>
+    private static double LineWidth(SnapStyle st, double scale) => Math.Max(1.5 * scale, Math.Min(4 * scale, st.GlowSize * scale / 8));
 
     /// <summary>
     /// Styles a capture. <paramref name="source"/> is 32-bit BGRA or BGRX (its alpha is ignored: a
-    /// screenshot is opaque). <paramref name="accent"/> is 0xRRGGBB,
-    /// the capture color: it paints the gradient and the glow.
+    /// screenshot is opaque).
     /// </summary>
-    public static StyledPixels Render(byte[] source, int width, int height, int stride, SnapStyle style, uint accent)
+    public static StyledPixels Render(byte[] source, int width, int height, int stride, SnapStyle style, double scale = 1)
     {
         if (width <= 0 || height <= 0) throw new ArgumentException("Empty image");
-        var m = Measure(width, height, style);
+        var st = style.Normalized();
+        var m = Measure(width, height, st, scale);
         var outW = m.Width;
         var outH = m.Height;
         var dst = new byte[outW * outH * 4];
 
-        FillBackdrop(dst, outW, outH, style.Backdrop, source, width, height, stride, accent);
+        FillBackdrop(dst, outW, outH, st, source, width, height, stride);
 
-        // The rounded rectangle of the capture, in canvas pixels.
-        double left = m.ImageX, top = m.ImageY, right = m.ImageX + width, bottom = m.ImageY + height;
-        var cx = (left + right) / 2;
-        var cy = (top + bottom) / 2;
+        double left = m.ImageX, top = m.ImageY;
+        var cx = left + width / 2.0;
+        var cy = top + height / 2.0;
         var hx = width / 2.0;
         var hy = height / 2.0;
-        var r = m.Radius;
+        var r = Math.Min(st.CornerRadius * scale, Math.Min(width, height) / 2.0);
+        var bw = st.Border ? st.BorderWidth * scale : 0;
+        var ohx = hx + bw;
+        var ohy = hy + bw;
+        var orad = r > 0 ? r + bw : 0;
 
-        var (ar, ag, ab) = Split(accent);
-        var shadowAlpha = style.Backdrop == StyleBackdrop.None ? 0.40 : 0.50;
-        var inner = (int)Math.Ceiling(r) + 1; // rows and columns this far inside are plain image
+        var shadowOn = st.Shadow && st.ShadowOpacity > 0;
+        var shadowAlpha = st.ShadowOpacity / 100.0;
+        var sigma = st.ShadowBlur * scale / 2;
+        var sx = st.ShadowX * scale;
+        var sy = st.ShadowY * scale;
+        var (shr, shg, shb) = Split(StyleColors.Parse(st.ShadowColor, 0));
+
+        var glowOn = st.Glow && st.GlowStrength > 0;
+        var glowReach = st.GlowSize * scale;
+        var glowStrength = st.GlowStrength / 100.0;
+        var line = LineWidth(st, scale);
+        var (gr, gg, gb) = Split(StyleColors.Parse(st.GlowColor, 0x3D6BFF));
+        var (br, bg, bb) = Split(StyleColors.Parse(st.BorderColor, 0xFFFFFF));
+
+        var inner = (int)Math.Ceiling(r) + 1; // rows this far inside are plain image in the middle
 
         Parallel.For(0, outH, y =>
         {
             var row = y * outW * 4;
             var py = y + 0.5;
-            var insideRows = y >= top + inner && y < bottom - inner;
+            var insideRows = y >= top + inner && y < top + height - inner;
             for (var x = 0; x < outW; x++)
             {
-                if (insideRows && x == m.ImageX + 1)
+                if (insideRows && x == m.ImageX + 1 && width > 2)
                 {
                     // Fast path: the whole middle of this row is the capture, as is.
                     var count = width - 2;
-                    if (count > 0)
-                    {
-                        CopyOpaque(source, (y - m.ImageY) * stride + 4, dst, row + x * 4, count);
-                        x += count - 1;
-                        continue;
-                    }
+                    CopyOpaque(source, (y - m.ImageY) * stride + 4, dst, row + x * 4, count);
+                    x += count - 1;
+                    continue;
                 }
 
                 var px = x + 0.5;
@@ -89,37 +113,37 @@ public static class StyleRenderer
                 double b = dst[i] / 255.0 * a, g = dst[i + 1] / 255.0 * a, rr = dst[i + 2] / 255.0 * a;
 
                 var d = RoundedBoxDistance(px - cx, py - cy, hx, hy, r);
+                var dOuter = bw > 0 ? RoundedBoxDistance(px - cx, py - cy, ohx, ohy, orad) : d;
 
-                if (m.ShadowBlur > 0)
+                if (shadowOn && dOuter > -1)
                 {
-                    var ds = RoundedBoxDistance(px - cx, py - (cy + m.ShadowOffset), hx, hy, r);
-                    var s = shadowAlpha * 0.5 * Erfc(ds / (m.ShadowBlur * 0.7071));
-                    // A shadow is black: only its alpha matters.
-                    b *= 1 - s; g *= 1 - s; rr *= 1 - s;
-                    a = s + a * (1 - s);
+                    var ds = RoundedBoxDistance(px - cx - sx, py - cy - sy, ohx, ohy, orad);
+                    var cover = sigma < 0.5 ? Math.Clamp(0.5 - ds, 0, 1) : 0.5 * Erfc(ds / (sigma * 1.41421356));
+                    Over(ref b, ref g, ref rr, ref a, shb / 255.0, shg / 255.0, shr / 255.0, shadowAlpha * cover);
                 }
 
-                if (m.GlowSize > 0 && d > -m.LineWidth)
+                if (glowOn && dOuter > -1)
                 {
-                    double ga;
-                    if (d <= 0) ga = 1; // the bright line on the edge
-                    else
-                    {
-                        var t = Math.Max(0, 1 - d / m.GlowSize);
-                        ga = Math.Min(1, 0.85 * t * t + (d < m.LineWidth ? 1 - d / m.LineWidth : 0));
-                    }
-                    Over(ref b, ref g, ref rr, ref a, ab / 255.0, ag / 255.0, ar / 255.0, ga);
+                    var dd = Math.Max(0, dOuter);
+                    var t = Math.Max(0, 1 - dd / glowReach);
+                    var ga = 0.8 * t * t + (dd < line ? 1 - dd / line : 0);
+                    Over(ref b, ref g, ref rr, ref a, gb / 255.0, gg / 255.0, gr / 255.0, glowStrength * Math.Min(1, ga));
+                }
+
+                if (bw > 0)
+                {
+                    var cover = Math.Clamp(0.5 - dOuter, 0, 1);
+                    if (cover > 0) Over(ref b, ref g, ref rr, ref a, bb / 255.0, bg / 255.0, br / 255.0, cover);
                 }
 
                 // The capture, with an anti-aliased rounded edge.
-                var cover = Math.Clamp(0.5 - d, 0, 1);
-                if (m.GlowSize > 0) cover = Math.Clamp(0.5 - (d + m.LineWidth), 0, 1);
-                if (cover > 0)
+                var imageCover = Math.Clamp(0.5 - d, 0, 1);
+                if (imageCover > 0)
                 {
-                    var sx = Math.Clamp(x - m.ImageX, 0, width - 1);
-                    var sy = Math.Clamp(y - m.ImageY, 0, height - 1);
-                    var si = sy * stride + sx * 4;
-                    Over(ref b, ref g, ref rr, ref a, source[si] / 255.0, source[si + 1] / 255.0, source[si + 2] / 255.0, cover);
+                    var ix = Math.Clamp(x - m.ImageX, 0, width - 1);
+                    var iy = Math.Clamp(y - m.ImageY, 0, height - 1);
+                    var si = iy * stride + ix * 4;
+                    Over(ref b, ref g, ref rr, ref a, source[si] / 255.0, source[si + 1] / 255.0, source[si + 2] / 255.0, imageCover);
                 }
 
                 if (a <= 0.0001)
@@ -184,16 +208,20 @@ public static class StyleRenderer
 
     // ------------------------------------------------------------------ backdrops
 
-    private static void FillBackdrop(byte[] dst, int w, int h, StyleBackdrop backdrop, byte[] src, int sw, int sh, int stride, uint accent)
+    private static void FillBackdrop(byte[] dst, int w, int h, SnapStyle st, byte[] src, int sw, int sh, int stride)
     {
-        switch (backdrop)
+        var c1 = StyleColors.Parse(st.BackdropColor, 0x3D6BFF);
+        var c2 = StyleColors.Parse(st.BackdropColor2, 0x07113A);
+        switch (st.Backdrop)
         {
+            case StyleBackdrop.Color:
+                FillGradient(dst, w, h, c1, c1);
+                break;
             case StyleBackdrop.Gradient:
-                // One color family, light to deep: pretty with every capture color.
-                FillGradient(dst, w, h, Mix(accent, 0xFFFFFF, 0.18), Mix(accent, 0x07113A, 0.55));
+                FillGradient(dst, w, h, c1, c2);
                 break;
             case StyleBackdrop.Space:
-                FillGradient(dst, w, h, 0x1A2470, 0x07113A);
+                FillGradient(dst, w, h, c1, c2);
                 Stars(dst, w, h);
                 break;
             case StyleBackdrop.Blur:

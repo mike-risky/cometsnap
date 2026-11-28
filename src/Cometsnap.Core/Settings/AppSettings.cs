@@ -72,8 +72,9 @@ public sealed class AppSettings
     /// <summary>Look of the capture screen: a <see cref="CaptureThemes"/> id ("blue" is the classic look).</summary>
     public string CaptureTheme { get; set; } = CaptureThemes.DefaultId;
 
-    /// <summary>Share-ready look (rounded corners, shadow, backdrop): a <see cref="Styling.SnapStyles"/> id.</summary>
-    public string SnapStyle { get; set; } = Styling.SnapStyles.DefaultId;
+    /// <summary>Share-ready look, built in the Style studio (corners, border, shadow, glow, backdrop).</summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(Styling.SnapStyleJsonConverter))]
+    public Styling.SnapStyle SnapStyle { get; set; } = new();
 
     /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
     public bool StyleOnCopy { get; set; }
