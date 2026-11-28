@@ -70,6 +70,17 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(Row(T("Magnifier corner"), corner));
         panel.Children.Add(ThemePicker());
 
+        panel.Children.Add(Section(T("Share-ready style")));
+        panel.Children.Add(new TextBlock
+        {
+            Text = T("Rounded corners, a soft shadow and a backdrop, ready for social posts and docs. The backdrop and glow follow your capture colors."),
+            FontSize = 11, Foreground = SpaceTheme.DustBrush, TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(StylePicker());
+        panel.Children.Add(Toggle(T("Style on copy"), s.StyleOnCopy, v => s.StyleOnCopy = v, T("The clipboard gets the styled capture. Off: the raw capture.")));
+        panel.Children.Add(Toggle(T("Style on export"), s.StyleOnExport, v => s.StyleOnExport = v, T("Saved files (and what you drag out of the tray) are styled. Off: the raw capture.")));
+        panel.Children.Add(Toggle(T("Style per shot"), s.StylePerShot, v => s.StylePerShot = v, T("A ✨ Style button on the Copied card styles just that capture.")));
+
         panel.Children.Add(Section(T("Where captures go")));
         panel.Children.Add(Toggle(T("Copy captures to the clipboard"), s.CopyToClipboardOnCapture, v => s.CopyToClipboardOnCapture = v));
         panel.Children.Add(Toggle(T("Save every capture"), s.AutoSave, v => s.AutoSave = v, T("Each capture is also saved in your captures folder.")));
@@ -346,6 +357,7 @@ public sealed class SettingsWindow : Window
                 _app.SaveSettings();
                 preview.Theme = t;
                 Paint();
+                _refreshStylePreview?.Invoke();
             };
             chips.Add((chip, t));
             wrap.Children.Add(chip);
@@ -353,6 +365,69 @@ public sealed class SettingsWindow : Window
         Paint();
         stack.Children.Add(wrap);
         stack.Children.Add(preview);
+        return stack;
+    }
+
+    private Action? _refreshStylePreview;
+
+    /// <summary>English names of the styles, written out so the translation check sees them.</summary>
+    private static string StyleName(Cometsnap.Core.Styling.SnapStyle st) => st.Id switch
+    {
+        "clean" => T("Clean"),
+        "showcase" => T("Showcase"),
+        "frosted" => T("Frosted"),
+        "comet" => T("Comet"),
+        "laser" => T("Laser"),
+        _ => st.Name,
+    };
+
+    /// <summary>Style chips and a live preview: a little fake window drawn in the chosen style.</summary>
+    private Control StylePicker()
+    {
+        var s = _app.Settings;
+        var stack = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 4) };
+        var wrap = new WrapPanel();
+        var preview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        var chips = new List<(Border Chip, Cometsnap.Core.Styling.SnapStyle Style)>();
+        void Paint()
+        {
+            var current = Cometsnap.Core.Styling.SnapStyles.Get(s.SnapStyle);
+            foreach (var (chip, st) in chips)
+            {
+                var on = st.Id == current.Id;
+                chip.BorderBrush = on ? CaptureLook.AccentBrush : SpaceTheme.NavyLightBrush;
+                chip.BorderThickness = new Thickness(on ? 2 : 1);
+                chip.Background = on ? SpaceTheme.NavyLightBrush : SpaceTheme.NavyBrush;
+            }
+            try { preview.Source = Cometsnap.Linux.Services.StylePreview.Render(current, CaptureLook.Theme.Accent); }
+            catch (Exception ex) { Log.Error("Style preview failed", ex); }
+        }
+        foreach (var style in Cometsnap.Core.Styling.SnapStyles.All)
+        {
+            var st = style;
+            var chip = new Border
+            {
+                CornerRadius = new CornerRadius(14), Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 6, 6),
+                Child = new TextBlock { Text = StyleName(st), FontSize = 13 }, Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+            };
+            chip.PointerPressed += (_, e) =>
+            {
+                e.Handled = true;
+                s.SnapStyle = st.Id;
+                _app.SaveSettings();
+                Paint();
+            };
+            chips.Add((chip, st));
+            wrap.Children.Add(chip);
+        }
+        _refreshStylePreview = Paint;
+        Paint();
+        stack.Children.Add(wrap);
+        stack.Children.Add(new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            Background = SpaceTheme.NavyBrush, Padding = new Thickness(14), Child = preview,
+        });
         return stack;
     }
 

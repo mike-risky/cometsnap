@@ -26,7 +26,7 @@ public static class StyleRenderer
         var radius = style.Corners ? Math.Min(12 * k, Math.Min(width, height) / 4.0) : 0;
         var blur = style.Shadow ? 16 * k : 0;
         var offset = style.Shadow ? 6 * k : 0;
-        var glow = style.Glow ? 16 * k : 0;
+        var glow = style.Glow ? 20 * k : 0;
         var line = style.Glow ? Math.Max(1.5, 2 * k) : 0;
 
         int pad;

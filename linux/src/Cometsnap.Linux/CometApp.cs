@@ -174,10 +174,22 @@ public sealed class CometApp : Application
     // ------------------------------------------------------------------ captures
 
     /// <summary>A capture is done: copy it, save it, show the Edit card.</summary>
-    public void OnCaptured(Bitmap image, PixelRect rect)
+    public void OnCaptured(Bitmap raw, PixelRect rect)
     {
         var copy = Settings.CopyToClipboardOnCapture;
-        if (Settings.ShowEditCard) ShowCard(image, rect, copy);
+        // Share-ready style: the copy and the saved file can each be raw or styled.
+        Bitmap? styled = null;
+        Bitmap Styled()
+        {
+            if (styled is not null) return styled;
+            try { styled = SnapStyler.Apply(raw, Settings); }
+            catch (Exception ex) { Log.Error("Styling the capture failed", ex); styled = raw; }
+            return styled;
+        }
+        var copyImage = Settings.StyleOnCopy ? Styled() : raw;
+        var image = Settings.StyleOnExport ? Styled() : raw;
+        var saving = Settings.AutoSave || Settings.AskWhereToSave;
+        if (Settings.ShowEditCard) ShowCard(saving ? image : copyImage, rect, copy, raw);
         LaunchComet(rect, image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.UIThread.Post(CountSnap, DispatcherPriority.ApplicationIdle);
@@ -193,7 +205,8 @@ public sealed class CometApp : Application
             try
             {
                 var png = CaptureStore.EncodePng(image);
-                if (copy) await Dispatcher.UIThread.InvokeAsync(() => Clipboard.SetPngAsync(png));
+                var copyPng = ReferenceEquals(copyImage, image) ? png : CaptureStore.EncodePng(copyImage);
+                if (copy) await Dispatcher.UIThread.InvokeAsync(() => Clipboard.SetPngAsync(copyPng));
                 if (ask)
                 {
                     Dispatcher.UIThread.Post(() => _ = AskAndSaveAsync(image, png, edit));
@@ -315,10 +328,46 @@ public sealed class CometApp : Application
         _ = StartHotkeysAsync();
     }
 
-    private void ShowCard(Bitmap image, PixelRect rect, bool copied)
+    private void ShowCard(Bitmap image, PixelRect rect, bool copied, Bitmap? raw = null)
     {
         var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
-        EnsureCard().ShowFor(image, work, scale, copied);
+        // ✨ has nothing to add when both the copy and the file are styled already.
+        var canStyle = raw is not null && Settings.StylePerShot && !(Settings.StyleOnCopy && Settings.StyleOnExport);
+        EnsureCard().ShowFor(image, work, scale, copied, raw: raw, canStyle: canStyle);
+    }
+
+    /// <summary>
+    /// The ✨ Style button of the Copied card: styles this one capture, copies it and saves it
+    /// beside the original ("name-styled.png"), which stays untouched.
+    /// </summary>
+    private async Task StyleOneShotAsync(string? path, Bitmap raw)
+    {
+        try
+        {
+            var settings = Settings;
+            var styled = await Task.Run(() => SnapStyler.Apply(raw, settings));
+            var png = await Task.Run(() => CaptureStore.EncodePng(styled));
+            var copied = await Clipboard.SetPngAsync(png);
+            string? styledPath = null;
+            if (path is not null)
+            {
+                if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
+                else
+                {
+                    var target = Cometsnap.Core.Styling.SnapStyles.StyledPath(path);
+                    await Task.Run(() => CaptureStore.WriteAtomic(target, CaptureStore.ForPath(png, target)));
+                    Recent.Add(target);
+                    styledPath = target;
+                }
+            }
+            _card?.ShowStyled(raw, styled, styledPath, copied);
+            if (!Settings.ShowEditCard) Toast(T("Styled capture copied"), 2500);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Styling one capture failed", ex);
+            Toast($"{T("Could not style the capture")}: {ex.Message}", 4000);
+        }
     }
 
     private EditCard EnsureCard()
@@ -331,6 +380,7 @@ public sealed class CometApp : Application
             else new EditorWindow(this, img, new AnnotationDocument(), null).Show();
         };
         _card.TrimRequested += OpenTrimmer;
+        _card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
         return _card;
     }
 

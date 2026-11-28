@@ -54,6 +54,18 @@ public sealed class AppSettings
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
 
+    /// <summary>Share-ready look (rounded corners, shadow, backdrop): a SnapStyles id (shared with Windows).</summary>
+    public string SnapStyle { get; set; } = Cometsnap.Core.Styling.SnapStyles.DefaultId;
+
+    /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
+    public bool StyleOnCopy { get; set; }
+
+    /// <summary>Save the styled capture (the file you drag out of the panel). Off: the file is the raw capture.</summary>
+    public bool StyleOnExport { get; set; }
+
+    /// <summary>Show a ✨ Style button on the Copied card, to style just that capture.</summary>
+    public bool StylePerShot { get; set; } = true;
+
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;
 

@@ -42,6 +42,8 @@
     <Compile Include="..\..\..\src\Cometsnap.Core\Storage\TraySelection.cs" Link="Core\Shared\TraySelection.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Storage\FileNamePattern.cs" Link="Core\Shared\FileNamePattern.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Settings\CaptureThemes.cs" Link="Core\Shared\CaptureThemes.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Styling\SnapStyles.cs" Link="Core\Shared\SnapStyles.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Styling\StyleRenderer.cs" Link="Core\Shared\StyleRenderer.cs" />
   </ItemGroup>
 
   <ItemGroup>

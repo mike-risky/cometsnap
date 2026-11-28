@@ -23,6 +23,9 @@ public sealed class EditCard : Window
     private readonly Border _card;
     private readonly Border _editButton;
     private readonly Border _trimButton;
+    private readonly Border _styleButton;
+    private Bitmap? _raw;                 // the capture before any style, for the ✨ button
+    private bool _canStyle;
     private Bitmap? _image;
     private string? _path;
     private string? _recording;           // set while the card shows a recording
@@ -34,6 +37,9 @@ public sealed class EditCard : Window
 
     /// <summary>Raised with the recording's path when the card of a recording is clicked (opens the trimmer).</summary>
     public event Action<string>? TrimRequested;
+
+    /// <summary>Raised with the saved path (if known) and the raw capture when ✨ Style is clicked.</summary>
+    public event Action<string?, Bitmap>? StyleRequested;
 
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
     public const string ScissorsIcon = "M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4";
@@ -73,6 +79,18 @@ public sealed class EditCard : Window
         _trimButton = Ui.ActionButton(T("Trim"), ScissorsIcon, T("Trim the start and end, or cut parts out"), OnEdit, primary: true);
         _trimButton.VerticalAlignment = VerticalAlignment.Center;
         _trimButton.IsVisible = false;
+        // ✨ Style: this one capture, share-ready (rounded corners, shadow, backdrop).
+        _styleButton = Ui.ActionButton("✨ " + T("Style"), null, T("Style this capture: rounded corners, shadow, backdrop"), () =>
+        {
+            if (_raw is not { } raw) return;
+            _timer.Stop();
+            _styleButton!.IsVisible = false;
+            _title.Text = T("STYLING…");
+            StyleRequested?.Invoke(_path, raw);
+        });
+        _styleButton.VerticalAlignment = VerticalAlignment.Center;
+        _styleButton.Margin = new Thickness(0, 0, 6, 0);
+        _styleButton.IsVisible = false;
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -84,6 +102,7 @@ public sealed class EditCard : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
+        row.Children.Add(_styleButton);
         row.Children.Add(edit);
         row.Children.Add(_trimButton);
         row.Children.Add(close);
@@ -146,8 +165,10 @@ public sealed class EditCard : Window
     }
 
     /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area (desktop pixels).</summary>
-    public void ShowFor(Bitmap image, PixelRect workArea, double scaling, bool copied, string? title = null)
+    public void ShowFor(Bitmap image, PixelRect workArea, double scaling, bool copied, string? title = null, Bitmap? raw = null, bool canStyle = false)
     {
+        _raw = raw;
+        _canStyle = canStyle && raw is not null;
         SetMode(recording: null);
         _image = image;
         _path = null;
@@ -164,6 +185,7 @@ public sealed class EditCard : Window
     /// </summary>
     public void ShowForRecording(string path, Bitmap? poster, string detail, bool copied, PixelRect workArea, double scaling)
     {
+        _canStyle = false;
         SetMode(path);
         _image = poster;
         _path = path;
@@ -180,6 +202,7 @@ public sealed class EditCard : Window
         var video = recording is not null;
         _editButton.IsVisible = !video;
         _trimButton.IsVisible = video;
+        _styleButton.IsVisible = !video && _canStyle;
         ToolTip.SetTip(_card, video ? T("Click to trim · Drag into any app") : T("Click to edit · Drag into any app"));
     }
 
@@ -211,6 +234,19 @@ public sealed class EditCard : Window
     }
 
     public void SetDetail(string text) => _detail.Text = text;
+
+    /// <summary>The ✨ Style button finished: the card now holds the styled capture (already copied).</summary>
+    public void ShowStyled(Bitmap raw, Bitmap styled, string? path, bool copied)
+    {
+        if (!ReferenceEquals(raw, _raw) || _recording is not null || !IsVisible) return;
+        _image = styled;
+        _path = path;
+        _thumb.Source = styled;
+        _title.Text = copied ? T("STYLED & COPIED!") : T("STYLED!");
+        _detail.Text = $"{styled.PixelSize.Width} × {styled.PixelSize.Height}" + (path is null ? "" : " · " + System.IO.Path.GetFileName(path));
+        _timer.Stop();
+        if (!IsPointerOver) _timer.Start();
+    }
 
     private void OnEdit()
     {
