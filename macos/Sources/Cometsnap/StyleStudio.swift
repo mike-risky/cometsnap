@@ -462,10 +462,6 @@ private final class CheckerView: NSView {
     }
 }
 
-private final class FlippedView: NSView {
-    override var isFlipped: Bool { true }
-}
-
 /// Lets a closure be an AppKit target/action.
 final class BlockTarget: NSObject {
     private let block: () -> Void
