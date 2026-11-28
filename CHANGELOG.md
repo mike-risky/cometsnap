@@ -10,12 +10,14 @@ Changes merged after the last release show up under "Latest build" first: they a
 ## Latest build
 
 ### New
-- **Share-ready style.** Rounded corners, a soft shadow and a backdrop, the way screenshots look in social
-  posts. Pick a style in Settings, with a live preview: Clean, Showcase (a gradient in your capture color),
-  Frosted (the capture blurred behind itself), Comet (deep space with a glow) or Laser (a glowing outline).
-  Three switches, mix them as you like: **Style on copy** (clipboard), **Style on export** (saved files and
-  what you drag out of the tray), and **Style per shot**, a ✨ button on the Copied card that styles just that
-  capture. Copy and export stay raw by default, so capture is as instant as ever. Windows, macOS and Linux.
+- **Share-ready style, your way.** Make screenshots look the way they do in social posts, and build the look
+  yourself in the new **Style studio** with a big live preview: rounded or square corners, a border in any color,
+  a drop shadow you move pixel by pixel (left, right, up, down) with its own blur, opacity and color, a laser line
+  or neon glow in any color, and a backdrop (one color, a gradient, the capture blurred behind itself, or deep space
+  with stars). Turn each part on or off and mix them freely, or start from Clean, Showcase, Frosted, Neon, Laser,
+  Comet or Polaroid. Three switches decide where it applies: **Style on copy** (clipboard), **Style on export**
+  (saved files and what you drag out of the tray) and **Style per shot**, a ✨ button on the Copied card that
+  styles just that capture. Copy and export stay raw by default, so capture is as instant as ever. Windows, macOS and Linux.
 
 ### Improved
 - **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains
