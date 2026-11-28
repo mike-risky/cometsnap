@@ -132,6 +132,8 @@ public sealed class CometApp : Application
         _seasonTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(1) };
         _seasonTimer.Tick += (_, _) => ApplySeason();
         _seasonTimer.Start();
+        Updates = new Cometsnap.App.Updates.UpdateService(this);
+        Updates.Start();
         if (!Settings.SnapCountSeeded) SeedSnapCount();
         _tray.ContextMenuRequested += (_, _) => ShowTrayMenu();
         _tray.Activated += () =>
@@ -158,6 +160,10 @@ public sealed class CometApp : Application
         var afterInstall = e.Args.Any(a => a.Equals("--after-install", StringComparison.OrdinalIgnoreCase));
         if (afterInstall || !Settings.ReplaceOfferAnswered)
             Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => OfferReplace(printScreenOk, afterInstall));
+        // Started by Setup after an in-app update: say it worked.
+        if (e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase)))
+            Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () =>
+                Notify(L.F("Cometsnap {0} is installed", Version), L.T("It lives here in the tray. Press Print Screen to capture.")));
     }
 
     /// <summary>
@@ -585,6 +591,9 @@ public sealed class CometApp : Application
         }
         _comet.Launch(start, end, image);
     }
+
+    /// <summary>The daily update check and the "Cometsnap X is here" card.</summary>
+    public Cometsnap.App.Updates.UpdateService Updates { get; private set; } = null!;
 
     public static string Version =>
         typeof(CometApp).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";

@@ -339,6 +339,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\Cometsnap.exe"; Parameters: "--after-install"; Description: "{cm:RunAfter}"; Flags: nowait postinstall skipifsilent
+; In-app update (Cometsnap runs this Setup with /SILENT /UPDATE=1): start the new version right away.
+Filename: "{app}\Cometsnap.exe"; Parameters: "--updated"; Flags: nowait; Check: IsInAppUpdate
 
 [Code]
 const
@@ -363,6 +365,12 @@ function OpenMutex(dwDesiredAccess: DWORD; bInheritHandle: BOOL; lpName: String)
   external 'OpenMutexW@kernel32.dll stdcall';
 function CloseHandle(hObject: THandle): BOOL;
   external 'CloseHandle@kernel32.dll stdcall';
+
+{ True when Cometsnap itself started this Setup to update (Settings > Updates, or the update card). }
+function IsInAppUpdate: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:UPDATE|0}') = '1');
+end;
 
 function CometsnapRunning: Boolean;
 var

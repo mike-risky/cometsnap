@@ -28,6 +28,8 @@
        Setup installs Microsoft's .NET Desktop Runtime once when the PC does not have it. -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' != '' and '$(CometsnapFlavor)' == 'Installed'">
     <SelfContained>false</SelfContained>
+    <!-- The in-app updater installs new versions with Setup only in this flavor (see Updates/UpdateService.cs). -->
+    <DefineConstants>$(DefineConstants);INSTALLED_FLAVOR</DefineConstants>
   </PropertyGroup>
 
   <!-- Portable (default): carries its own .NET runtime, compressed inside the exe. -->

@@ -3,9 +3,12 @@ name: linux
 on:
   push:
     branches: [main]
-    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', '.github/workflows/linux.yml']
+    # A release tag (v1.4.0) also builds the Linux app and attaches it to that release, so the
+    # in-app updater finds it there. Path filters do not apply to tags.
+    tags: ['v*']
+    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', 'src/Cometsnap.Core/Updates/**', 'tests/Cometsnap.Core.Tests/UpdateTests.cs', 'updates/**', '.github/workflows/linux.yml']
   pull_request:
-    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', '.github/workflows/linux.yml']
+    paths: ['linux/**', 'assets/**', 'src/Cometsnap.Core/Localization/**', 'src/Cometsnap.Core/Updates/**', 'tests/Cometsnap.Core.Tests/UpdateTests.cs', 'updates/**', '.github/workflows/linux.yml']
   workflow_dispatch:
 
 permissions:
@@ -51,8 +54,23 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      # A tag gives its own number. Other builds carry the latest release's number, so the
+      # in-app updater offers them the next release (0.1.0 only when GitHub can't be asked).
+      - name: Pick the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null | sed 's/^v//')" || true
+          fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || VERSION="0.1.0"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Version: $VERSION"
       - name: Build AppImage and .deb (${{ matrix.arch }})
-        run: packaging/package.sh ${{ matrix.arch }} 0.1.0
+        run: packaging/package.sh ${{ matrix.arch }} "$VERSION"
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}
@@ -73,6 +91,7 @@ jobs:
         run: |
           mkdir -p rel
           find dl -type f \( -name '*.AppImage' -o -name '*.deb' \) -exec cp {} rel/ \;
+          (cd rel && sha256sum *.AppImage *.deb > SHA256SUMS-linux.txt && cat SHA256SUMS-linux.txt)
           ls -la rel
           cat > notes.txt <<'NOTES'
           **AppImage (any distro):** download the file for your PC (x86_64 for most PCs, aarch64 for ARM), then
@@ -84,6 +103,18 @@ jobs:
           Works on X11 and Wayland (GNOME, KDE Plasma, Cinnamon, Xfce...). Recording on Wayland uses the desktop portal and needs the GStreamer PipeWire plugin, which most desktops already have.
           NOTES
           sed -i 's/^          //' notes.txt
+      - name: Attach to the tagged release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # The Windows workflow (or github.com) creates the release: wait for it, up to an hour (signing can take a while).
+          for i in $(seq 1 120); do
+            gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break
+            echo "Waiting for release $GITHUB_REF_NAME..."; sleep 30
+          done
+          gh release upload "$GITHUB_REF_NAME" rel/* --clobber
       - name: Update the Linux "latest build" pre-release (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
