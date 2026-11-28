@@ -101,6 +101,77 @@ final class HotkeyCenter {
     fileprivate func fire(_ id: UInt32) { handlers[id]?() }
 }
 
+extension HotkeyAction {
+    /// The shortcut used until the user picks another one in Settings.
+    var builtIn: Hotkey {
+        switch self {
+        case .capture: return .captureCmdShift2
+        case .video: return .videoCmdShift7
+        case .gif: return .gifCmdShift8
+        case .text: return .textCmdShift9
+        case .scrolling: return .scrollingCmdShift0
+        case .color: return .colorCmdShift6
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .capture: return L.t("Capture region / window")
+        case .video: return L.t("Record a video (MP4)")
+        case .gif: return L.t("Record a GIF")
+        case .text: return L.t("Copy text from the screen")
+        case .scrolling: return L.t("Scrolling capture")
+        case .color: return L.t("Pick a color (copies #RRGGBB)")
+        }
+    }
+}
+
+extension AppSettings {
+    /// The shortcut for an action: the user's pick, or the built-in one.
+    func hotkey(_ action: HotkeyAction) -> Hotkey {
+        if let s = hotkeys[action.rawValue] { return Hotkey(keyCode: s.keyCode, modifiers: s.modifiers, display: s.display) }
+        return action.builtIn
+    }
+}
+
+/// Turns a key press into a shortcut: Carbon modifiers and a readable label ("⌃⌥⇧⌘K").
+enum HotkeyRecorder {
+    private static let named: [Int: String] = [
+        kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6", kVK_F7: "F7", kVK_F8: "F8",
+        kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12", kVK_F13: "F13", kVK_F14: "F14", kVK_F15: "F15",
+        kVK_F16: "F16", kVK_F17: "F17", kVK_F18: "F18", kVK_F19: "F19", kVK_F20: "F20",
+        kVK_Space: "Space", kVK_Return: "↩", kVK_Tab: "⇥", kVK_Delete: "⌫", kVK_ForwardDelete: "⌦",
+        kVK_Home: "↖", kVK_End: "↘", kVK_PageUp: "⇞", kVK_PageDown: "⇟",
+        kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+    ]
+    private static let functionKeys: Set<Int> = [kVK_F1, kVK_F2, kVK_F3, kVK_F4, kVK_F5, kVK_F6, kVK_F7, kVK_F8, kVK_F9, kVK_F10,
+                                                 kVK_F11, kVK_F12, kVK_F13, kVK_F14, kVK_F15, kVK_F16, kVK_F17, kVK_F18, kVK_F19, kVK_F20]
+
+    /// nil for a lone modifier, or a plain key without ⌘, ⌥ or ⌃ (it would stop that key from typing).
+    static func spec(for event: NSEvent) -> HotkeySpec? {
+        let code = Int(event.keyCode)
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        var carbon: UInt32 = 0
+        var label = ""
+        if flags.contains(.control) { carbon |= UInt32(controlKey); label += "⌃" }
+        if flags.contains(.option) { carbon |= UInt32(optionKey); label += "⌥" }
+        if flags.contains(.shift) { carbon |= UInt32(shiftKey); label += "⇧" }
+        if flags.contains(.command) { carbon |= UInt32(cmdKey); label += "⌘" }
+        let key: String
+        if let n = named[code] {
+            key = n
+        } else if let c = event.charactersIgnoringModifiers?.uppercased(), let first = c.unicodeScalars.first,
+                  !c.isEmpty, first.value >= 0x21, first.value < 0xF700 {
+            key = c
+        } else {
+            return nil
+        }
+        let strong = flags.contains(.command) || flags.contains(.option) || flags.contains(.control)
+        guard strong || functionKeys.contains(code) else { return nil }
+        return HotkeySpec(keyCode: UInt32(code), modifiers: carbon, display: label + key)
+    }
+}
+
 // MARK: - macOS screenshot shortcut takeover
 
 /// Optionally hands the macOS screenshot shortcuts (⌘⇧3, ⌘⇧4, ⌘⇧5 and their ⌃ copy variants)
@@ -221,6 +292,18 @@ enum PNG {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard let d = data(image) else { throw CocoaError(.fileWriteUnknown) }
         try d.write(to: url, options: .atomic)
+    }
+
+    /// PNG, or JPEG (quality 0.92) when the file ends in .jpg / .jpeg.
+    static func writeImage(_ image: CGImage, to url: URL) throws {
+        let ext = url.pathExtension.lowercased()
+        guard ext == "jpg" || ext == "jpeg" else { return try write(image, to: url) }
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { throw CocoaError(.fileWriteUnknown) }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.92] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { throw CocoaError(.fileWriteUnknown) }
+        try (data as Data).write(to: url, options: .atomic)
     }
 
     static func load(_ url: URL) -> CGImage? {

@@ -43,7 +43,30 @@ final class AppController: NSObject, NSApplicationDelegate {
     var capturesDirectory: URL { paths.capturesDirectory(settings) }
 
     var hotkeyDisplay: HotkeyDisplay {
-        HotkeyDisplay(capture: settings.takeOverSystemShortcut ? "⌘⇧4" : "⌘⇧2", video: "⌘⇧7", gif: "⌘⇧8")
+        let changed = settings.hotkeys[HotkeyAction.capture.rawValue] != nil
+        return HotkeyDisplay(capture: settings.takeOverSystemShortcut && !changed ? "⌘⇧4" : settings.hotkey(.capture).display,
+                             video: settings.hotkey(.video).display, gif: settings.hotkey(.gif).display,
+                             text: settings.hotkey(.text).display, scrolling: settings.hotkey(.scrolling).display,
+                             color: settings.hotkey(.color).display)
+    }
+
+    /// While Settings listens for new keys, the app's own shortcuts must not catch them.
+    func pauseHotkeys() { HotkeyCenter.shared.unregisterAll() }
+
+    /// The {counter} value the next saved capture will get.
+    var nextNameCounter: Int { max(0, settings.nameCounter) + 1 }
+
+    /// Uses up a {counter} value (only when the name pattern has one) and returns it.
+    func takeNameCounter() -> Int {
+        let next = nextNameCounter
+        if FileNamePattern.usesCounter(settings.fileNamePattern) { update { $0.nameCounter = next } }
+        return next
+    }
+
+    /// A free path for a new capture, under the user's name pattern and format.
+    func nextCaptureURL() -> URL {
+        SnapNaming.nextFreeURL(root: capturesDirectory, date: Date(), pattern: settings.fileNamePattern,
+                               ext: SnapNaming.fileExtension(for: settings.imageFormat), counter: takeNameCounter())
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -98,6 +121,9 @@ final class AppController: NSObject, NSApplicationDelegate {
         if old.takeOverSystemShortcut != settings.takeOverSystemShortcut {
             SystemShortcuts.setBuiltInShortcuts(enabled: !settings.takeOverSystemShortcut)
             registerHotkeys()
+        } else if old.hotkeys != settings.hotkeys {
+            registerHotkeys()
+            statusItem.refreshIcon()
         }
         if old.seasonalLooks != settings.seasonalLooks { statusItem.refreshIcon() }
         if old.capturesFolder != settings.capturesFolder {
@@ -143,7 +169,7 @@ final class AppController: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if self.recorder.isRecording { self.recorder.stop() } else { self.capture.startRegion() }
         }
-        hk.register(.captureCmdShift2, action: region)
+        hk.register(settings.hotkey(.capture), action: region)
         hk.register(.captureF13, action: region)
         if settings.takeOverSystemShortcut {
             // Give macOS a moment to release the shortcut after the change.
@@ -155,13 +181,13 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
         let video: () -> Void = { [weak self] in self?.recorder.toggleRegion(format: .mp4) }
         let gif: () -> Void = { [weak self] in self?.recorder.toggleRegion(format: .gif) }
-        hk.register(.videoCmdShift7, action: video)
+        hk.register(settings.hotkey(.video), action: video)
         hk.register(.videoShiftF13, action: video)
-        hk.register(.gifCmdShift8, action: gif)
+        hk.register(settings.hotkey(.gif), action: gif)
         hk.register(.gifCtrlShiftF13, action: gif)
-        hk.register(.textCmdShift9, action: { [weak self] in self?.capture.startTextCapture() })
-        hk.register(.scrollingCmdShift0, action: { [weak self] in self?.scrolling.start() })
-        hk.register(.colorCmdShift6, action: { [weak self] in self?.capture.startColorPicker() })
+        hk.register(settings.hotkey(.text), action: { [weak self] in self?.capture.startTextCapture() })
+        hk.register(settings.hotkey(.scrolling), action: { [weak self] in self?.scrolling.start() })
+        hk.register(settings.hotkey(.color), action: { [weak self] in self?.capture.startColorPicker() })
     }
 
     // MARK: copy text (OCR)
