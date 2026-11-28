@@ -50,8 +50,25 @@ public static class L
     public static string F(string english, params object?[] args) =>
         string.Format(CultureInfo.CurrentCulture, T(english), args);
 
+    private static readonly Dictionary<string, IReadOnlyDictionary<string, string>> Merged = new();
+
     /// <summary>The translation table of a language (null for English or an unknown code).</summary>
-    public static IReadOnlyDictionary<string, string>? Table(string code) => code switch
+    public static IReadOnlyDictionary<string, string>? Table(string code)
+    {
+        lock (Merged)
+        {
+            if (Merged.TryGetValue(code, out var cached)) return cached;
+            var main = MainTable(code);
+            if (main is null) return null;
+            // The update texts live in UpdateStrings.cs; the main table wins on a duplicate.
+            var all = new Dictionary<string, string>(main);
+            if (UpdateStrings.Table(code) is { } updates)
+                foreach (var (k, v) in updates) all.TryAdd(k, v);
+            return Merged[code] = all;
+        }
+    }
+
+    private static IReadOnlyDictionary<string, string>? MainTable(string code) => code switch
     {
         "fr" => Strings.French,
         "de" => Strings.German,

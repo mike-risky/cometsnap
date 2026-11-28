@@ -129,6 +129,10 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
   clipboard as `#RRGGBB` (Shift+click for `rgb(...)`). In any capture, **C** copies the color under the cursor too
 - **Capture colors**: pick the look of the capture screen in Settings (Comet blue, Sun yellow, Terracotta, Flame
   orange or Stardust). Crosshair, frames, loupe, size tag, scrolling frame and Copied card follow, with a live preview
+- **Updates come to you**: once a day Cometsnap asks GitHub Releases whether a new version is out. A small card
+  says what it brings (in your language) with **Update now**, **Later** and **Skip this version**; Update now downloads
+  the small installer, checks it and restarts Cometsnap. Nothing installs without your click, and *Settings › Updates*
+  turns the check off. The portable exe gets a download link; macOS and Linux have the same card
 
 ## Keys
 

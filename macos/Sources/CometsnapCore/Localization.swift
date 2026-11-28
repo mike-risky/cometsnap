@@ -20,7 +20,8 @@ public enum L {
     public static func use(_ choice: String?, preferred: [String] = Locale.preferredLanguages) {
         let wanted = choice?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
         let code = wanted.isEmpty ? fromPreferred(preferred) : wanted
-        table = Strings.table(code)
+        // The update texts live in UpdateStrings.swift; the main table wins on a duplicate.
+        table = Strings.table(code).map { $0.merging(UpdateStrings.table(code) ?? [:]) { main, _ in main } }
         language = table == nil ? "en" : code
     }
 

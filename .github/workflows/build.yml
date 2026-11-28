@@ -333,6 +333,9 @@ jobs:
             Install: **Cometsnap-Setup-x64.exe** (most PCs) or Cometsnap-Setup-arm64.exe (Snapdragon / Surface Pro X).
             Portable, no install: Cometsnap-x64.exe or Cometsnap-arm64.exe. SHA256SUMS.txt lists the checksums.
 
+            **macOS** (14+, Apple Silicon and Intel): Cometsnap-macOS.dmg. **Linux:** Cometsnap-x86_64.AppImage or cometsnap_amd64.deb (ARM64 builds too).
+            The Mac and Linux files arrive a few minutes after the Windows ones.
+
             **What's new:** [CHANGELOG.md](https://github.com/mike-risky/cometsnap/blob/main/CHANGELOG.md) · [cometsnap.com/changelog](https://cometsnap.com/changelog)
 
             **Code signing policy:** free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
