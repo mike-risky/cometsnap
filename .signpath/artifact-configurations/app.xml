@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- SignPath artifact configuration "app" (slug: app).
-     Signs the Cometsnap app (x64 and arm64) and the two Inno Setup uninstallers, which the
+     Signs the Cometsnap app (x64 and arm64; portable in <arch>/, the one Setup installs in
+     installed-<arch>/) and the two Inno Setup uninstallers, which the
      workflow uploads as uninstaller-<arch>/uninst-<inno version>-<hash>.e32.exe.
      Artifact layout: see the "sign" job in .github/workflows/build.yml. -->
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
@@ -11,6 +12,8 @@
     <pe-file-set product-name="Cometsnap" product-version="${version}">
       <include path="x64/Cometsnap.exe" />
       <include path="arm64/Cometsnap.exe" />
+      <include path="installed-x64/Cometsnap.exe" />
+      <include path="installed-arm64/Cometsnap.exe" />
       <include path="uninstaller-x64/uninst-*.exe" />
       <include path="uninstaller-arm64/uninst-*.exe" />
       <for-each>

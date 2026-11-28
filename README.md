@@ -27,7 +27,9 @@ Get the installer from the [Latest build](https://github.com/mike-risky/cometsna
 - When it finishes, Cometsnap starts and offers to replace your old screen capture tool.
 - Uninstall from *Settings > Apps*: startup entry removed, Print Screen goes back to Windows, captures kept.
 
-Prefer no install? `Cometsnap-x64.exe` / `Cometsnap-arm64.exe` are portable single files.
+Setup is small because it installs Microsoft's .NET Desktop Runtime 10 only if your PC does not already have it (one time, Windows asks for permission).
+
+Prefer no install? `Cometsnap-x64.exe` / `Cometsnap-arm64.exe` are portable single files with the runtime built in, so they are bigger.
 - Put a file named `portable.txt` next to the exe to keep settings and captures beside it (USB-friendly).
 
 Windows may show a SmartScreen warning the first time because the exe is not code-signed yet:
@@ -181,14 +183,15 @@ and **Ctrl+E** opens the selection in the editor.
 
 ## Building
 
-Windows: requires the [.NET 8 SDK](https://dotnet.microsoft.com/download) on Windows.
+Windows: requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) on Windows.
 macOS and Linux: see [`macos/README.md`](macos/README.md) and [`linux/`](linux/).
 
 ```powershell
 dotnet build Cometsnap.sln
 dotnet test Cometsnap.sln
 dotnet publish src/Cometsnap.App -c Release -r win-x64 -o out/x64   # portable out/x64/Cometsnap.exe
-# Setup (Inno Setup 6.3+): ISCC /DArch=x64 installer\Cometsnap.iss   -> out/Cometsnap-Setup-x64.exe
+dotnet publish src/Cometsnap.App -c Release -r win-x64 -p:CometsnapFlavor=Installed -o out/x64/installed   # small exe for Setup
+# Setup (Inno Setup 6.3+): ISCC /DArch=x64 /DSourceExe=..\out\x64\installed\Cometsnap.exe installer\Cometsnap.iss   -> out/Cometsnap-Setup-x64.exe
 ```
 
 Every push builds `Cometsnap.exe` for x64 and ARM64 with GitHub Actions.

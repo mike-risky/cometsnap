@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
       - name: Build
         run: dotnet build Cometsnap.sln -c Release
       - name: Test
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
       - name: Pick the version
         shell: pwsh
         run: |
@@ -54,12 +54,29 @@ jobs:
           $version = "0.1.${{ github.run_number }}"
           if ("${{ github.ref_type }}" -eq "tag") { $version = "${{ github.ref_name }}".TrimStart("v") }
           "VERSION=$version" >> $env:GITHUB_ENV
-      - name: Publish portable Cometsnap.exe (${{ matrix.arch }})
+      - name: Publish Cometsnap.exe, portable and for Setup (${{ matrix.arch }})
         shell: pwsh
         run: |
+          $common = @("-c", "Release", "-r", "win-${{ matrix.arch }}", "-p:Version=$env:VERSION",
+                      "-p:IncludeSourceRevisionInInformationalVersion=false")
+          # Portable: carries its own .NET runtime (compressed), runs anywhere with nothing to install.
+          dotnet publish src/Cometsnap.App/Cometsnap.App.csproj @common -o out/${{ matrix.arch }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # For Setup: only Cometsnap itself. Setup installs the .NET Desktop Runtime when it is missing.
+          dotnet publish src/Cometsnap.App/Cometsnap.App.csproj @common -p:CometsnapFlavor=Installed -o out/${{ matrix.arch }}/installed
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "Portable:  {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/Cometsnap.exe).Length / 1MB)
+          "For Setup: {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/installed/Cometsnap.exe).Length / 1MB)
+      - name: What takes the space (${{ matrix.arch }})
+        shell: pwsh
+        run: |
+          # Same app, unbundled, to show which files make up the exe.
           dotnet publish src/Cometsnap.App/Cometsnap.App.csproj -c Release -r win-${{ matrix.arch }} `
-            -p:Version=$env:VERSION -p:IncludeSourceRevisionInInformationalVersion=false -o out/${{ matrix.arch }}
-          Get-ChildItem out/${{ matrix.arch }}
+            -p:PublishSingleFile=false -p:EnableCompressionInSingleFile=false -o scratch/unbundled | Out-Null
+          $files = Get-ChildItem -Recurse -File scratch/unbundled
+          "Total unbundled: {0:N1} MB in {1} files" -f (($files | Measure-Object Length -Sum).Sum / 1MB), $files.Count
+          $files | Sort-Object Length -Descending | Select-Object -First 25 |
+            ForEach-Object { "{0,8:N1} MB  {1}" -f ($_.Length / 1MB), $_.Name }
       - name: Build Cometsnap-Setup-${{ matrix.arch }}.exe
         shell: pwsh
         run: |
@@ -68,7 +85,7 @@ jobs:
             choco install innosetup -y --no-progress
           }
           & $iscc "/DAppVersion=$env:VERSION" "/DArch=${{ matrix.arch }}" `
-            "/DSourceExe=$PWD\out\${{ matrix.arch }}\Cometsnap.exe" "/O$PWD\out\${{ matrix.arch }}" installer\Cometsnap.iss
+            "/DSourceExe=$PWD\out\${{ matrix.arch }}\installed\Cometsnap.exe" "/O$PWD\out\${{ matrix.arch }}" installer\Cometsnap.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem out/${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
@@ -76,6 +93,7 @@ jobs:
           name: Cometsnap-${{ matrix.arch }}
           path: |
             out/${{ matrix.arch }}/Cometsnap.exe
+            out/${{ matrix.arch }}/installed/Cometsnap.exe
             out/${{ matrix.arch }}/Cometsnap-Setup-${{ matrix.arch }}.exe
           if-no-files-found: error
 
@@ -83,7 +101,7 @@ jobs:
   # Stays switched off until the repository variable SIGNPATH_ORGANIZATION_ID exists, then signs
   # every tagged release (v*) and any manual run with "sign" ticked. Each run sends two signing
   # requests that a maintainer approves on signpath.io:
-  #   1. "app": Cometsnap.exe (x64, arm64) and the Inno Setup uninstallers
+  #   1. "app": Cometsnap.exe (portable and installed, x64 and arm64) and the Inno Setup uninstallers
   #   2. "installer": Cometsnap-Setup-x64.exe and Cometsnap-Setup-arm64.exe, built around the signed files
   # Setup: docs/CODE_SIGNING_SETUP.md. Artifact configurations: .signpath/artifact-configurations/.
   sign:
@@ -128,11 +146,12 @@ jobs:
             $dir = "$PWD\uninst\$arch"
             New-Item -ItemType Directory -Force $dir | Out-Null
             & $env:ISCC "/DAppVersion=$env:VERSION" "/DArch=$arch" "/DSignedUninstallerDir=$dir" `
-              "/DSourceExe=$PWD\unsigned\$arch\Cometsnap.exe" "/O$PWD\scratch\$arch" installer\Cometsnap.iss | Out-Host
+              "/DSourceExe=$PWD\unsigned\$arch\installed\Cometsnap.exe" "/O$PWD\scratch\$arch" installer\Cometsnap.iss | Out-Host
             $files = @(Get-ChildItem $dir -Filter "uninst-*.e*")
             if ($files.Count -ne 1) { throw "Expected one unsigned uninstaller in $dir, found $($files.Count)" }
-            New-Item -ItemType Directory -Force "sign-app\$arch", "sign-app\uninstaller-$arch" | Out-Null
+            New-Item -ItemType Directory -Force "sign-app\$arch", "sign-app\installed-$arch", "sign-app\uninstaller-$arch" | Out-Null
             Copy-Item "unsigned\$arch\Cometsnap.exe" "sign-app\$arch\Cometsnap.exe"
+            Copy-Item "unsigned\$arch\installed\Cometsnap.exe" "sign-app\installed-$arch\Cometsnap.exe"
             # SignPath picks PE files by extension, so the uninstaller travels as .exe.
             Copy-Item $files[0].FullName "sign-app\uninstaller-$arch\$($files[0].Name).exe"
           }
@@ -177,7 +196,7 @@ jobs:
           New-Item -ItemType Directory -Force sign-installer | Out-Null
           foreach ($arch in "x64", "arm64") {
             & $env:ISCC "/DAppVersion=$env:VERSION" "/DArch=$arch" "/DSignedUninstallerDir=$PWD\uninst\$arch" `
-              "/DSourceExe=$PWD\signed-app\$arch\Cometsnap.exe" "/O$PWD\sign-installer" installer\Cometsnap.iss
+              "/DSourceExe=$PWD\signed-app\installed-$arch\Cometsnap.exe" "/O$PWD\sign-installer" installer\Cometsnap.iss
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           Get-ChildItem sign-installer
