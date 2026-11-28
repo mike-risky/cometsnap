@@ -67,6 +67,31 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "Portable:  {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/Cometsnap.exe).Length / 1MB)
           "For Setup: {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/installed/Cometsnap.exe).Length / 1MB)
+      - name: Launch check (x64)
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          # Starts each exe and makes sure it is still running after 20 seconds.
+          $failed = $false
+          foreach ($exe in "out/x64/Cometsnap.exe", "out/x64/installed/Cometsnap.exe") {
+            Get-Process Cometsnap -ErrorAction SilentlyContinue | Stop-Process -Force
+            $since = Get-Date
+            $p = Start-Process $exe -PassThru
+            Start-Sleep 20
+            if ($p.HasExited) {
+              "::error::$exe exited after start with code $($p.ExitCode)"
+              $failed = $true
+              Get-WinEvent -FilterHashtable @{ LogName = "Application"; StartTime = $since } -ErrorAction SilentlyContinue |
+                Where-Object { $_.ProviderName -in ".NET Runtime", "Application Error", "Windows Error Reporting" } |
+                ForEach-Object { "--- $($_.ProviderName) ---"; $_.Message }
+            } else {
+              "$exe is running"
+              $p | Stop-Process -Force
+            }
+            $log = Join-Path $env:APPDATA "Cometsnap\cometsnap.log"
+            if (Test-Path $log) { "--- cometsnap.log ---"; Get-Content $log -Tail 60 }
+          }
+          if ($failed) { exit 1 }
       - name: What takes the space (${{ matrix.arch }})
         shell: pwsh
         run: |
