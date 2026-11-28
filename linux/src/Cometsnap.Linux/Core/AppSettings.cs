@@ -38,6 +38,7 @@ public sealed class AppSettings
 
     /// <summary>Copy text (OCR with Tesseract).</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
+    public string QrHotkey { get; set; } = "Ctrl+Alt+Q";
 
     /// <summary>Start recording a region (pick it like a capture). Pressed again while recording: stop.</summary>
     public string RecordHotkey { get; set; } = "Shift+PrintScreen";
@@ -53,6 +54,21 @@ public sealed class AppSettings
 
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
+    /// <summary>After each capture, look for a QR code and offer its content.</summary>
+    public bool DetectQrCodes { get; set; } = true;
+
+    /// <summary>Share-ready look built in the Style studio (corners, border, shadow, glow, backdrop; shared with Windows).</summary>
+    [JsonConverter(typeof(Cometsnap.Core.Styling.SnapStyleJsonConverter))]
+    public Cometsnap.Core.Styling.SnapStyle SnapStyle { get; set; } = new();
+
+    /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
+    public bool StyleOnCopy { get; set; }
+
+    /// <summary>Save the styled capture (the file you drag out of the panel). Off: the file is the raw capture.</summary>
+    public bool StyleOnExport { get; set; }
+
+    /// <summary>Show a ✨ Style button on the Copied card, to style just that capture.</summary>
+    public bool StylePerShot { get; set; } = true;
 
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;

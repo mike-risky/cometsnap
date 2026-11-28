@@ -38,6 +38,7 @@ public sealed class AppSettings
 
     /// <summary>Copy text (OCR): drag over text on the screen and the text goes on the clipboard.</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
+    public string QrHotkey { get; set; } = "Ctrl+Alt+Q";
 
     /// <summary>Folder for captures. Empty = default (Pictures\Cometsnap or beside the exe in portable mode).</summary>
     public string CapturesFolder { get; set; } = "";
@@ -68,9 +69,24 @@ public sealed class AppSettings
 
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
+    /// <summary>After each capture, look for a QR code and offer its content on the Copied card.</summary>
+    public bool DetectQrCodes { get; set; } = true;
 
     /// <summary>Look of the capture screen: a <see cref="CaptureThemes"/> id ("blue" is the classic look).</summary>
     public string CaptureTheme { get; set; } = CaptureThemes.DefaultId;
+
+    /// <summary>Share-ready look, built in the Style studio (corners, border, shadow, glow, backdrop).</summary>
+    [System.Text.Json.Serialization.JsonConverter(typeof(Styling.SnapStyleJsonConverter))]
+    public Styling.SnapStyle SnapStyle { get; set; } = new();
+
+    /// <summary>Put the styled capture on the clipboard. Off: the clipboard gets the raw capture.</summary>
+    public bool StyleOnCopy { get; set; }
+
+    /// <summary>Save the styled capture (the file you drag out of the tray). Off: the file is the raw capture.</summary>
+    public bool StyleOnExport { get; set; }
+
+    /// <summary>Show a ✨ Style button on the Copied card, to style just that capture.</summary>
+    public bool StylePerShot { get; set; } = true;
 
     public LoupeCorner LoupeCorner { get; set; } = LoupeCorner.BottomLeft;
     public bool WindowDetection { get; set; } = true;

@@ -164,6 +164,9 @@ public sealed class CaptureController
     /// <summary>"Copy text": drag over some text (or click a window) and its text goes on the clipboard.</summary>
     public void StartTextCapture() => PickArea((image, rect) => _ = _app.CopyTextAsync(image, rect));
 
+    /// <summary>Select an area with a QR code or barcode: what it holds goes to the clipboard.</summary>
+    public void StartQrCapture() => PickArea((image, rect) => _ = _app.ScanCodeAsync(image, rect));
+
     /// <summary>Copies, saves and announces an image made elsewhere (a scrolling capture), like a normal capture.</summary>
     public void DeliverImage(BitmapSource image, PixelRect from) => Deliver(image, from);
 
@@ -290,6 +293,13 @@ public sealed class CaptureController
     /// <summary>Copies like a normal capture, then asks where to save it.</summary>
     private void SaveAs(BitmapSource image) => Deliver(image, null, askWhere: true);
 
+    /// <summary>A file made from a capture (its styled copy) joins the recent captures, like a capture.</summary>
+    public void AnnounceSaved(string path, BitmapSource image)
+    {
+        CaptureSaved?.Invoke(path);
+        CaptureStored?.Invoke(path, image);
+    }
+
     /// <summary>The Save dialog, after the clipboard copy. The file joins the recent captures.</summary>
     private void AskAndSave(BitmapSource image)
     {
@@ -326,15 +336,33 @@ public sealed class CaptureController
         }
     }
 
-    private void Deliver(BitmapSource image, PixelRect? from, bool askWhere = false)
+    /// <summary>The last capture as taken, before any style (the Copied card's ✨ button styles it).</summary>
+    public BitmapSource? LastRawCapture { get; private set; }
+
+    private void Deliver(BitmapSource raw, PixelRect? from, bool askWhere = false)
     {
         var settings = _app.Settings;
         var sw = Stopwatch.StartNew();
-        if (settings.CopyToClipboardOnCapture && !ClipboardService.SetImage(image))
-            Log.Error("Could not copy the capture to the clipboard");
-        Log.Info($"Capture {image.PixelWidth}×{image.PixelHeight} on clipboard in {sw.ElapsedMilliseconds} ms");
+        LastRawCapture = raw;
 
-        if (from is { } rect) CaptureTaken?.Invoke(image, rect);
+        // Share-ready style (Settings > Style): each of copy and export can be raw or styled.
+        BitmapSource? styled = null;
+        BitmapSource Styled()
+        {
+            if (styled is not null) return styled;
+            try { styled = SnapStyler.Apply(raw, settings); }
+            catch (Exception ex) { Log.Error("Styling the capture failed", ex); styled = raw; }
+            return styled;
+        }
+        var copy = settings.StyleOnCopy ? Styled() : raw;
+        var image = settings.StyleOnExport ? Styled() : raw;
+
+        if (settings.CopyToClipboardOnCapture && !ClipboardService.SetImage(copy))
+            Log.Error("Could not copy the capture to the clipboard");
+        Log.Info($"Capture {raw.PixelWidth}×{raw.PixelHeight} on clipboard in {sw.ElapsedMilliseconds} ms");
+
+        // The card shows what was saved (that is what Edit opens and a drag drops).
+        if (from is { } rect) CaptureTaken?.Invoke(settings.AutoSave || askWhere || settings.AskWhereToSave ? image : copy, rect);
 
         // The card and the comet show first; the dialog or the editor come right after.
         if (askWhere || settings.AskWhereToSave)

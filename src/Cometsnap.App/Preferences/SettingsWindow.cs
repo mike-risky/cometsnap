@@ -6,6 +6,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Cometsnap.App.Theme;
+using Cometsnap.Core.Styling;
 using Cometsnap.Core.Input;
 using Cometsnap.Core.Localization;
 using Cometsnap.Core.Native;
@@ -102,8 +103,21 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(ThemePicker());
         stack.Children.Add(Switch(L.T("Instant capture (no toolbar)"), L.T("The capture is taken the moment you release the mouse."), S.InstantCapture, v => S.InstantCapture = v));
         stack.Children.Add(Switch(L.T("Show the Edit card after a capture"), L.T("A small card in the corner to edit or drag the capture."), S.ShowEditCard, v => S.ShowEditCard = v));
+        stack.Children.Add(Switch(L.T("Spot QR codes in captures"), L.T("The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard."), S.DetectQrCodes, v => S.DetectQrCodes = v));
         stack.Children.Add(Switch(L.T("Comet animation"), L.T("The comet flies your capture into the tray."), S.ShowCometAnimation, v => S.ShowCometAnimation = v));
         stack.Children.Add(Switch(L.T("Detect windows under the mouse"), L.T("Click a window to capture just that window."), S.WindowDetection, v => S.WindowDetection = v));
+
+        // ---- share-ready style
+        Section(stack, L.T("Share-ready style"));
+        stack.Children.Add(new TextBlock
+        {
+            Text = L.T("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio."),
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -4, 0, 10),
+        });
+        stack.Children.Add(StylePicker());
+        stack.Children.Add(Switch(L.T("Style on copy"), L.T("The clipboard gets the styled capture. Off: the raw capture."), S.StyleOnCopy, v => S.StyleOnCopy = v));
+        stack.Children.Add(Switch(L.T("Style on export"), L.T("Saved files (and what you drag out of the tray) are styled. Off: the raw capture."), S.StyleOnExport, v => S.StyleOnExport = v));
+        stack.Children.Add(Switch(L.T("Style per shot"), L.T("A ✨ Style button on the Copied card styles just that capture."), S.StylePerShot, v => S.StylePerShot = v));
 
         // ---- where captures go
         Section(stack, L.T("Where captures go"));
@@ -141,6 +155,7 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(HotkeyRow(L.T("Active window"), () => S.ActiveWindowHotkey, v => S.ActiveWindowHotkey = v, new AppSettings().ActiveWindowHotkey));
         stack.Children.Add(HotkeyRow(L.T("Scrolling capture"), () => S.ScrollingHotkey, v => S.ScrollingHotkey = v, new AppSettings().ScrollingHotkey));
         stack.Children.Add(HotkeyRow(L.T("Copy text from the screen"), () => S.TextHotkey, v => S.TextHotkey = v, new AppSettings().TextHotkey));
+        stack.Children.Add(HotkeyRow(L.T("Scan a QR code"), () => S.QrHotkey, v => S.QrHotkey = v, new AppSettings().QrHotkey));
         stack.Children.Add(HotkeyRow(L.T("Pick a color (copies #RRGGBB)"), () => S.ColorHotkey, v => S.ColorHotkey = v, new AppSettings().ColorHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a video (MP4)"), () => S.RecordHotkey, v => S.RecordHotkey = v, new AppSettings().RecordHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a GIF"), () => S.RecordGifHotkey, v => S.RecordGifHotkey = v, new AppSettings().RecordGifHotkey));
@@ -283,6 +298,39 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(wrap);
         panel.Children.Add(ThemePreview(current));
         return panel;
+    }
+
+    // ------------------------------------------------------------------ share-ready style
+
+    private Image? _stylePreview;
+
+    /// <summary>A small preview of the current style and the button that opens the Style studio.</summary>
+    private UIElement StylePicker()
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        _stylePreview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        RenderOptions.SetBitmapScalingMode(_stylePreview, BitmapScalingMode.HighQuality);
+        RefreshStylePreview();
+        var frame = new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            Background = StyleSample.Checker(), Padding = new Thickness(16), Child = _stylePreview, Cursor = Cursors.Hand,
+            ToolTip = L.T("Open the Style studio"),
+        };
+        frame.MouseLeftButtonUp += (_, e) => { e.Handled = true; _app.OpenStyleStudio(); };
+        panel.Children.Add(frame);
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
+        row.Children.Add(Pill("✨ " + L.T("Open the Style studio"), primary: true, _app.OpenStyleStudio));
+        panel.Children.Add(row);
+        return panel;
+    }
+
+    /// <summary>Redraws the small preview (the Style studio calls this after each change).</summary>
+    public void RefreshStylePreview()
+    {
+        if (_stylePreview is null) return;
+        try { _stylePreview.Source = StyledBitmaps.Apply(StyleSample.Sample, S.SnapStyle ?? new SnapStyle()); }
+        catch { _stylePreview.Visibility = Visibility.Collapsed; }
     }
 
     /// <summary>A small fake capture screen: dimmed desktop, crosshair, selection with glow, size tag and loupe.</summary>

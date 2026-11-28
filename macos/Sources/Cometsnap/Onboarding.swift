@@ -196,6 +196,7 @@ final class SettingsWindow: NSWindow {
     private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧3, ⌘⇧4 and ⌘⇧5 for Cometsnap (turns off the macOS screenshot shortcuts)"), target: nil, action: nil)
     private let copyBox = NSButton(checkboxWithTitle: L.t("Copy every capture to the clipboard"), target: nil, action: nil)
     private let card = NSButton(checkboxWithTitle: L.t("Show the small Edit card after a capture"), target: nil, action: nil)
+    private let spotQr = NSButton(checkboxWithTitle: L.t("Spot QR codes in captures"), target: nil, action: nil)
     private let comet = NSButton(checkboxWithTitle: L.t("Comet animation into the menu bar"), target: nil, action: nil)
     private let sound = NSButton(checkboxWithTitle: L.t("Play a sound"), target: nil, action: nil)
     private let audio = NSButton(checkboxWithTitle: L.t("Record the Mac's sound in videos"), target: nil, action: nil)
@@ -216,6 +217,10 @@ final class SettingsWindow: NSWindow {
     private var listening: HotkeyAction?
     private var keyMonitor: Any?
     private var themeButtons: [NSButton] = []
+    private let stylePreview = NSImageView()
+    private let styleCopyBox = NSButton(checkboxWithTitle: L.t("Style on copy"), target: nil, action: nil)
+    private let styleExportBox = NSButton(checkboxWithTitle: L.t("Style on export"), target: nil, action: nil)
+    private let stylePerShotBox = NSButton(checkboxWithTitle: L.t("Style per shot"), target: nil, action: nil)
     private let preview = ThemePreviewView(frame: CGRect(x: 0, y: 0, width: 460, height: 132))
 
     init(app: AppController) {
@@ -230,7 +235,8 @@ final class SettingsWindow: NSWindow {
     }
 
     private func build() {
-        for b in [login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal, saveBox, askBox, editorBox] {
+        for b in [login, takeOver, copyBox, card, spotQr, comet, sound, audio, celebrations, seasonal, saveBox, askBox, editorBox,
+                  styleCopyBox, styleExportBox, stylePerShotBox] {
             b.target = self
             b.action = #selector(changed)
         }
@@ -285,6 +291,15 @@ final class SettingsWindow: NSWindow {
         themeBox.orientation = .vertical
         themeBox.alignment = .leading
         themeBox.spacing = 6
+
+        // Share-ready style: a small preview, the Style studio button and the three switches.
+        stylePreview.imageScaling = .scaleProportionallyUpOrDown
+        stylePreview.translatesAutoresizingMaskIntoConstraints = false
+        stylePreview.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        stylePreview.heightAnchor.constraint(equalToConstant: 190).isActive = true
+        let studioButton = NSButton(title: "✨ " + L.t("Open the Style studio"), target: self, action: #selector(openStyleStudio))
+        studioButton.bezelStyle = .rounded
+        studioButton.keyEquivalent = ""
 
         let title = NSTextField(labelWithAttributedString: Theme.wordmark(28))
         func row(_ label: String, _ v: NSView) -> NSView {
@@ -344,8 +359,14 @@ final class SettingsWindow: NSWindow {
             hotkeyRows.append(r)
         }
 
-        var views: [NSView] = [title, login, takeOver, card, comet, sound, audio, celebrations, seasonal]
+        var views: [NSView] = [title, login, takeOver, card, spotQr, comet, sound, audio, celebrations, seasonal]
         views += [row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), themeBox]
+        views += [heading(L.t("Share-ready style")),
+                  hint(L.t("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio.")),
+                  stylePreview, studioButton,
+                  styleCopyBox, hint(L.t("The clipboard gets the styled capture. Off: the raw capture.")),
+                  styleExportBox, hint(L.t("Saved files (and what you drag out of the tray) are styled. Off: the raw capture.")),
+                  stylePerShotBox, hint(L.t("A ✨ Style button on the Copied card styles just that capture."))]
         views += [heading(L.t("Where captures go")), copyBox, saveBox, askBox, editorBox]
         views += [row(L.t("Captures folder"), folderRow), row(L.t("File name"), nameBox), row(L.t("File format"), format)]
         views.append(hint(L.t("PNG keeps every pixel sharp. JPG files are smaller.")))
@@ -393,6 +414,7 @@ final class SettingsWindow: NSWindow {
         takeOver.state = s.takeOverSystemShortcut ? .on : .off
         copyBox.state = s.copyToClipboard ? .on : .off
         card.state = s.showEditCard ? .on : .off
+        spotQr.state = s.detectQrCodes ? .on : .off
         comet.state = s.cometAnimation ? .on : .off
         sound.state = s.playSound ? .on : .off
         audio.state = s.recordSystemAudio ? .on : .off
@@ -404,6 +426,10 @@ final class SettingsWindow: NSWindow {
         language.selectItem(at: (L.languages.firstIndex { $0.code == s.language }).map { $0 + 1 } ?? 0)
         for (i, t) in CaptureThemes.all.enumerated() { themeButtons[i].state = t.id == s.captureTheme ? .on : .off }
         preview.theme = CaptureThemes.get(s.captureTheme)
+        stylePreview.image = SnapStyler.preview(style: s.snapStyle)
+        styleCopyBox.state = s.styleOnCopy ? .on : .off
+        styleExportBox.state = s.styleOnExport ? .on : .off
+        stylePerShotBox.state = s.stylePerShot ? .on : .off
         folder.stringValue = app.capturesDirectory.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
         saveBox.state = s.saveEveryCapture ? .on : .off
         askBox.state = s.askWhereToSave ? .on : .off
@@ -496,6 +522,7 @@ final class SettingsWindow: NSWindow {
             s.takeOverSystemShortcut = takeOver.state == .on
             s.copyToClipboard = copyBox.state == .on
             s.showEditCard = card.state == .on
+            s.detectQrCodes = spotQr.state == .on
             s.cometAnimation = comet.state == .on
             s.playSound = sound.state == .on
             s.recordSystemAudio = audio.state == .on
@@ -507,6 +534,9 @@ final class SettingsWindow: NSWindow {
             s.askWhereToSave = askBox.state == .on
             s.openEditorAfterCapture = editorBox.state == .on
             s.imageFormat = format.indexOfSelectedItem == 1 ? "jpg" : "png"
+            s.styleOnCopy = styleCopyBox.state == .on
+            s.styleOnExport = styleExportBox.state == .on
+            s.stylePerShot = stylePerShotBox.state == .on
         }
         refreshExample()
         if sound.state == .on { Sound.snap() }
@@ -526,6 +556,10 @@ final class SettingsWindow: NSWindow {
         let id = CaptureThemes.all[i].id
         app.update { $0.captureTheme = id }
         reload()
+    }
+
+    @objc private func openStyleStudio() {
+        app.showStyleStudio()
     }
 
     private static func dot(_ color: NSColor) -> NSImage {

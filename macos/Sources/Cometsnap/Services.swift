@@ -48,6 +48,7 @@ struct Hotkey: Equatable {
     static let videoShiftF13 = Hotkey(keyCode: UInt32(kVK_F13), modifiers: UInt32(shiftKey), display: "⇧F13")
     static let textCmdShift9 = Hotkey(keyCode: UInt32(kVK_ANSI_9), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧9")
     static let colorCmdShift6 = Hotkey(keyCode: UInt32(kVK_ANSI_6), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧6")
+    static let qrCmdShift1 = Hotkey(keyCode: UInt32(kVK_ANSI_1), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧1")
     static let scrollingCmdShift0 = Hotkey(keyCode: UInt32(kVK_ANSI_0), modifiers: UInt32(cmdKey | shiftKey), display: "⌘⇧0")
     static let gifCtrlShiftF13 = Hotkey(keyCode: UInt32(kVK_F13), modifiers: UInt32(controlKey | shiftKey), display: "⌃⇧F13")
 }
@@ -111,6 +112,7 @@ extension HotkeyAction {
         case .text: return .textCmdShift9
         case .scrolling: return .scrollingCmdShift0
         case .color: return .colorCmdShift6
+        case .qr: return .qrCmdShift1
         }
     }
 
@@ -122,6 +124,7 @@ extension HotkeyAction {
         case .text: return L.t("Copy text from the screen")
         case .scrolling: return L.t("Scrolling capture")
         case .color: return L.t("Pick a color (copies #RRGGBB)")
+        case .qr: return L.t("Scan a QR code")
         }
     }
 }
@@ -298,6 +301,7 @@ enum PNG {
     static func writeImage(_ image: CGImage, to url: URL) throws {
         let ext = url.pathExtension.lowercased()
         guard ext == "jpg" || ext == "jpeg" else { return try write(image, to: url) }
+        let image = SnapStyler.flattened(image)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { throw CocoaError(.fileWriteUnknown) }

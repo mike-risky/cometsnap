@@ -19,6 +19,7 @@ public static class Program
           --stop              stop recording
           --edit FILE         open an image in the editor
           --settings          open the settings
+          --style-studio      open the Style studio
           --background        start silently in the tray (used at login)
           --quit              quit the running Cometsnap
         """;

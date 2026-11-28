@@ -56,6 +56,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(Toggle(T("Detect windows under the mouse"), s.WindowDetection, v => s.WindowDetection = v,
             WindowFinder.IsAvailable ? null : T("Wayland does not let apps see other windows: click captures the screen, drag picks an area.")));
         panel.Children.Add(Toggle(T("Show the Edit card after a capture"), s.ShowEditCard, v => s.ShowEditCard = v));
+        panel.Children.Add(Toggle(T("Spot QR codes in captures"), s.DetectQrCodes, v => s.DetectQrCodes = v));
         panel.Children.Add(Toggle(T("Soft click sound"), s.PlaySounds, v => s.PlaySounds = v));
         panel.Children.Add(Toggle(T("Comet animation"), s.ShowCometAnimation, v => s.ShowCometAnimation = v,
             T("The capture rides a comet towards the tray. Needs a compositor (most desktops have one).")));
@@ -69,6 +70,17 @@ public sealed class SettingsWindow : Window
         corner.SelectionChanged += (_, _) => { s.LoupeCorner = (LoupeCorner)Math.Max(0, corner.SelectedIndex); _app.SaveSettings(); };
         panel.Children.Add(Row(T("Magnifier corner"), corner));
         panel.Children.Add(ThemePicker());
+
+        panel.Children.Add(Section(T("Share-ready style")));
+        panel.Children.Add(new TextBlock
+        {
+            Text = T("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio."),
+            FontSize = 11, Foreground = SpaceTheme.DustBrush, TextWrapping = TextWrapping.Wrap,
+        });
+        panel.Children.Add(StylePicker());
+        panel.Children.Add(Toggle(T("Style on copy"), s.StyleOnCopy, v => s.StyleOnCopy = v, T("The clipboard gets the styled capture. Off: the raw capture.")));
+        panel.Children.Add(Toggle(T("Style on export"), s.StyleOnExport, v => s.StyleOnExport = v, T("Saved files (and what you drag out of the tray) are styled. Off: the raw capture.")));
+        panel.Children.Add(Toggle(T("Style per shot"), s.StylePerShot, v => s.StylePerShot = v, T("A ✨ Style button on the Copied card styles just that capture.")));
 
         panel.Children.Add(Section(T("Where captures go")));
         panel.Children.Add(Toggle(T("Copy captures to the clipboard"), s.CopyToClipboardOnCapture, v => s.CopyToClipboardOnCapture = v));
@@ -95,6 +107,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(HotkeyRow(T("Capture the whole screen"), () => s.FullscreenHotkey, v => s.FullscreenHotkey = v, defaults.FullscreenHotkey));
         panel.Children.Add(HotkeyRow(T("Scrolling capture"), () => s.ScrollingHotkey, v => s.ScrollingHotkey = v, defaults.ScrollingHotkey));
         panel.Children.Add(HotkeyRow(T("Copy text from the screen"), () => s.TextHotkey, v => s.TextHotkey = v, defaults.TextHotkey));
+        panel.Children.Add(HotkeyRow(T("Scan a QR code"), () => s.QrHotkey, v => s.QrHotkey = v, defaults.QrHotkey));
         panel.Children.Add(HotkeyRow(T("Pick a color"), () => s.ColorHotkey, v => s.ColorHotkey = v, defaults.ColorHotkey));
         panel.Children.Add(HotkeyRow(T("Record a video (press again to stop)"), () => s.RecordHotkey, v => s.RecordHotkey = v, defaults.RecordHotkey));
         panel.Children.Add(HotkeyRow(T("Record a GIF (press again to stop)"), () => s.RecordGifHotkey, v => s.RecordGifHotkey = v, defaults.RecordGifHotkey));
@@ -381,6 +394,36 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(wrap);
         stack.Children.Add(preview);
         return stack;
+    }
+
+    private Image? _stylePreview;
+
+    /// <summary>A small preview of the current style and the button that opens the Style studio.</summary>
+    private Control StylePicker()
+    {
+        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 8, 0, 4) };
+        _stylePreview = new Image { Width = 300, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        RefreshStylePreview();
+        var frame = new Border
+        {
+            CornerRadius = new CornerRadius(10), BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1),
+            Background = StyleStudioWindow.Checker(), Padding = new Thickness(14), Child = _stylePreview,
+            Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand),
+        };
+        frame.PointerPressed += (_, e) => { e.Handled = true; _app.OpenStyleStudio(); };
+        stack.Children.Add(frame);
+        var open = Ui.ActionButton("✨ " + T("Open the Style studio"), null, T("Open the Style studio"), _app.OpenStyleStudio, primary: true);
+        open.HorizontalAlignment = HorizontalAlignment.Left;
+        stack.Children.Add(open);
+        return stack;
+    }
+
+    /// <summary>Redraws the small preview (the Style studio calls this after each change).</summary>
+    public void RefreshStylePreview()
+    {
+        if (_stylePreview is null) return;
+        try { _stylePreview.Source = Cometsnap.Linux.Services.StylePreview.Render(_app.Settings.SnapStyle ?? new Cometsnap.Core.Styling.SnapStyle()); }
+        catch (Exception ex) { Log.Error("Style preview failed", ex); }
     }
 
     private Control Toggle(string label, bool value, Action<bool> set, string? note = null)

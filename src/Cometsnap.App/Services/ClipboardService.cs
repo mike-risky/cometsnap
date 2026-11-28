@@ -10,12 +10,14 @@ public static class ClipboardService
 {
     /// <summary>
     /// Puts the image on the clipboard as a bitmap (Word, Outlook, Paint) and as PNG
-    /// (Teams, browsers, Slack keep it lossless that way).
+    /// (Teams, browsers, Slack keep it lossless that way). A styled capture with see-through
+    /// corners keeps them in the PNG; the bitmap, which has no transparency, gets a white backdrop
+    /// instead of black corners.
     /// </summary>
     public static bool SetImage(BitmapSource image)
     {
         var data = new DataObject();
-        data.SetImage(image);
+        data.SetImage(Cometsnap.Core.Styling.StyledBitmaps.Flatten(image));
         try
         {
             var png = new MemoryStream();

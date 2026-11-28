@@ -31,6 +31,15 @@ public sealed class EditCard : Window
     private readonly Border _editButton;
     private readonly Border _cardBorder;
     private readonly Border _textButton;
+    private readonly Border _linkButton;
+    private readonly Border _qrButton;
+    private readonly TextBlock _qrLabel;
+    private Rect _workArea;
+    private string? _offered;            // a QR code spotted in a normal capture, not copied yet
+    private string? _link;                // a scanned QR code that is a web link
+    private readonly Border _styleButton;
+    private BitmapSource? _raw;           // the capture before any style, for the ✨ button
+    private bool _canStyle;
     private string? _recording;           // set while the card shows a recording
     private string? _text;                // set while the card shows recognized text
     private readonly DispatcherTimer _timer;
@@ -48,8 +57,17 @@ public sealed class EditCard : Window
     /// <summary>Raised with the capture when its Text button is clicked (read the text in it).</summary>
     public event Action<BitmapSource>? TextRequested;
 
+    /// <summary>Raised with the saved path (if known) and the raw capture when ✨ Style is clicked.</summary>
+    public event Action<string?, BitmapSource>? StyleRequested;
+
     /// <summary>Raised with the recognized text when the card of a text capture is clicked.</summary>
     public event Action<string>? ShowTextRequested;
+
+    /// <summary>The user asked to open the web link of a scanned QR code (never opened on its own).</summary>
+    public event Action<string>? OpenLinkRequested;
+
+    /// <summary>The user asked to copy the QR code spotted in a capture (instead of the screenshot).</summary>
+    public event Action<string>? CopyCodeRequested;
 
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
     private const string TextIcon = "M3,3.5 H13 M8,3.5 V13.5 M6,13.5 H10";
@@ -120,6 +138,71 @@ public sealed class EditCard : Window
             TextRequested?.Invoke(image);
         };
 
+        // ✨ Style: this one capture, share-ready (rounded corners, shadow, backdrop).
+        _styleButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 6, 11, 6),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            ToolTip = L.T("Style this capture: rounded corners, shadow, backdrop"),
+            Child = new TextBlock { Text = "✨ " + L.T("Style"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 13 },
+        };
+        _styleButton.MouseEnter += (_, _) => _styleButton.Background = CaptureLook.AccentBrush;
+        _styleButton.MouseLeave += (_, _) => _styleButton.Background = SpaceTheme.NavyBrush;
+        _styleButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _raw is not { } raw) return;
+            _timer.Stop();
+            _styleButton.Visibility = Visibility.Collapsed;
+            _title.Text = L.T("STYLING…");
+            StyleRequested?.Invoke(_path, raw);
+        };
+
+        // Open link: only for a scanned QR code that is a web link, and only on a click.
+        _linkButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 6, 11, 6),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock { Text = "🔗 " + L.T("Open link"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 13 },
+        };
+        _linkButton.MouseEnter += (_, _) => _linkButton.Background = CaptureLook.AccentBrush;
+        _linkButton.MouseLeave += (_, _) => _linkButton.Background = SpaceTheme.NavyBrush;
+        _linkButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _link is not { } link) return;
+            _timer.Stop();
+            Hide();
+            OpenLinkRequested?.Invoke(link);
+        };
+
+        // Copy QR: a QR code was spotted in this capture. One click puts its content on the
+        // clipboard instead of the screenshot.
+        _qrLabel = new TextBlock { Text = "▦ " + L.T("Copy QR"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 13 };
+        _qrButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 6, 11, 6),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            Visibility = Visibility.Collapsed, Child = _qrLabel,
+        };
+        _qrButton.MouseEnter += (_, _) => _qrButton.Background = CaptureLook.AccentBrush;
+        _qrButton.MouseLeave += (_, _) => _qrButton.Background = SpaceTheme.NavyBrush;
+        _qrButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _offered is not { } code) return;
+            CopyCodeRequested?.Invoke(code);
+            _title.Text = L.T("QR CODE COPIED!");
+            _detail.Text = FirstLine(code);
+            _qrLabel.Text = "✓ " + L.T("Copied");
+            _timer.Stop();
+            if (!IsMouseOver) _timer.Start();
+        };
+
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -130,7 +213,10 @@ public sealed class EditCard : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
+        row.Children.Add(_styleButton);
         row.Children.Add(_textButton);
+        row.Children.Add(_qrButton);
+        row.Children.Add(_linkButton);
         row.Children.Add(edit);
         row.Children.Add(close);
 
@@ -189,8 +275,10 @@ public sealed class EditCard : Window
     }
 
     /// <summary>Shows (or refreshes) the card for a new capture, bottom-right of the work area.</summary>
-    public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied)
+    public void ShowFor(BitmapSource image, Rect workAreaDip, bool copied, BitmapSource? raw = null, bool canStyle = false)
     {
+        _raw = raw ?? image;
+        _canStyle = canStyle;
         SetMode(recording: null, text: null);
         _image = image;
         _path = null;
@@ -203,6 +291,7 @@ public sealed class EditCard : Window
         if (!IsVisible) Show();
         if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
         UpdateLayout();
+        _workArea = workAreaDip;
         Left = workAreaDip.Right - ActualWidth - 4;
         Top = workAreaDip.Bottom - ActualHeight - 4;
         _timer.Stop();
@@ -215,6 +304,7 @@ public sealed class EditCard : Window
     /// </summary>
     public void ShowForRecording(string path, BitmapSource? poster, string detail, bool copied, Rect workAreaDip)
     {
+        _canStyle = false;
         SetMode(path, text: null);
         _image = poster;
         _path = path;
@@ -226,6 +316,7 @@ public sealed class EditCard : Window
         if (!IsVisible) Show();
         if (Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
         UpdateLayout();
+        _workArea = workAreaDip;
         Left = workAreaDip.Right - ActualWidth - 4;
         Top = workAreaDip.Bottom - ActualHeight - 4;
         _timer.Stop();
@@ -237,9 +328,14 @@ public sealed class EditCard : Window
         _title.Foreground = CaptureLook.TagBrush;
         _recording = recording;
         _text = text;
+        _link = null;
+        _linkButton.Visibility = Visibility.Collapsed;
+        _offered = null;
+        _qrButton.Visibility = Visibility.Collapsed;
         var video = recording is not null;
         var reading = text is not null;
         _textButton.Visibility = video || reading ? Visibility.Collapsed : Visibility.Visible;
+        _styleButton.Visibility = video || reading || !_canStyle ? Visibility.Collapsed : Visibility.Visible;
         _editButton.Visibility = reading && text!.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         _editIcon.Data = Geometry.Parse(video ? ScissorsIcon : reading ? EyeIcon : PenIcon);
         _editLabel.Text = video ? L.T("Trim") : reading ? L.T("Show") : L.T("Edit");
@@ -274,6 +370,69 @@ public sealed class EditCard : Window
         Present(workAreaDip, fadeLater: true);
     }
 
+    /// <summary>The capture is being searched for a QR code or barcode.</summary>
+    public void ShowScanning(BitmapSource image, Rect workAreaDip)
+    {
+        ShowReading(image, workAreaDip);
+        _title.Text = L.T("SCANNING…");
+        _detail.Text = L.T("Looking for a QR code");
+    }
+
+    /// <summary>
+    /// Shows what the QR code (or barcode) holds, already on the clipboard. A web link gets an
+    /// "Open link" button; nothing is ever opened without that click.
+    /// </summary>
+    public void ShowCode(BitmapSource image, string? text, string? format, string? link, Rect workAreaDip)
+    {
+        SetMode(recording: null, text: text ?? "");
+        _image = image;
+        _path = null;
+        _thumb.Source = image;
+        if (text is null)
+        {
+            _title.Text = L.T("NO QR CODE FOUND");
+            _detail.Text = L.T("Select just the code, a bit bigger");
+        }
+        else
+        {
+            _title.Text = format == "QR code" ? L.T("QR CODE COPIED!") : L.T("CODE COPIED!");
+            _detail.Text = FirstLine(text);
+            _link = link;
+            if (link is not null)
+            {
+                _linkButton.Visibility = Visibility.Visible;
+                _linkButton.ToolTip = link;
+            }
+        }
+        Present(workAreaDip, fadeLater: true);
+    }
+
+    /// <summary>
+    /// A QR code was spotted in the capture this card shows: offers Copy QR (and Open link for a
+    /// web link). The screenshot stays on the clipboard until Copy QR is clicked.
+    /// </summary>
+    public void OfferCode(BitmapSource image, string text, string? link)
+    {
+        if (!ReferenceEquals(image, _image) || _recording is not null || _text is not null || !IsVisible) return;
+        _offered = text;
+        _qrLabel.Text = "▦ " + L.T("Copy QR");
+        _qrButton.ToolTip = L.T("Copy what the QR code holds") + "\n" + (text.Length > 120 ? text[..120] + "…" : text);
+        _qrButton.Visibility = Visibility.Visible;
+        _link = link;
+        if (link is not null)
+        {
+            _linkButton.Visibility = Visibility.Visible;
+            _linkButton.ToolTip = link;
+        }
+        _detail.Text = "▦ " + FirstLine(text);
+        // The card grew: keep its right edge where it was.
+        UpdateLayout();
+        if (!_workArea.IsEmpty) Left = _workArea.Right - ActualWidth - 4;
+        // A bit more time to reach the new buttons.
+        _timer.Stop();
+        if (!IsMouseOver) _timer.Start();
+    }
+
     private static string FirstLine(string text) =>
         text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
 
@@ -285,10 +444,27 @@ public sealed class EditCard : Window
         if (!wasVisible) Show();
         if (!wasVisible && Content is FrameworkElement card) EditorUi.Entrance(card, lift: 14, ms: 180);
         UpdateLayout();
+        _workArea = workAreaDip;
         Left = workAreaDip.Right - ActualWidth - 4;
         Top = workAreaDip.Bottom - ActualHeight - 4;
         _timer.Stop();
         if (fadeLater) _timer.Start();
+    }
+
+    /// <summary>
+    /// The ✨ Style button finished: the card now holds the styled capture (already on the
+    /// clipboard), and Edit or a drag use the styled file when there is one.
+    /// </summary>
+    public void ShowStyled(BitmapSource raw, BitmapSource styled, string? path, bool copied)
+    {
+        if (!ReferenceEquals(raw, _raw) || _recording is not null || _text is not null || !IsVisible) return;
+        _image = styled;
+        _path = path;
+        _thumb.Source = styled;
+        _title.Text = copied ? L.T("STYLED & COPIED!") : L.T("STYLED!");
+        _detail.Text = $"{styled.PixelWidth} × {styled.PixelHeight}" + (path is null ? "" : " · " + Path.GetFileName(path));
+        _timer.Stop();
+        if (!IsMouseOver) _timer.Start();
     }
 
     /// <summary>The capture reached the disk: Edit will now open the file.</summary>
@@ -296,7 +472,7 @@ public sealed class EditCard : Window
     {
         if (_recording is not null || _text is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
         _path = path;
-        _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · {Path.GetFileName(path)}";
+        if (_offered is null) _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · {Path.GetFileName(path)}";
     }
 
     private void OnEdit()

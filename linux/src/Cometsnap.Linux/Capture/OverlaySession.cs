@@ -13,6 +13,8 @@ public enum OverlayPurpose
     Text,
     /// <summary>A screenshot, with a reminder that holding the button and scrolling makes a long one.</summary>
     Scroll,
+    /// <summary>Pick the QR code or barcode to scan.</summary>
+    Qr,
     /// <summary>Color picker: a click copies the color under the cursor.</summary>
     Color,
 }

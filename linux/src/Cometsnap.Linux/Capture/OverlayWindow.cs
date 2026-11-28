@@ -321,6 +321,8 @@ internal sealed class OverlaySurface : Control
             ? T("RECORD: click a window or drag an area · F full screen · Esc cancel")
             : s.Purpose == OverlayPurpose.Text
             ? T("Drag over the text to copy, or click a window · Esc cancel")
+            : s.Purpose == OverlayPurpose.Qr
+            ? T("Drag over the QR code, or click a window · Esc cancel")
             : s.Purpose == OverlayPurpose.Scroll
             ? T("Hold the button and scroll to capture a long page")
             : s.WindowDetection

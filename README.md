@@ -78,6 +78,7 @@ It speaks English, Spanish, Portuguese, French, German, Italian, Simplified Chin
 offline: `sudo apt install tesseract-ocr` (plus e.g. `tesseract-ocr-fra` for other languages).
 **Scrolling capture**: in any capture, drag over the part that scrolls and, still holding the button, scroll; let go
 to finish (Ctrl+Alt+Print Screen opens the capture with this reminder). It needs an X11 session for now.
+**Scan a QR code** (Ctrl+Alt+Q, or the tray menu): drag over a QR code and what it holds is copied, with an Open link button for web links.
 Recordings open in a small trimmer (the **Trim** button on the Copied card, or double-click one in the tray panel):
 drag the yellow handles to cut the start and end, drag across the timeline and press Del to cut a part out.
 The untouched recording is kept, so every cut stays adjustable.
@@ -125,6 +126,10 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 - **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
   button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
   Click the card to see the text and copy just a part
+- **QR codes**: when a capture has a QR code in it, the Copied card offers **Copy QR** and, for web links, **Open link**
+  (the screenshot stays on the clipboard; turn it off in Settings). **Scan a QR code** (Ctrl+Alt+Q, or the tray menu):
+  drag over a QR code (or a barcode) and what it holds lands on the clipboard right away, read offline. A web link gets an **Open link** button on the Copied card; nothing opens on its own.
+  On macOS it is ⌘⇧1 and uses Apple's Vision; every shortcut can be changed in Settings
 - **Color picker** (Win+Shift+C, or the tray menu): the loupe opens, click any pixel and its color lands on the
   clipboard as `#RRGGBB` (Shift+click for `rgb(...)`). In any capture, **C** copies the color under the cursor too
 - **Capture colors**: pick the look of the capture screen in Settings (Comet blue, Sun yellow, Terracotta, Flame
@@ -145,6 +150,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
 | Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (hold the button and scroll, let go to finish) |
 | Anywhere | **Ctrl+Alt+T** | Copy the text in an area (OCR) |
+| Anywhere | **Ctrl+Alt+Q** | Scan a QR code or barcode in an area (copies what it holds) |
 | Anywhere | **Win+Shift+C** | Color picker: click a pixel to copy its `#RRGGBB` |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |

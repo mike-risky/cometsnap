@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- QR codes and barcodes (Scan QR code): small, managed, offline. -->
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Cometsnap.Core.Tests" />
   </ItemGroup>
 

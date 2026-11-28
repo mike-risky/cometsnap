@@ -9,6 +9,8 @@ public struct AppSettings: Codable, Equatable {
     public var playSound = false
     public var cometAnimation = true
     public var showEditCard = true
+    /// After each capture, look for a QR code and offer its content on the Copied card.
+    public var detectQrCodes = true
     public var copyToClipboard = true
     public var takeOverSystemShortcut = false
     public var firstRunDone = false
@@ -29,6 +31,14 @@ public struct AppSettings: Codable, Equatable {
     public var language = ""
     /// Look of the capture screen: a CaptureThemes id ("blue" is the classic look).
     public var captureTheme = CaptureThemes.defaultID
+    /// Share-ready look built in the Style studio (corners, border, shadow, glow, backdrop).
+    public var snapStyle = SnapStyle()
+    /// Put the styled capture on the clipboard. Off: the raw capture.
+    public var styleOnCopy = false
+    /// Save the styled capture (the file you drag out of the panel). Off: the raw capture.
+    public var styleOnExport = false
+    /// A ✨ Style button on the Copied card styles just that capture.
+    public var stylePerShot = true
     /// Save each capture in the captures folder (the clipboard copy is separate).
     public var saveEveryCapture = true
     /// Name of each saved capture, with {date}, {time}… tokens; "/" makes subfolders (see FileNamePattern).
@@ -50,7 +60,8 @@ public struct AppSettings: Codable, Equatable {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
              celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme,
-             saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys
+             saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys,
+             snapStyle, styleOnCopy, styleOnExport, stylePerShot, detectQrCodes
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,6 +72,7 @@ public struct AppSettings: Codable, Equatable {
         playSound = (try? c.decodeIfPresent(Bool.self, forKey: .playSound)) ?? d.playSound
         cometAnimation = (try? c.decodeIfPresent(Bool.self, forKey: .cometAnimation)) ?? d.cometAnimation
         showEditCard = (try? c.decodeIfPresent(Bool.self, forKey: .showEditCard)) ?? d.showEditCard
+        detectQrCodes = (try? c.decodeIfPresent(Bool.self, forKey: .detectQrCodes)) ?? d.detectQrCodes
         copyToClipboard = (try? c.decodeIfPresent(Bool.self, forKey: .copyToClipboard)) ?? d.copyToClipboard
         takeOverSystemShortcut = (try? c.decodeIfPresent(Bool.self, forKey: .takeOverSystemShortcut)) ?? d.takeOverSystemShortcut
         firstRunDone = (try? c.decodeIfPresent(Bool.self, forKey: .firstRunDone)) ?? d.firstRunDone
@@ -83,6 +95,12 @@ public struct AppSettings: Codable, Equatable {
         askWhereToSave = (try? c.decodeIfPresent(Bool.self, forKey: .askWhereToSave)) ?? d.askWhereToSave
         openEditorAfterCapture = (try? c.decodeIfPresent(Bool.self, forKey: .openEditorAfterCapture)) ?? d.openEditorAfterCapture
         nameCounter = max(0, (try? c.decodeIfPresent(Int.self, forKey: .nameCounter)) ?? 0)
+        // Early test builds saved a preset id: it loads as that preset.
+        if let style = (try? c.decodeIfPresent(SnapStyle.self, forKey: .snapStyle)) ?? nil { snapStyle = style }
+        else if let id = (try? c.decodeIfPresent(String.self, forKey: .snapStyle)) ?? nil { snapStyle = SnapStylePresets.get(id) }
+        styleOnCopy = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnCopy)) ?? d.styleOnCopy
+        styleOnExport = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnExport)) ?? d.styleOnExport
+        stylePerShot = (try? c.decodeIfPresent(Bool.self, forKey: .stylePerShot)) ?? d.stylePerShot
         hotkeys = ((try? c.decodeIfPresent([String: HotkeySpec].self, forKey: .hotkeys)) ?? nil) ?? [:]
     }
 
@@ -117,7 +135,7 @@ public struct HotkeySpec: Codable, Equatable {
 
 /// The actions whose shortcut can be changed in Settings.
 public enum HotkeyAction: String, CaseIterable {
-    case capture, video, gif, text, scrolling, color
+    case capture, video, gif, text, scrolling, color, qr
 }
 
 /// Standard folders.

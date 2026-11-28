@@ -12,6 +12,8 @@ public sealed class ToastWindow : Window
 {
     private readonly TextBlock _text;
     private readonly Border _card;
+    private readonly Button _action;
+    private Action? _onAction;
     private IDisposable? _timer;
 
     public ToastWindow()
@@ -30,6 +32,14 @@ public sealed class ToastWindow : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         row.Children.Add(new Image { Source = SpaceTheme.Logo, Width = 22, Height = 22, VerticalAlignment = VerticalAlignment.Center });
         row.Children.Add(_text);
+        // One optional button (like "Open link" for a scanned QR code); it never acts on its own.
+        _action = new Button
+        {
+            IsVisible = false, VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(10, 5),
+            Background = SpaceTheme.NavyBrush, Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeight.SemiBold, CornerRadius = new CornerRadius(8),
+        };
+        _action.Click += (_, _) => { var a = _onAction; Hide(); a?.Invoke(); };
+        row.Children.Add(_action);
         _card = new Border
         {
             Child = row,
@@ -44,9 +54,12 @@ public sealed class ToastWindow : Window
         PointerPressed += (_, _) => Hide();
     }
 
-    public void ShowMessage(string text, int ms, PixelRect workArea, double scaling)
+    public void ShowMessage(string text, int ms, PixelRect workArea, double scaling, string? actionLabel = null, Action? action = null)
     {
         _text.Text = text;
+        _onAction = action;
+        _action.Content = actionLabel;
+        _action.IsVisible = action is not null && actionLabel is not null;
         if (!IsVisible) Show();
         Ui.Entrance(_card, lift: 10, ms: 160);
         void Place() => Position = new PixelPoint(

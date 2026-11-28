@@ -30,6 +30,7 @@ public sealed class CometApp : Application
     public CaptureStore Store { get; private set; } = null!;
     public ClipboardService Clipboard { get; private set; } = null!;
     public TextCapture CopyText { get; private set; } = null!;
+    public CodeScan ScanCode { get; private set; } = null!;
     public ScrollingCapture Scrolling { get; private set; } = null!;
     public SoundService Sound { get; private set; } = null!;
     public CaptureController Capture { get; private set; } = null!;
@@ -99,6 +100,7 @@ public sealed class CometApp : Application
         Flyout = new FlyoutWindow(this);
         Clipboard = new ClipboardService(() => Flyout);
         CopyText = new TextCapture(this);
+        ScanCode = new CodeScan(this);
         Scrolling = new ScrollingCapture(this);
         Task.Run(() => Recent.Load(CapturesFolder));
 
@@ -159,6 +161,7 @@ public sealed class CometApp : Application
             case "fullscreen": Capture.CaptureFullscreen(); break;
             case "scroll": Scrolling.Start(); break;
             case "text": CopyText.Start(); break;
+            case "qr": ScanCode.Start(); break;
             case "color": Capture.StartColorPicker(); break;
             case "delayed": Capture.StartDelayed(parts.Length > 1 && int.TryParse(parts[1], out var s) ? s : 3); break;
             case "record": Recorder.ToggleRegion(RecordingFormat.Mp4); break;
@@ -167,6 +170,7 @@ public sealed class CometApp : Application
             case "stop": Recorder.Stop(); break;
             case "flyout" or "show": Flyout.Toggle(); break;
             case "settings": OpenSettings(); break;
+            case "style-studio": OpenStyleStudio(); break;
             case "edit" when parts.Length > 1: OpenInEditor(parts[1]); break;
             case "trim" when parts.Length > 1: OpenTrimmer(parts[1]); break;
             case "quit": Quit(); break;
@@ -179,10 +183,28 @@ public sealed class CometApp : Application
     // ------------------------------------------------------------------ captures
 
     /// <summary>A capture is done: copy it, save it, show the Edit card.</summary>
-    public void OnCaptured(Bitmap image, PixelRect rect)
+    public void OnCaptured(Bitmap raw, PixelRect rect)
     {
+        LastRawCapture = raw;
         var copy = Settings.CopyToClipboardOnCapture;
-        if (Settings.ShowEditCard) ShowCard(image, rect, copy);
+        // Share-ready style: the copy and the saved file can each be raw or styled.
+        Bitmap? styled = null;
+        Bitmap Styled()
+        {
+            if (styled is not null) return styled;
+            try { styled = SnapStyler.Apply(raw, Settings); }
+            catch (Exception ex) { Log.Error("Styling the capture failed", ex); styled = raw; }
+            return styled;
+        }
+        var copyImage = Settings.StyleOnCopy ? Styled() : raw;
+        var image = Settings.StyleOnExport ? Styled() : raw;
+        var saving = Settings.AutoSave || Settings.AskWhereToSave;
+        if (Settings.ShowEditCard)
+        {
+            var shown = saving ? image : copyImage;
+            ShowCard(shown, rect, copy, raw);
+            if (Settings.DetectQrCodes) SpotQr(shown, raw);
+        }
         LaunchComet(rect, image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.UIThread.Post(CountSnap, DispatcherPriority.ApplicationIdle);
@@ -198,7 +220,8 @@ public sealed class CometApp : Application
             try
             {
                 var png = CaptureStore.EncodePng(image);
-                if (copy) await Dispatcher.UIThread.InvokeAsync(() => Clipboard.SetPngAsync(png));
+                var copyPng = ReferenceEquals(copyImage, image) ? png : CaptureStore.EncodePng(copyImage);
+                if (copy) await Dispatcher.UIThread.InvokeAsync(() => Clipboard.SetPngAsync(copyPng));
                 if (ask)
                 {
                     Dispatcher.UIThread.Post(() => _ = AskAndSaveAsync(image, png, edit));
@@ -320,10 +343,63 @@ public sealed class CometApp : Application
         _ = StartHotkeysAsync();
     }
 
-    private void ShowCard(Bitmap image, PixelRect rect, bool copied)
+    /// <summary>
+    /// After a capture (copied and saved as usual): looks for a QR code in the background. When
+    /// there is one, the Copied card offers its content; the screenshot stays on the clipboard.
+    /// </summary>
+    private void SpotQr(Bitmap shown, Bitmap raw) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await Task.Delay(60); // the card, the comet and the save go first
+            var code = CodeScan.FindQr(raw);
+            if (code is null) return;
+            var link = Cometsnap.Core.Scanning.CodeScanner.LinkOf(code.Text);
+            Dispatcher.UIThread.Post(() => _card?.OfferCode(shown, code.Text, link));
+        }
+        catch (Exception ex) { Log.Error("Looking for a QR code failed", ex); }
+    });
+
+    private void ShowCard(Bitmap image, PixelRect rect, bool copied, Bitmap? raw = null)
     {
         var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
-        EnsureCard().ShowFor(image, work, scale, copied);
+        // ✨ has nothing to add when both the copy and the file are styled already.
+        var canStyle = raw is not null && Settings.StylePerShot && !(Settings.StyleOnCopy && Settings.StyleOnExport);
+        EnsureCard().ShowFor(image, work, scale, copied, raw: raw, canStyle: canStyle);
+    }
+
+    /// <summary>
+    /// The ✨ Style button of the Copied card: styles this one capture, copies it and saves it
+    /// beside the original ("name-styled.png"), which stays untouched.
+    /// </summary>
+    private async Task StyleOneShotAsync(string? path, Bitmap raw)
+    {
+        try
+        {
+            var settings = Settings;
+            var styled = await Task.Run(() => SnapStyler.Apply(raw, settings));
+            var png = await Task.Run(() => CaptureStore.EncodePng(styled));
+            var copied = await Clipboard.SetPngAsync(png);
+            string? styledPath = null;
+            if (path is not null)
+            {
+                if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
+                else
+                {
+                    var target = Cometsnap.Core.Styling.StyledFiles.StyledPath(path);
+                    await Task.Run(() => CaptureStore.WriteAtomic(target, CaptureStore.ForPath(png, target)));
+                    Recent.Add(target);
+                    styledPath = target;
+                }
+            }
+            _card?.ShowStyled(raw, styled, styledPath, copied);
+            if (!Settings.ShowEditCard) Toast(T("Styled capture copied"), 2500);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Styling one capture failed", ex);
+            Toast($"{T("Could not style the capture")}: {ex.Message}", 4000);
+        }
     }
 
     private EditCard EnsureCard()
@@ -336,6 +412,9 @@ public sealed class CometApp : Application
             else new EditorWindow(this, img, new AnnotationDocument(), null).Show();
         };
         _card.TrimRequested += OpenTrimmer;
+        _card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
+        _card.CopyCodeRequested += text => _ = Clipboard.SetTextAsync(text);
+        _card.OpenLinkRequested += link => { if (Cometsnap.Core.Scanning.CodeScanner.LinkOf(link) is { } safe) Tools.Open(safe); };
         return _card;
     }
 
@@ -516,14 +595,14 @@ public sealed class CometApp : Application
     public double ScalingAt(PixelRect r) =>
         Screens?.ScreenFromPoint(new PixelPoint(r.CenterX, r.CenterY))?.Scaling ?? 1;
 
-    public void Toast(string text, int ms)
+    public void Toast(string text, int ms, string? actionLabel = null, Action? action = null)
     {
         Dispatcher.UIThread.Post(() =>
         {
             _toast ??= new ToastWindow();
             var p = X11.PointerPosition() ?? (0, 0);
             var (work, scale) = WorkAreaAt(p.X, p.Y);
-            _toast.ShowMessage(text, ms, work, scale);
+            _toast.ShowMessage(text, ms, work, scale, actionLabel, action);
         });
     }
 
@@ -561,6 +640,24 @@ public sealed class CometApp : Application
             _toast = null;
         }
         _tray?.Rebuild();
+    }
+
+    /// <summary>The newest capture, unstyled: the Style studio can preview on it.</summary>
+    public Bitmap? LastRawCapture { get; private set; }
+
+    private StyleStudioWindow? _styleStudio;
+
+    /// <summary>The Style studio (one at a time): builds the share-ready look with a live preview.</summary>
+    public void OpenStyleStudio()
+    {
+        if (_styleStudio is { IsVisible: true })
+        {
+            _styleStudio.Activate();
+            return;
+        }
+        _styleStudio = new StyleStudioWindow(this);
+        _styleStudio.StyleChanged += () => _settingsWindow?.RefreshStylePreview();
+        _styleStudio.Show();
     }
 
     public void OpenSettings()

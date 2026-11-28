@@ -39,6 +39,14 @@ final class CaptureController {
         }
     }
 
+    /// Scan a QR code: drag over a QR code or barcode and what it holds goes on the clipboard.
+    func startQrCapture() {
+        openOverlay(purpose: .qr) { [weak self] result in
+            guard let self, let result, let image = result.image else { return }
+            self.app.scanCode(image, scale: result.frozen.scale, from: result.rect)
+        }
+    }
+
     /// Color picker: the loupe opens on the frozen screen, a click copies the color as #RRGGBB.
     func startColorPicker() {
         openOverlay(purpose: .color, onColor: { color, text in
@@ -118,13 +126,35 @@ final class CaptureController {
     }
 
     /// Copy first (instant), then save on a background queue.
-    func deliver(_ image: CGImage, scale: CGFloat, from rect: CGRect) {
+    func deliver(_ raw: CGImage, scale: CGFloat, from rect: CGRect) {
         let settings = app.settings
-        if settings.copyToClipboard { Clipboard.copy(image, scale: scale) }
+        app.lastRawCapture = (raw, scale)
+        // Share-ready style: the copy and the saved file can each be raw or styled.
+        var styledCache: CGImage?
+        func styled() -> CGImage {
+            if let s = styledCache { return s }
+            let s = SnapStyler.apply(raw, settings: settings, scale: scale) ?? raw
+            styledCache = s
+            return s
+        }
+        let copyImage = settings.styleOnCopy ? styled() : raw
+        let image = settings.styleOnExport ? styled() : raw
+        if settings.copyToClipboard { Clipboard.copy(copyImage, scale: scale) }
         if settings.playSound { Sound.snap() }
         if settings.cometAnimation { CometFlight.fly(from: rect, to: app.statusItem.buttonFrame, image: image) }
         let card = settings.showEditCard ? app.editCard : nil
-        card?.show(image: image, scale: scale, copied: settings.copyToClipboard)
+        let saving = settings.askWhereToSave || settings.saveEveryCapture
+        // ✨ has nothing to add when both the copy and the file are styled already.
+        let canStyle = settings.stylePerShot && !(settings.styleOnCopy && settings.styleOnExport)
+        let shown = saving ? image : copyImage
+        card?.show(image: shown, scale: scale, copied: settings.copyToClipboard, raw: raw, canStyle: canStyle)
+        if let card, settings.detectQrCodes {
+            // After the copy: a QR code in the capture is offered on the card, never forced on the clipboard.
+            Task { @MainActor in
+                guard let code = try? await CodeReader.read(raw).first(where: { $0.format == "QR code" }) else { return }
+                card.offerCode(code.text, link: CodeLinks.linkOf(code.text), for: shown)
+            }
+        }
         if settings.askWhereToSave {
             DispatchQueue.main.async { [weak self] in self?.askAndSave(image, scale: scale, card: card) }
             return
@@ -201,8 +231,22 @@ final class EditCard: NSPanel {
     var onText: ((CGImage, CGFloat) -> Void)?
     /// A click on the card of a text capture: show the text.
     var onShowText: ((String) -> Void)?
+    /// The ✨ button: style this capture (saved file if known, raw capture, scale).
+    var onStyle: ((URL?, CGImage, CGFloat) -> Void)?
+    /// "Open link" on a scanned QR code: only on a click, never on its own.
+    var onOpenLink: ((String) -> Void)?
     private var recognized: String?
+    private var link: String?
+    private let linkButton: SpaceButton
+    /// "Copy QR": a QR code spotted in a normal capture; its content is copied only on a click.
+    var onCopyCode: ((String) -> Void)?
+    private var offered: String?
+    private let qrButton: SpaceButton
+    private static let baseWidth: CGFloat = 380
     private let textButton: SpaceButton
+    private let styleButton: SpaceButton
+    private var raw: CGImage?
+    private var canStyle = false
 
     private let thumb = NSImageView()
     private let titleLabel = NSTextField(labelWithString: L.t("COPIED!"))
@@ -218,7 +262,10 @@ final class EditCard: NSPanel {
     init() {
         editButton = SpaceButton(title: L.t("Edit"), symbol: "pencil", fill: Theme.terracotta, tip: L.t("Open in the editor"))
         textButton = SpaceButton(title: "", symbol: "text.viewfinder", fill: Theme.surface, tip: L.t("Copy the text in this capture"))
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 340, height: 84), styleMask: [.borderless, .nonactivatingPanel],
+        styleButton = SpaceButton(title: "", symbol: "sparkles", fill: Theme.surface, tip: L.t("Style this capture: rounded corners, shadow, backdrop"))
+        linkButton = SpaceButton(title: "", symbol: "link", fill: Theme.surface, tip: L.t("Open link"))
+        qrButton = SpaceButton(title: "", symbol: "qrcode", fill: Theme.surface, tip: L.t("Copy what the QR code holds"))
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 380, height: 84), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
         level = .statusBar
@@ -264,11 +311,43 @@ final class EditCard: NSPanel {
             self.hideTimer?.invalidate()
             self.onText?(image, self.scale)
         }
+        styleButton.onClick = { [weak self] in
+            guard let self, let raw = self.raw, !self.fileOnly, self.recognized == nil else { return }
+            self.hideTimer?.invalidate()
+            self.styleButton.isHidden = true
+            self.titleLabel.stringValue = L.t("STYLING…")
+            self.onStyle?(self.url, raw, self.scale)
+        }
+        linkButton.isHidden = true
+        linkButton.onClick = { [weak self] in
+            guard let self, let link = self.link else { return }
+            self.hideTimer?.invalidate()
+            self.orderOut(nil)
+            self.onOpenLink?(link)
+        }
+        qrButton.isHidden = true
+        qrButton.onClick = { [weak self] in
+            guard let self, let code = self.offered else { return }
+            self.onCopyCode?(code)
+            self.titleLabel.stringValue = L.t("QR CODE COPIED!")
+            self.detail.stringValue = code.split(separator: "\n").first.map { String($0) } ?? ""
+            self.qrButton.isHidden = true
+            self.restartTimer()
+        }
         let close = SpaceButton(title: "", symbol: "xmark", tip: L.t("Dismiss"))
         close.layer?.borderWidth = 0
         close.onClick = { [weak self] in self?.fadeOut() }
 
-        for v in [thumb, titleLabel, detail, textButton, editButton, close] as [NSView] {
+        // The small round buttons sit in a row; hidden ones take no room.
+        let buttons = NSStackView(views: [qrButton, linkButton, styleButton, textButton])
+        buttons.orientation = .horizontal
+        buttons.spacing = 6
+        for b in [qrButton, linkButton, styleButton, textButton] {
+            b.translatesAutoresizingMaskIntoConstraints = false
+            b.widthAnchor.constraint(equalToConstant: 34).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        }
+        for v in [thumb, titleLabel, detail, buttons, editButton, close] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
         }
@@ -281,12 +360,10 @@ final class EditCard: NSPanel {
             titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
             detail.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             detail.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
-            detail.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
-            textButton.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
-            textButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-            textButton.widthAnchor.constraint(equalToConstant: 34),
-            textButton.heightAnchor.constraint(equalToConstant: 34),
+            detail.trailingAnchor.constraint(lessThanOrEqualTo: buttons.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: buttons.leadingAnchor, constant: -8),
+            buttons.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
+            buttons.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             editButton.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -4),
             editButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             editButton.widthAnchor.constraint(equalToConstant: 74),
@@ -301,13 +378,20 @@ final class EditCard: NSPanel {
 
     override var canBecomeKey: Bool { false }
 
-    func show(image: CGImage, scale: CGFloat, copied: Bool) {
+    func show(image: CGImage, scale: CGFloat, copied: Bool, raw: CGImage? = nil, canStyle: Bool = false) {
         self.image = image
         self.scale = scale
         self.url = nil
+        self.raw = raw ?? image
+        self.canStyle = canStyle
         fileOnly = false
         recognized = nil
+        link = nil
+        linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = false
+        styleButton.isHidden = !canStyle
         editButton.isHidden = false
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = copied ? L.t("COPIED!") : L.t("SNAPPED!")
@@ -324,7 +408,12 @@ final class EditCard: NSPanel {
         self.url = url
         fileOnly = true
         recognized = nil
+        link = nil
+        linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = false
         thumb.image = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
@@ -343,7 +432,12 @@ final class EditCard: NSPanel {
         url = nil
         fileOnly = false
         recognized = ""
+        link = nil
+        linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = true
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = L.t("READING…")
@@ -357,6 +451,7 @@ final class EditCard: NSPanel {
     func showText(_ text: String, lines: Int) {
         recognized = text
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = text.isEmpty
         editButton.update(title: L.t("Show"), symbol: "eye")
         editButton.toolTip = L.t("See the text and copy just a part")
@@ -367,17 +462,72 @@ final class EditCard: NSPanel {
         if !isVisible { present() } else { restartTimer() }
     }
 
+    /// A QR code was spotted in the capture this card shows: offers Copy QR (and the link button
+    /// for a web link). The screenshot stays on the clipboard until Copy QR is clicked.
+    func offerCode(_ text: String, link: String?, for image: CGImage) {
+        guard image === self.image, isVisible, recognized == nil, !fileOnly else { return }
+        offered = text
+        qrButton.isHidden = false
+        qrButton.toolTip = L.t("Copy what the QR code holds") + "\n" + String(text.prefix(120))
+        self.link = link
+        linkButton.isHidden = link == nil
+        linkButton.toolTip = link
+        detail.stringValue = "▦ " + (text.split(separator: "\n").first.map { String($0) } ?? "")
+        // Room for the new buttons: the card grows to the left.
+        let extra: CGFloat = link == nil ? 40 : 80
+        var f = frame
+        let right = f.maxX
+        f.size.width = Self.baseWidth + extra
+        f.origin.x = right - f.size.width
+        setFrame(f, display: true, animate: true)
+        restartTimer()
+    }
+
+    /// The capture is being searched for a QR code or barcode.
+    func showScanning(image: CGImage, scale: CGFloat) {
+        showReading(image: image, scale: scale)
+        titleLabel.stringValue = L.t("SCANNING…")
+        detail.stringValue = L.t("Looking for a QR code")
+    }
+
+    /// Shows what the QR code (or barcode) holds, already on the clipboard. A web link gets the
+    /// link button; nothing opens without that click.
+    func showCode(_ text: String?, format: String?, link: String?) {
+        showText(text ?? "", lines: 1)
+        if let text {
+            titleLabel.stringValue = format == "QR code" ? L.t("QR CODE COPIED!") : L.t("CODE COPIED!")
+            detail.stringValue = text.split(separator: "\n").first.map { String($0) } ?? ""
+            self.link = link
+            linkButton.isHidden = link == nil
+            linkButton.toolTip = link.map { L.t("Open link") + "\n" + $0 }
+        } else {
+            titleLabel.stringValue = L.t("NO QR CODE FOUND")
+            detail.stringValue = L.t("Select just the code, a bit bigger")
+        }
+    }
+
+    /// The ✨ button finished: the card now holds the styled capture (already on the clipboard).
+    func showStyled(raw: CGImage, styled: CGImage, url: URL?, copied: Bool) {
+        guard raw === self.raw, isVisible, recognized == nil, !fileOnly else { return }
+        image = styled
+        self.url = url
+        thumb.image = NSImage(cgImage: styled, size: NSSize(width: styled.width, height: styled.height))
+        titleLabel.stringValue = copied ? L.t("STYLED & COPIED!") : L.t("STYLED!")
+        detail.stringValue = "\(styled.width) × \(styled.height)" + (url.map { " · " + $0.lastPathComponent } ?? "")
+        restartTimer()
+    }
+
     func setSaved(_ url: URL, for image: CGImage) {
         guard image === self.image, isVisible, recognized == nil else { return }
         self.url = url
-        detail.stringValue = "\(image.width) × \(image.height) · \(url.lastPathComponent)"
+        if offered == nil { detail.stringValue = "\(image.width) × \(image.height) · \(url.lastPathComponent)" }
     }
 
     private func present() {
         titleLabel.textColor = CaptureLook.tag
         let screen = NSScreen.underMouse
         let vf = screen.visibleFrame
-        let f = CGRect(x: vf.maxX - frame.width - 14, y: vf.minY + 14, width: frame.width, height: frame.height)
+        let f = CGRect(x: vf.maxX - Self.baseWidth - 14, y: vf.minY + 14, width: Self.baseWidth, height: frame.height)
         setFrame(f.offsetBy(dx: 0, dy: -10), display: false)
         alphaValue = 0
         orderFrontRegardless()

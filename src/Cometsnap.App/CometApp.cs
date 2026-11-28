@@ -17,6 +17,7 @@ using Cometsnap.Core.Fun;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
 using Cometsnap.Core.Storage;
+using Cometsnap.Core.Styling;
 using Cometsnap.Core.Takeover;
 using Cometsnap.Editor;
 using Cometsnap.Video;
@@ -257,6 +258,7 @@ public sealed class CometApp : Application
         Register(Settings.RecordGifHotkey, () => Recorder.ToggleRegion(RecordingFormat.Gif));
         Register(Settings.ScrollingHotkey, Scrolling.Start);
         Register(Settings.TextHotkey, Capture.StartTextCapture);
+        Register(Settings.QrHotkey, Capture.StartQrCapture);
         Register(Settings.ColorHotkey, Capture.StartColorPicker);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
@@ -309,6 +311,22 @@ public sealed class CometApp : Application
         }
         if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;
         _settingsWindow.Activate();
+    }
+
+    private StyleStudioWindow? _styleStudio;
+
+    /// <summary>The Style studio (one at a time): builds the share-ready look with a live preview.</summary>
+    public void OpenStyleStudio()
+    {
+        if (_styleStudio is null)
+        {
+            _styleStudio = new StyleStudioWindow(this);
+            _styleStudio.StyleChanged += () => _settingsWindow?.RefreshStylePreview();
+            _styleStudio.Closed += (_, _) => _styleStudio = null;
+            _styleStudio.Show();
+        }
+        if (_styleStudio.WindowState == WindowState.Minimized) _styleStudio.WindowState = WindowState.Normal;
+        _styleStudio.Activate();
     }
 
     /// <summary>Moves new captures to another folder ("" = the default) and reloads the recent list.</summary>
@@ -394,10 +412,51 @@ public sealed class CometApp : Application
     private void OnCaptureTaken(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect from)
     {
         if (Settings.PlaySounds) _sounds?.Snap();
-        if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
+        if (Settings.ShowEditCard)
+        {
+            // ✨ has nothing to add when both the copy and the file are styled already.
+            var canStyle = Settings.StylePerShot && !(Settings.StyleOnCopy && Settings.StyleOnExport);
+            _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture, Capture.LastRawCapture, canStyle);
+            if (Settings.DetectQrCodes) _ = SpotQrAsync(image, Capture.LastRawCapture ?? image);
+        }
         LaunchComet(new Point(from.CenterX, from.CenterY), image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
+    }
+
+    // ------------------------------------------------------------------ share-ready style
+
+    /// <summary>
+    /// The ✨ Style button of the Copied card: styles this one capture, puts it on the clipboard
+    /// and saves it beside the original ("name-styled.png"), which stays untouched.
+    /// </summary>
+    public async Task StyleOneShotAsync(string? path, System.Windows.Media.Imaging.BitmapSource raw)
+    {
+        try
+        {
+            var settings = Settings;
+            var styled = await Task.Run(() => SnapStyler.Apply(raw, settings));
+            var copied = ClipboardService.SetImage(styled);
+            string? styledPath = null;
+            if (path is not null)
+            {
+                if (settings.StyleOnExport) styledPath = path; // the saved file is styled already
+                else
+                {
+                    styledPath = StyledFiles.StyledPath(path);
+                    var target = styledPath;
+                    await Task.Run(() => CaptureStore.SaveImage(styled, target));
+                    Capture.AnnounceSaved(target, styled);
+                }
+            }
+            _card?.ShowStyled(raw, styled, styledPath, copied);
+            if (!Settings.ShowEditCard) Notify(L.T("Styled capture copied"), styledPath is null ? "" : Path.GetFileName(styledPath));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Styling one capture failed", ex);
+            Notify(L.T("Could not style the capture"), ex.Message);
+        }
     }
 
     // ------------------------------------------------------------------ copy text (OCR)
@@ -443,6 +502,81 @@ public sealed class CometApp : Application
         {
             _reading = false;
         }
+    }
+
+    // ------------------------------------------------------------------ scan a QR code
+
+    /// <summary>
+    /// Looks for a QR code (or barcode) in the selected area, offline, and copies what it holds.
+    /// A web link is shown with an "Open link" button but never opened on its own.
+    /// </summary>
+    public async Task ScanCodeAsync(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect? from)
+    {
+        if (_reading) return;
+        _reading = true;
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            if (Settings.ShowEditCard) _card?.ShowScanning(image, SystemParameters.WorkArea);
+            var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(image, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+            var pixels = new byte[stride * h];
+            bgra.CopyPixels(pixels, stride, 0);
+            var codes = await Task.Run(() => Cometsnap.Core.Scanning.CodeScanner.Scan(pixels, w, h, stride));
+            Log.Info($"QR scan: {codes.Count} code(s) in {sw.ElapsedMilliseconds} ms");
+            var first = codes.FirstOrDefault();
+            string? text = codes.Count == 0 ? null : string.Join("\n", codes.Select(c => c.Text));
+            if (text is not null && !ClipboardService.SetText(text)) Log.Error("Could not copy the code to the clipboard");
+            var link = Cometsnap.Core.Scanning.CodeScanner.LinkOf(first?.Text);
+            if (Settings.ShowEditCard && _card is not null) _card.ShowCode(image, text, first?.Format, link, SystemParameters.WorkArea);
+            else if (text is not null) Notify(L.T("QR code copied"), Preview(text));
+            else Notify(L.T("No QR code found"), L.T("Select just the code, a bit bigger"));
+            if (text is not null && from is { } rect) LaunchComet(new Point(rect.CenterX, rect.CenterY));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("QR scan failed", ex);
+            _card?.Hide();
+            Notify(L.T("Could not scan the code"), ex.Message);
+        }
+        finally
+        {
+            _reading = false;
+        }
+    }
+
+    /// <summary>
+    /// After a normal capture (already copied and saved): looks for a QR code in the background.
+    /// When there is one, the Copied card offers its content; the screenshot stays on the clipboard.
+    /// </summary>
+    private async Task SpotQrAsync(System.Windows.Media.Imaging.BitmapSource shown, System.Windows.Media.Imaging.BitmapSource raw)
+    {
+        try
+        {
+            // Let the card, the comet and the save go first: capture stays instant.
+            await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var sw = Stopwatch.StartNew();
+            var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(raw, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+            var pixels = new byte[stride * h];
+            bgra.CopyPixels(pixels, stride, 0);
+            var code = await Task.Run(() => Cometsnap.Core.Scanning.CodeScanner.FindQr(pixels, w, h, stride));
+            if (code is null) return;
+            Log.Info($"QR spotted in a capture in {sw.ElapsedMilliseconds} ms");
+            _card?.OfferCode(shown, code.Text, Cometsnap.Core.Scanning.CodeScanner.LinkOf(code.Text));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Looking for a QR code failed", ex);
+        }
+    }
+
+    /// <summary>Opens a scanned web link in the default browser, only after the user clicked it.</summary>
+    public void OpenLink(string link)
+    {
+        if (Cometsnap.Core.Scanning.CodeScanner.LinkOf(link) is not { } safe) return;
+        try { Process.Start(new ProcessStartInfo(safe) { UseShellExecute = true }); }
+        catch (Exception ex) { Log.Error("Could not open the link", ex); }
     }
 
     private static string Preview(string text)
@@ -558,7 +692,10 @@ public sealed class CometApp : Application
         };
         card.TrimRequested += OpenTrimmer;
         card.TextRequested += image => _ = CopyTextAsync(image, null);
+        card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
         card.ShowTextRequested += ShowRecognizedText;
+        card.OpenLinkRequested += OpenLink;
+        card.CopyCodeRequested += text => { if (!ClipboardService.SetText(text)) Log.Error("Could not copy the QR code"); };
         return card;
     }
 
