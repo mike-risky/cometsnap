@@ -7,9 +7,9 @@ namespace Cometsnap.Core.Tests;
 public class CodeScannerTests
 {
     /// <summary>A code drawn like on a screen: dark modules on a light page, with a margin around it.</summary>
-    private static (byte[] Px, int W, int H) Draw(string text, BarcodeFormat format, int width, int height, int pageW, int pageH, int atX, int atY, bool dark = false)
+    private static (byte[] Px, int W, int H) Draw(string text, BarcodeFormat format, int width, int height, int pageW, int pageH, int atX, int atY, bool dark = false, int margin = 1)
     {
-        var matrix = new MultiFormatWriter().encode(text, format, width, height, new Dictionary<EncodeHintType, object> { [EncodeHintType.MARGIN] = 1, [EncodeHintType.CHARACTER_SET] = "UTF-8" });
+        var matrix = new MultiFormatWriter().encode(text, format, width, height, new Dictionary<EncodeHintType, object> { [EncodeHintType.MARGIN] = margin, [EncodeHintType.CHARACTER_SET] = "UTF-8" });
         var px = new byte[pageW * pageH * 4];
         byte bg = dark ? (byte)0x12 : (byte)0xF7, fg = dark ? (byte)0xF0 : (byte)0x10;
         for (var i = 0; i < px.Length; i += 4) { px[i] = bg; px[i + 1] = bg; px[i + 2] = bg; px[i + 3] = 255; }
@@ -31,6 +31,14 @@ public class CodeScannerTests
         var code = Assert.Single(codes);
         Assert.Equal("https://cometsnap.com/?q=1", code.Text);
         Assert.Equal("QR code", code.Format);
+    }
+
+    [Fact]
+    public void Reads_a_code_boxed_right_up_to_its_edges()
+    {
+        // No quiet zone at all: the scanner adds one before decoding.
+        var (px, w, h) = Draw("tight box", BarcodeFormat.QR_CODE, 150, 150, 150, 150, 0, 0, margin: 0);
+        Assert.Equal("tight box", Assert.Single(CodeScanner.Scan(px, w, h, w * 4)).Text);
     }
 
     [Fact]

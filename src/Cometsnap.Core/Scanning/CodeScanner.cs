@@ -39,6 +39,10 @@ public static class CodeScanner
             AutoRotate = true,
             Options = new DecodingOptions { TryHarder = true, TryInverted = true, PossibleFormats = Formats, CharacterSet = "UTF-8" },
         };
+        // A white quiet zone around the picked area: a tightly boxed code still reads.
+        // (Light-on-dark codes get a dark one too, as TryInverted flips the whole image.)
+        var pad = Math.Max(16, Math.Max(w, h) / 8);
+        (luminance, w, h) = (Pad(luminance, w, h, pad), w + 2 * pad, h + 2 * pad);
         var source = new PlanarYUVLuminanceSource(luminance, w, h, 0, 0, w, h, false);
         var results = reader.DecodeMultiple(source) ?? (reader.Decode(source) is { } one ? [one] : []);
         var list = new List<ScannedCode>();
@@ -49,6 +53,15 @@ public static class CodeScanner
         }
         // QR codes first: that is what people scan screens for.
         return list.OrderBy(c => c.Format == "QR code" ? 0 : 1).ToList();
+    }
+
+    private static byte[] Pad(byte[] lum, int w, int h, int pad)
+    {
+        var ow = w + 2 * pad;
+        var outp = new byte[ow * (h + 2 * pad)];
+        Array.Fill(outp, (byte)255);
+        for (var y = 0; y < h; y++) Buffer.BlockCopy(lum, y * w, outp, (y + pad) * ow + pad, w);
+        return outp;
     }
 
     /// <summary>Gray levels (0.299 R + 0.587 G + 0.114 B), optionally enlarged by an integer factor.</summary>
