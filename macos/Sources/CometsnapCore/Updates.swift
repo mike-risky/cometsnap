@@ -124,7 +124,9 @@ public enum WhatsNew {
                 continue
             }
             let t = line.trimmingCharacters(in: .whitespaces)
-            guard line.hasPrefix("- **"), // top-level items only, not their sub-points let end = t.range(of: "**", range: t.index(t.startIndex, offsetBy: 4)..<t.endIndex) else { continue }
+            // Top-level items only, not their sub-points.
+            guard line.hasPrefix("- **"),
+                  let end = t.range(of: "**", range: t.index(t.startIndex, offsetBy: 4)..<t.endIndex) else { continue }
             var title = String(t[t.index(t.startIndex, offsetBy: 4)..<end.lowerBound]).trimmingCharacters(in: .whitespaces)
             while let last = title.last, last == "." || last == ":" { title.removeLast() }
             switch into {
