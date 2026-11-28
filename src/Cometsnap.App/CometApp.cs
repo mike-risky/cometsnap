@@ -322,7 +322,7 @@ public sealed class CometApp : Application
     private void OfferReplace(bool printScreenRegistered, bool justInstalled = false)
     {
         var report = CaptureTools.Detect(printScreenRegistered);
-        var window = new ReplaceWindow(report, Settings.StartWithWindows, justInstalled ? L.F("Cometsnap {0} is installed", Version) : null);
+        var window = new ReplaceWindow(report, Settings, justInstalled ? L.F("Cometsnap {0} is installed", Version) : null);
         window.ShowDialog();
 
         Settings.ReplaceOfferAnswered = true;

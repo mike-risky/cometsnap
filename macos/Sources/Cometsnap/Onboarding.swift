@@ -13,7 +13,7 @@ final class WelcomeWindow: NSWindow {
     init(app: AppController) {
         self.app = app
         permissionButton = SpaceButton(title: L.t("Allow screen access"), symbol: "lock.open", fill: Theme.blue)
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 560, height: 560), styleMask: [.titled, .closable, .fullSizeContentView],
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 560, height: 700), styleMask: [.titled, .closable, .fullSizeContentView],
                    backing: .buffered, defer: false)
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
@@ -45,9 +45,7 @@ final class WelcomeWindow: NSWindow {
         login.state = .on
         styleCheckbox(login)
 
-        let keys = NSTextField(wrappingLabelWithString: L.t("Shortcuts: ⌘⇧4 (or ⌘⇧2) capture · ⌘⇧3 whole screen · ⌘⇧7 record video · ⌘⇧8 record GIF · Print Screen / F13 on PC keyboards. Release the mouse and it's copied and saved."))
-        keys.font = Theme.ui(12)
-        keys.textColor = Theme.muted
+        let keys = briefing()
 
         let go = SpaceButton(title: L.t("Let's go ☄️"), symbol: nil, fill: Theme.terracotta, fontSize: 15)
         go.onClick = { [weak self] in self?.finish() }
@@ -87,6 +85,54 @@ final class WelcomeWindow: NSWindow {
             go.heightAnchor.constraint(equalToConstant: 40),
         ])
         header.start()
+    }
+
+    /// "Mission briefing": how Cometsnap works, in four lines and the handy shortcuts.
+    private func briefing() -> NSView {
+        let s = app.settings
+        let capture = s.hotkeys[HotkeyAction.capture.rawValue] != nil ? s.hotkey(.capture).display : "⌘⇧4"
+        let title = NSTextField(labelWithString: L.t("Mission briefing").uppercased(with: Locale(identifier: L.language)))
+        title.font = Theme.heading(13)
+        title.textColor = Theme.yellow
+        var rows: [NSView] = [title]
+        let steps = [
+            L.f("Press {0}, then click a window or drag a box.", capture),
+            L.t("Let go: it's copied and saved. Just paste it anywhere."),
+            L.t("Click the Copied card to add arrows, boxes and text."),
+            L.t("Your recent snaps wait in the menu bar."),
+        ]
+        for (i, step) in steps.enumerated() {
+            let n = NSTextField(labelWithString: "\(i + 1)")
+            n.font = Theme.heading(13)
+            n.textColor = Theme.yellow
+            n.widthAnchor.constraint(equalToConstant: 16).isActive = true
+            let t = NSTextField(wrappingLabelWithString: step)
+            t.font = Theme.ui(12.5)
+            t.textColor = .white
+            t.preferredMaxLayoutWidth = 440
+            let row = NSStackView(views: [n, t])
+            row.alignment = .firstBaseline
+            row.spacing = 8
+            rows.append(row)
+        }
+        let keys = NSTextField(wrappingLabelWithString: L.f("{0} video · {1} GIF · {2} copy text · {3} pick a color",
+                                                             s.hotkey(.video).display, s.hotkey(.gif).display, s.hotkey(.text).display, s.hotkey(.color).display))
+        keys.font = Theme.ui(11.5)
+        keys.textColor = Theme.muted
+        keys.preferredMaxLayoutWidth = 464
+        rows.append(keys)
+        let col = NSStackView(views: rows)
+        col.orientation = .vertical
+        col.alignment = .leading
+        col.spacing = 5
+        col.setCustomSpacing(8, after: title)
+        col.edgeInsets = NSEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        col.wantsLayer = true
+        col.layer?.backgroundColor = Theme.surface.cgColor
+        col.layer?.borderColor = Theme.line.cgColor
+        col.layer?.borderWidth = 1
+        col.layer?.cornerRadius = 12
+        return col
     }
 
     private func stepLabel(_ n: String, _ title: String, _ detail: String) -> NSView {

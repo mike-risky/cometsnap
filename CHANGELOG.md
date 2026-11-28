@@ -7,6 +7,14 @@ Downloads are on the [Releases page](https://github.com/mike-risky/cometsnap/rel
 Changes merged after the last release show up under "Latest build" first: they are already in the
 `nightly`, `macos-nightly` and `linux-nightly` builds and become part of the next numbered release.
 
+## Latest build
+
+### Improved
+- **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains
+  Cometsnap in four short lines (press, let go and it's copied and saved, click the Copied card to edit, find
+  your snaps in the tray) plus the handy shortcuts: video, GIF, copy text and the color picker. It shows the
+  keys you actually have, on Windows, macOS and Linux, in all 8 languages.
+
 ## v1.3.0 — 28 November 2026
 
 ### New
