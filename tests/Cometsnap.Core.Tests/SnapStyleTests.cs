@@ -122,4 +122,36 @@ public class SnapStyleTests
         var path = Path.Combine("C:", "Snaps", "2026-11", "snap_1.png");
         Assert.Equal(Path.Combine("C:", "Snaps", "2026-11", "snap_1-styled.png"), StyledFiles.StyledPath(path));
     }
+
+    [Fact]
+    public void Settings_file_keeps_the_custom_style_and_reads_old_preset_ids()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "cometsnap-style-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "settings.json");
+        try
+        {
+            var s = new AppSettings();
+            s.SnapStyle.ShadowX = -7;
+            s.SnapStyle.Glow = true;
+            s.SnapStyle.GlowColor = "#FF2BD6";
+            s.SnapStyle.Backdrop = StyleBackdrop.Space;
+            s.Save(path);
+            var back = AppSettings.Load(path);
+            Assert.Equal(-7, back.SnapStyle.ShadowX);
+            Assert.True(back.SnapStyle.Glow);
+            Assert.Equal("#FF2BD6", back.SnapStyle.GlowColor);
+            Assert.Equal(StyleBackdrop.Space, back.SnapStyle.Backdrop);
+
+            // Early test builds saved a preset id: it loads as that preset, the other settings survive.
+            File.WriteAllText(path, "{ \"SnapStyle\": \"neon\", \"StyleOnCopy\": true }");
+            var old = AppSettings.Load(path);
+            Assert.True(old.StyleOnCopy);
+            Assert.True(old.SnapStyle.Glow);
+            Assert.Equal("#FF2BD6", old.SnapStyle.GlowColor);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
+    }
 }

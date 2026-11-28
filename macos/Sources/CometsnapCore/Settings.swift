@@ -29,8 +29,8 @@ public struct AppSettings: Codable, Equatable {
     public var language = ""
     /// Look of the capture screen: a CaptureThemes id ("blue" is the classic look).
     public var captureTheme = CaptureThemes.defaultID
-    /// Share-ready look (rounded corners, shadow, backdrop): a SnapStyles id.
-    public var snapStyle = SnapStyles.defaultID
+    /// Share-ready look built in the Style studio (corners, border, shadow, glow, backdrop).
+    public var snapStyle = SnapStyle()
     /// Put the styled capture on the clipboard. Off: the raw capture.
     public var styleOnCopy = false
     /// Save the styled capture (the file you drag out of the panel). Off: the raw capture.
@@ -92,7 +92,9 @@ public struct AppSettings: Codable, Equatable {
         askWhereToSave = (try? c.decodeIfPresent(Bool.self, forKey: .askWhereToSave)) ?? d.askWhereToSave
         openEditorAfterCapture = (try? c.decodeIfPresent(Bool.self, forKey: .openEditorAfterCapture)) ?? d.openEditorAfterCapture
         nameCounter = max(0, (try? c.decodeIfPresent(Int.self, forKey: .nameCounter)) ?? 0)
-        snapStyle = SnapStyles.get(try? c.decodeIfPresent(String.self, forKey: .snapStyle)).id
+        // Early test builds saved a preset id: it loads as that preset.
+        if let style = (try? c.decodeIfPresent(SnapStyle.self, forKey: .snapStyle)) ?? nil { snapStyle = style }
+        else if let id = (try? c.decodeIfPresent(String.self, forKey: .snapStyle)) ?? nil { snapStyle = SnapStylePresets.get(id) }
         styleOnCopy = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnCopy)) ?? d.styleOnCopy
         styleOnExport = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnExport)) ?? d.styleOnExport
         stylePerShot = (try? c.decodeIfPresent(Bool.self, forKey: .stylePerShot)) ?? d.stylePerShot

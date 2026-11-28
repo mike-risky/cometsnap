@@ -120,11 +120,12 @@ final class CaptureController {
     /// Copy first (instant), then save on a background queue.
     func deliver(_ raw: CGImage, scale: CGFloat, from rect: CGRect) {
         let settings = app.settings
+        app.lastRawCapture = (raw, scale)
         // Share-ready style: the copy and the saved file can each be raw or styled.
         var styledCache: CGImage?
         func styled() -> CGImage {
             if let s = styledCache { return s }
-            let s = SnapStyler.apply(raw, settings: settings) ?? raw
+            let s = SnapStyler.apply(raw, settings: settings, scale: scale) ?? raw
             styledCache = s
             return s
         }

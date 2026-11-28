@@ -146,17 +146,16 @@ final class AppController: NSObject, NSApplicationDelegate {
     /// the original ("name-styled.png"), which stays untouched.
     func styleOneShot(url: URL?, raw: CGImage, scale: CGFloat) {
         let settings = self.settings
-        let style = SnapStyles.get(settings.snapStyle)
-        let accent = CaptureLook.theme.accent
+        let style = settings.snapStyle
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let styled = SnapStyler.apply(raw, style: style, accent: accent) else { return }
+            guard let styled = SnapStyler.apply(raw, style: style, scale: Double(scale)) else { return }
             var target: URL?
             var failure: Error?
             if let url {
                 if settings.styleOnExport {
                     target = url // the saved file is styled already
                 } else {
-                    let t = SnapStyles.styledURL(url)
+                    let t = StyledFiles.styledURL(url)
                     do { try PNG.writeImage(styled, to: t); target = t } catch { failure = error }
                 }
             }
@@ -379,6 +378,21 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     func hidePanels() {
         flyout?.hide()
+    }
+
+    /// The newest capture, unstyled, and its scale: the Style studio can preview on it.
+    var lastRawCapture: (CGImage, CGFloat)?
+    private var styleStudio: StyleStudioWindow?
+
+    /// The Style studio (one at a time): builds the share-ready look with a live preview.
+    func showStyleStudio() {
+        hidePanels()
+        if styleStudio == nil || styleStudio?.isVisible == false {
+            styleStudio = StyleStudioWindow(app: self)
+            styleStudio?.onChange = { [weak self] in self?.settingsWindow?.reload() }
+        }
+        NSApp.activate()
+        styleStudio?.makeKeyAndOrderFront(nil)
     }
 
     func showSettings() {

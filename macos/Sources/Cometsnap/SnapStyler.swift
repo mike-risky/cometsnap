@@ -3,11 +3,12 @@ import CometsnapCore
 
 /// Applies the share-ready style (Settings > Share-ready style) to a capture. Safe on any queue.
 enum SnapStyler {
-    static func apply(_ image: CGImage, settings: AppSettings) -> CGImage? {
-        apply(image, style: SnapStyles.get(settings.snapStyle), accent: CaptureLook.theme.accent)
+    /// scale = pixels per point of the capture (2 on Retina), so the style looks the same on every screen.
+    static func apply(_ image: CGImage, settings: AppSettings, scale: CGFloat) -> CGImage? {
+        apply(image, style: settings.snapStyle, scale: Double(scale))
     }
 
-    static func apply(_ image: CGImage, style: SnapStyle, accent: UInt32) -> CGImage? {
+    static func apply(_ image: CGImage, style: SnapStyle, scale: Double = 1) -> CGImage? {
         let w = image.width, h = image.height
         guard w > 0, h > 0 else { return nil }
         let space = colorSpace(of: image)
@@ -17,8 +18,19 @@ enum SnapStyler {
                                   space: space, bitmapInfo: readInfo), let data = ctx.data else { return nil }
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
         let pixels = [UInt8](UnsafeBufferPointer(start: data.assumingMemoryBound(to: UInt8.self), count: w * h * 4))
-        let styled = StyleRenderer.render(pixels, width: w, height: h, stride: w * 4, style: style, accent: accent)
+        let styled = StyleRenderer.render(pixels, width: w, height: h, stride: w * 4, style: style, scale: scale)
         return makeImage(styled, space: space)
+    }
+
+    /// A smaller copy (for previews of big captures).
+    static func scaled(_ image: CGImage, by factor: Double) -> CGImage? {
+        let w = max(1, Int(Double(image.width) * factor)), h = max(1, Int(Double(image.height) * factor))
+        let info = CGImageAlphaInfo.noneSkipFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: colorSpace(of: image), bitmapInfo: info) else { return nil }
+        ctx.interpolationQuality = .high
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 
     /// The image on white, without transparency (JPEG has none: see-through corners would turn black).
@@ -50,8 +62,8 @@ enum SnapStyler {
         return CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
     }
 
-    /// The Settings preview: a small pretend app window, styled for real.
-    static func preview(style: SnapStyle, accent: UInt32) -> NSImage? {
+    /// The Settings and Style studio preview: a small pretend app window, styled for real (shown at half size).
+    static func preview(style: SnapStyle) -> NSImage? {
         let w = 640, h = 380
         var p = [UInt8](repeating: 0, count: w * h * 4)
         func rect(_ x: Int, _ y: Int, _ rw: Int, _ rh: Int, _ rgb: UInt32, _ radius: Double = 0) {
@@ -76,7 +88,7 @@ enum SnapStyler {
         rect(36, 280, 140, 44, 0xE2553A, 10)
         rect(376, 270, 228, 14, 0xC9CFE3, 7)
         rect(376, 300, 170, 14, 0xC9CFE3, 7)
-        let styled = StyleRenderer.render(p, width: w, height: h, stride: w * 4, style: style, accent: accent)
+        let styled = StyleRenderer.render(p, width: w, height: h, stride: w * 4, style: style)
         guard let space = CGColorSpace(name: CGColorSpace.sRGB), let cg = makeImage(styled, space: space) else { return nil }
         return NSImage(cgImage: cg, size: NSSize(width: styled.width / 2, height: styled.height / 2))
     }

@@ -1,45 +1,161 @@
 import Foundation
 
 /// What goes behind a styled capture.
-public enum StyleBackdrop {
-    /// Transparent: just the capture (and its shadow or glow).
+public enum StyleBackdrop: String, Codable, CaseIterable {
+    /// Transparent: just the capture with its shadow, border and glow.
     case none
-    /// A diagonal gradient in the capture color.
+    /// One solid color.
+    case color
+    /// A diagonal gradient between two colors.
     case gradient
     /// The capture itself, blurred and enlarged, like frosted glass.
     case blur
-    /// Deep space: navy night with a few stars.
+    /// Deep space: a night gradient between the two colors, with stars.
     case space
 }
 
-/// A "share-ready" look: rounded corners, soft shadow, glowing outline, backdrop.
-/// Same styles and ids as Windows (src/Cometsnap.Core/Styling/SnapStyles.cs).
-public struct SnapStyle: Equatable {
-    public let id: String
-    public let name: String
-    public let corners: Bool
-    public let shadow: Bool
-    public let glow: Bool
-    public let backdrop: StyleBackdrop
-}
+/// A fully custom "share-ready" look, built in the Style studio: rounded corners, border, drop
+/// shadow (offset, blur, color, opacity), laser or neon glow, and a backdrop. Every part can be on
+/// or off, so they combine freely. Sizes are in points (pixels at 1x). Colors are "#RRGGBB".
+/// Same fields and defaults as Windows/Linux (src/Cometsnap.Core/Styling/SnapStyles.cs).
+public struct SnapStyle: Codable, Equatable {
+    /// Corner radius; 0 = square corners.
+    public var cornerRadius = 12
+    public var border = false
+    public var borderWidth = 3
+    public var borderColor = "#FFFFFF"
+    public var shadow = true
+    /// Shadow offset: positive X = right, positive Y = down.
+    public var shadowX = 0
+    public var shadowY = 10
+    public var shadowBlur = 28
+    public var shadowColor = "#000000"
+    /// 0 to 100.
+    public var shadowOpacity = 45
+    /// Glow around the edge: small = a laser line, big = neon.
+    public var glow = false
+    public var glowColor = "#3D6BFF"
+    public var glowSize = 18
+    /// 0 to 100.
+    public var glowStrength = 85
+    public var backdrop = StyleBackdrop.none
+    public var backdropColor = "#3D6BFF"
+    public var backdropColor2 = "#07113A"
+    /// Space around the capture when there is a backdrop.
+    public var padding = 64
 
-public enum SnapStyles {
-    public static let defaultID = "clean"
+    public init() {}
 
-    /// Names are English; the UI translates them with L.t.
-    public static let all: [SnapStyle] = [
-        SnapStyle(id: "clean", name: "Clean", corners: true, shadow: true, glow: false, backdrop: .none),
-        SnapStyle(id: "showcase", name: "Showcase", corners: true, shadow: true, glow: false, backdrop: .gradient),
-        SnapStyle(id: "frosted", name: "Frosted", corners: true, shadow: true, glow: false, backdrop: .blur),
-        SnapStyle(id: "comet", name: "Comet", corners: true, shadow: false, glow: true, backdrop: .space),
-        SnapStyle(id: "laser", name: "Laser", corners: true, shadow: false, glow: true, backdrop: .none),
-    ]
-
-    /// The style with this id, or Clean for empty or unknown ids.
-    public static func get(_ id: String?) -> SnapStyle {
-        all.first { $0.id.lowercased() == (id ?? "").lowercased() } ?? all[0]
+    enum CodingKeys: String, CodingKey {
+        case cornerRadius, border, borderWidth, borderColor, shadow, shadowX, shadowY, shadowBlur, shadowColor, shadowOpacity,
+             glow, glowColor, glowSize, glowStrength, backdrop, backdropColor, backdropColor2, padding
     }
 
+    /// Tolerant: a missing or odd field keeps its default (a hand-edited settings file can hold anything).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = SnapStyle()
+        func int(_ k: CodingKeys, _ v: Int) -> Int { ((try? c.decodeIfPresent(Int.self, forKey: k)) ?? nil) ?? v }
+        func bool(_ k: CodingKeys, _ v: Bool) -> Bool { ((try? c.decodeIfPresent(Bool.self, forKey: k)) ?? nil) ?? v }
+        func str(_ k: CodingKeys, _ v: String) -> String { ((try? c.decodeIfPresent(String.self, forKey: k)) ?? nil) ?? v }
+        cornerRadius = int(.cornerRadius, d.cornerRadius)
+        border = bool(.border, d.border)
+        borderWidth = int(.borderWidth, d.borderWidth)
+        borderColor = str(.borderColor, d.borderColor)
+        shadow = bool(.shadow, d.shadow)
+        shadowX = int(.shadowX, d.shadowX)
+        shadowY = int(.shadowY, d.shadowY)
+        shadowBlur = int(.shadowBlur, d.shadowBlur)
+        shadowColor = str(.shadowColor, d.shadowColor)
+        shadowOpacity = int(.shadowOpacity, d.shadowOpacity)
+        glow = bool(.glow, d.glow)
+        glowColor = str(.glowColor, d.glowColor)
+        glowSize = int(.glowSize, d.glowSize)
+        glowStrength = int(.glowStrength, d.glowStrength)
+        backdrop = StyleBackdrop(rawValue: str(.backdrop, "none").lowercased()) ?? .none
+        backdropColor = str(.backdropColor, d.backdropColor)
+        backdropColor2 = str(.backdropColor2, d.backdropColor2)
+        padding = int(.padding, d.padding)
+        self = normalized()
+    }
+
+    /// Keeps every number in a sensible range.
+    public func normalized() -> SnapStyle {
+        func clamp(_ v: Int, _ lo: Int, _ hi: Int) -> Int { min(hi, max(lo, v)) }
+        var s = self
+        s.cornerRadius = clamp(s.cornerRadius, 0, 200)
+        s.borderWidth = clamp(s.borderWidth, 1, 60)
+        s.shadowX = clamp(s.shadowX, -200, 200)
+        s.shadowY = clamp(s.shadowY, -200, 200)
+        s.shadowBlur = clamp(s.shadowBlur, 0, 200)
+        s.shadowOpacity = clamp(s.shadowOpacity, 0, 100)
+        s.glowSize = clamp(s.glowSize, 1, 200)
+        s.glowStrength = clamp(s.glowStrength, 0, 100)
+        s.padding = clamp(s.padding, 0, 600)
+        s.borderColor = StyleColors.normalize(s.borderColor, "#FFFFFF")
+        s.shadowColor = StyleColors.normalize(s.shadowColor, "#000000")
+        s.glowColor = StyleColors.normalize(s.glowColor, "#3D6BFF")
+        s.backdropColor = StyleColors.normalize(s.backdropColor, "#3D6BFF")
+        s.backdropColor2 = StyleColors.normalize(s.backdropColor2, "#07113A")
+        return s
+    }
+}
+
+/// Ready-made starting points for the Style studio. Picking one copies it; then everything can be changed.
+public enum SnapStylePresets {
+    /// Ids and English names (the UI translates them with L.t).
+    public static let all: [(id: String, name: String)] = [
+        ("clean", "Clean"), ("showcase", "Showcase"), ("frosted", "Frosted"),
+        ("neon", "Neon"), ("laser", "Laser"), ("comet", "Comet"), ("polaroid", "Polaroid"),
+    ]
+
+    public static func get(_ id: String?) -> SnapStyle {
+        var s = SnapStyle()
+        switch (id ?? "").lowercased() {
+        case "showcase":
+            s.backdrop = .gradient; s.backdropColor = "#6F8FFF"; s.backdropColor2 = "#1C2C77"; s.padding = 64; s.shadowY = 14; s.shadowBlur = 36
+        case "frosted":
+            s.backdrop = .blur; s.padding = 64; s.shadowY = 12; s.shadowBlur = 32; s.border = true; s.borderWidth = 2; s.borderColor = "#FFFFFF"
+        case "neon":
+            s.shadow = false; s.glow = true; s.glowColor = "#FF2BD6"; s.glowSize = 36; s.glowStrength = 90
+            s.backdrop = .color; s.backdropColor = "#0B0B1E"; s.padding = 72
+        case "laser":
+            s.shadow = false; s.glow = true; s.glowColor = "#FF3B30"; s.glowSize = 10; s.glowStrength = 100; s.cornerRadius = 6
+        case "comet":
+            s.shadow = false; s.glow = true; s.glowColor = "#3D6BFF"; s.glowSize = 24
+            s.backdrop = .space; s.backdropColor = "#1A2470"; s.backdropColor2 = "#07113A"; s.padding = 64
+        case "polaroid":
+            s.cornerRadius = 0; s.border = true; s.borderWidth = 14; s.borderColor = "#FFFFFF"
+            s.shadowX = 8; s.shadowY = 10; s.shadowBlur = 16; s.shadowOpacity = 40
+        default: break
+        }
+        return s
+    }
+}
+
+/// "#RRGGBB" helpers.
+public enum StyleColors {
+    /// A palette for the color chips (the hex box and color panel take any color).
+    public static let palette = ["#000000", "#FFFFFF", "#8A8FA3", "#FF3B30", "#E2553A", "#F09625", "#FFD60A",
+                                 "#34C759", "#00E5FF", "#3D6BFF", "#7B5CFF", "#FF2BD6", "#07113A"]
+
+    /// Parses "#RGB", "#RRGGBB" or "RRGGBB" into 0xRRGGBB; nil when it isn't a color.
+    public static func tryParse(_ text: String?) -> UInt32? {
+        guard var t = text?.trimmingCharacters(in: .whitespaces), !t.isEmpty else { return nil }
+        while t.hasPrefix("#") { t.removeFirst() }
+        if t.count == 3 { t = t.map { "\($0)\($0)" }.joined() }
+        guard t.count == 6, t.allSatisfy(\.isHexDigit) else { return nil }
+        return UInt32(t, radix: 16)
+    }
+
+    public static func parse(_ text: String?, _ fallback: UInt32) -> UInt32 { tryParse(text) ?? fallback }
+
+    public static func hex(_ rgb: UInt32) -> String { String(format: "#%06X", rgb & 0xFFFFFF) }
+
+    public static func normalize(_ text: String?, _ fallback: String) -> String { tryParse(text).map(hex) ?? fallback }
+}
+
+public enum StyledFiles {
     /// "snap_1.png" → "snap_1-styled.png", in the same folder.
     public static func styledURL(_ url: URL) -> URL {
         let ext = url.pathExtension
@@ -56,65 +172,86 @@ public struct StyledPixels {
     public var bgra: [UInt8]
 }
 
-/// Draws a capture in a SnapStyle, pixel by pixel. A port of the Windows/Linux renderer
-/// (src/Cometsnap.Core/Styling/StyleRenderer.cs), so the three apps look the same.
+/// Draws a capture in a SnapStyle: backdrop, drop shadow, glow, border, then the capture with
+/// rounded corners. A line-by-line port of src/Cometsnap.Core/Styling/StyleRenderer.cs, so the
+/// three apps look the same.
 public enum StyleRenderer {
     public struct Layout: Equatable {
         public let width: Int
         public let height: Int
         public let imageX: Int
         public let imageY: Int
-        public let radius: Double
-        public let shadowBlur: Double
-        public let shadowOffset: Double
-        public let glowSize: Double
-        public let lineWidth: Double
     }
 
-    public static func measure(width: Int, height: Int, style: SnapStyle) -> Layout {
-        let k = min(2.0, max(0.5, (Double(width) * Double(height)).squareRoot() / 1100.0))
-        let radius = style.corners ? min(12 * k, Double(min(width, height)) / 4.0) : 0
-        let blur = style.shadow ? 16 * k : 0
-        let offset = style.shadow ? 6 * k : 0
-        let glow = style.glow ? 20 * k : 0
-        let line = style.glow ? max(1.5, 2 * k) : 0
-        var pad: Int
-        if style.backdrop != .none { pad = max(40, Int((56 * k).rounded())) }
-        else { pad = Int(max(blur * 2.2 + offset, glow * 1.6).rounded(.up)) }
-        pad = max(pad, 0)
-        return Layout(width: width + 2 * pad, height: height + 2 * pad, imageX: pad, imageY: pad,
-                      radius: radius, shadowBlur: blur, shadowOffset: offset, glowSize: glow, lineWidth: line)
+    /// Canvas size and where the capture sits. scale multiplies every size of the style
+    /// (2 on a Retina screen, so 10 points of shadow look the same everywhere).
+    public static func measure(width: Int, height: Int, style: SnapStyle, scale: Double = 1) -> Layout {
+        let st = style.normalized()
+        let bw = st.border ? Double(st.borderWidth) * scale : 0
+        var left: Double, right: Double, top: Double, bottom: Double
+        if st.backdrop != .none {
+            left = Double(st.padding) * scale + bw
+            right = left; top = left; bottom = left
+        } else {
+            let glow = st.glow ? Double(st.glowSize) * scale * 1.3 + lineWidth(st, scale) : 0
+            let shadow = st.shadow && st.shadowOpacity > 0 ? Double(st.shadowBlur) * scale * 1.6 + 1 : 0
+            let sx = st.shadow ? Double(st.shadowX) * scale : 0
+            let sy = st.shadow ? Double(st.shadowY) * scale : 0
+            left = bw + max(glow, shadow > 0 ? shadow - sx : 0)
+            right = bw + max(glow, shadow > 0 ? shadow + sx : 0)
+            top = bw + max(glow, shadow > 0 ? shadow - sy : 0)
+            bottom = bw + max(glow, shadow > 0 ? shadow + sy : 0)
+        }
+        func l(_ v: Double) -> Int { Int(max(0, v).rounded(.up)) }
+        return Layout(width: width + l(left) + l(right), height: height + l(top) + l(bottom), imageX: l(left), imageY: l(top))
     }
 
-    /// Styles a capture given as 32-bit BGRA/BGRX (alpha ignored). accent is 0xRRGGBB.
-    public static func render(_ source: [UInt8], width: Int, height: Int, stride: Int, style: SnapStyle, accent: UInt32) -> StyledPixels {
+    /// Width of the bright line of a glow: thin, like a laser, whatever the reach.
+    static func lineWidth(_ st: SnapStyle, _ scale: Double) -> Double { max(1.5 * scale, min(4 * scale, Double(st.glowSize) * scale / 8)) }
+
+    /// Styles a capture given as 32-bit BGRA/BGRX (alpha ignored: a screenshot is opaque).
+    public static func render(_ source: [UInt8], width: Int, height: Int, stride: Int, style: SnapStyle, scale: Double = 1) -> StyledPixels {
         precondition(width > 0 && height > 0)
-        let m = measure(width: width, height: height, style: style)
+        let st = style.normalized()
+        let m = measure(width: width, height: height, style: st, scale: scale)
         let outW = m.width, outH = m.height
         var dst = [UInt8](repeating: 0, count: outW * outH * 4)
 
+        let left = Double(m.imageX), top = Double(m.imageY)
+        let cx = left + Double(width) / 2, cy = top + Double(height) / 2
+        let hx = Double(width) / 2, hy = Double(height) / 2
+        let r = min(Double(st.cornerRadius) * scale, Double(min(width, height)) / 2)
+        let bw = st.border ? Double(st.borderWidth) * scale : 0
+        let ohx = hx + bw, ohy = hy + bw
+        let orad = r > 0 ? r + bw : 0
+
+        let shadowOn = st.shadow && st.shadowOpacity > 0
+        let shadowAlpha = Double(st.shadowOpacity) / 100
+        let sigma = Double(st.shadowBlur) * scale / 2
+        let sx = Double(st.shadowX) * scale, sy = Double(st.shadowY) * scale
+        let (shr, shg, shb) = split(StyleColors.parse(st.shadowColor, 0))
+
+        let glowOn = st.glow && st.glowStrength > 0
+        let glowReach = Double(st.glowSize) * scale
+        let glowStrength = Double(st.glowStrength) / 100
+        let line = lineWidth(st, scale)
+        let (gr, gg, gb) = split(StyleColors.parse(st.glowColor, 0x3D6BFF))
+        let (br, bg, bb) = split(StyleColors.parse(st.borderColor, 0xFFFFFF))
+        let inner = Int(r.rounded(.up)) + 1
+
         dst.withUnsafeMutableBufferPointer { d in
             source.withUnsafeBufferPointer { s in
-                fillBackdrop(d, outW, outH, style.backdrop, s, width, height, stride, accent)
-
-                let left = Double(m.imageX), top = Double(m.imageY)
-                let right = left + Double(width), bottom = top + Double(height)
-                let cx = (left + right) / 2, cy = (top + bottom) / 2
-                let hx = Double(width) / 2, hy = Double(height) / 2
-                let r = m.radius
-                let ar = Double((accent >> 16) & 0xFF) / 255, ag = Double((accent >> 8) & 0xFF) / 255, ab = Double(accent & 0xFF) / 255
-                let shadowAlpha = style.backdrop == .none ? 0.40 : 0.50
-                let inner = Int(r.rounded(.up)) + 1
+                fillBackdrop(d, outW, outH, st, s, width, height, stride)
                 let dp = d.baseAddress!, sp = s.baseAddress!
 
                 DispatchQueue.concurrentPerform(iterations: outH) { y in
                     let row = y * outW * 4
                     let py = Double(y) + 0.5
-                    let insideRows = Double(y) >= top + Double(inner) && Double(y) < bottom - Double(inner)
+                    let insideRows = Double(y) >= top + Double(inner) && Double(y) < top + Double(height) - Double(inner)
                     var x = 0
                     while x < outW {
                         if insideRows && x == m.imageX + 1 && width > 2 {
-                            // Fast path: the middle of this row is the capture, as is.
+                            // Fast path: the whole middle of this row is the capture, as is.
                             let count = width - 2
                             let si = (y - m.imageY) * stride + 4
                             let di = row + x * 4
@@ -133,28 +270,30 @@ public enum StyleRenderer {
                         var b = Double(dp[i]) / 255 * a, g = Double(dp[i + 1]) / 255 * a, rr = Double(dp[i + 2]) / 255 * a
 
                         let dist = roundedBoxDistance(px - cx, py - cy, hx, hy, r)
+                        let dOuter = bw > 0 ? roundedBoxDistance(px - cx, py - cy, ohx, ohy, orad) : dist
 
-                        if m.shadowBlur > 0 {
-                            let ds = roundedBoxDistance(px - cx, py - (cy + m.shadowOffset), hx, hy, r)
-                            let sh = shadowAlpha * 0.5 * erfc(ds / (m.shadowBlur * 0.7071))
-                            b *= 1 - sh; g *= 1 - sh; rr *= 1 - sh
-                            a = sh + a * (1 - sh)
+                        if shadowOn && dOuter > -1 {
+                            let ds = roundedBoxDistance(px - cx - sx, py - cy - sy, ohx, ohy, orad)
+                            let cover = sigma < 0.5 ? min(1, max(0, 0.5 - ds)) : 0.5 * erfc(ds / (sigma * 1.41421356))
+                            over(&b, &g, &rr, &a, shb, shg, shr, shadowAlpha * cover)
                         }
-                        if m.glowSize > 0 && dist > -m.lineWidth {
-                            var ga: Double
-                            if dist <= 0 { ga = 1 } else {
-                                let t = max(0, 1 - dist / m.glowSize)
-                                ga = min(1, 0.85 * t * t + (dist < m.lineWidth ? 1 - dist / m.lineWidth : 0))
-                            }
-                            over(&b, &g, &rr, &a, ab, ag, ar, ga)
+                        if glowOn && dOuter > -1 {
+                            let dd = max(0, dOuter)
+                            let t = max(0, 1 - dd / glowReach)
+                            let ga = 0.8 * t * t + (dd < line ? 1 - dd / line : 0)
+                            over(&b, &g, &rr, &a, gb, gg, gr, glowStrength * min(1, ga))
                         }
-                        var cover = min(1, max(0, 0.5 - dist))
-                        if m.glowSize > 0 { cover = min(1, max(0, 0.5 - (dist + m.lineWidth))) }
-                        if cover > 0 {
-                            let sx = min(max(x - m.imageX, 0), width - 1)
-                            let sy = min(max(y - m.imageY, 0), height - 1)
-                            let si = sy * stride + sx * 4
-                            over(&b, &g, &rr, &a, Double(sp[si]) / 255, Double(sp[si + 1]) / 255, Double(sp[si + 2]) / 255, cover)
+                        if bw > 0 {
+                            let cover = min(1, max(0, 0.5 - dOuter))
+                            if cover > 0 { over(&b, &g, &rr, &a, bb, bg, br, cover) }
+                        }
+                        // The capture, with an anti-aliased rounded edge.
+                        let imageCover = min(1, max(0, 0.5 - dist))
+                        if imageCover > 0 {
+                            let ix = min(max(x - m.imageX, 0), width - 1)
+                            let iy = min(max(y - m.imageY, 0), height - 1)
+                            let si = iy * stride + ix * 4
+                            over(&b, &g, &rr, &a, Double(sp[si]) / 255, Double(sp[si + 1]) / 255, Double(sp[si + 2]) / 255, imageCover)
                         }
                         if a <= 0.0001 {
                             dp[i] = 0; dp[i + 1] = 0; dp[i + 2] = 0; dp[i + 3] = 0
@@ -191,19 +330,18 @@ public enum StyleRenderer {
 
     // MARK: backdrops
 
-    private static func fillBackdrop(_ d: UnsafeMutableBufferPointer<UInt8>, _ w: Int, _ h: Int, _ backdrop: StyleBackdrop,
-                                     _ s: UnsafeBufferPointer<UInt8>, _ sw: Int, _ sh: Int, _ stride: Int, _ accent: UInt32) {
-        switch backdrop {
-        case .gradient:
-            // One color family, light to deep: pretty with every capture color.
-            fillGradient(d, w, h, mix(accent, 0xFFFFFF, 0.18), mix(accent, 0x07113A, 0.55))
+    private static func fillBackdrop(_ d: UnsafeMutableBufferPointer<UInt8>, _ w: Int, _ h: Int, _ st: SnapStyle,
+                                     _ s: UnsafeBufferPointer<UInt8>, _ sw: Int, _ sh: Int, _ stride: Int) {
+        let c1 = StyleColors.parse(st.backdropColor, 0x3D6BFF)
+        let c2 = StyleColors.parse(st.backdropColor2, 0x07113A)
+        switch st.backdrop {
+        case .color: fillGradient(d, w, h, c1, c1)
+        case .gradient: fillGradient(d, w, h, c1, c2)
         case .space:
-            fillGradient(d, w, h, 0x1A2470, 0x07113A)
+            fillGradient(d, w, h, c1, c2)
             stars(d, w, h)
-        case .blur:
-            fillBlur(d, w, h, s, sw, sh, stride)
-        case .none:
-            break
+        case .blur: fillBlur(d, w, h, s, sw, sh, stride)
+        case .none: break
         }
     }
 
@@ -342,11 +480,14 @@ public enum StyleRenderer {
 
     private static func toByte(_ v: Double) -> UInt8 { UInt8(min(255, max(0, Int((v * 255).rounded())))) }
 
-    static func mix(_ a: UInt32, _ b: UInt32, _ t: Double) -> UInt32 {
-        func c(_ shift: UInt32) -> UInt32 {
-            let x = Double((a >> shift) & 0xFF), y = Double((b >> shift) & 0xFF)
-            return UInt32((x + (y - x) * t).rounded()) << shift
-        }
-        return c(16) | c(8) | c(0)
+    static func erfc(_ x: Double) -> Double {
+        let z = abs(x)
+        let t = 1 / (1 + 0.3275911 * z)
+        let y = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * exp(-z * z)
+        return x >= 0 ? y : 2 - y
+    }
+
+    static func split(_ rgb: UInt32) -> (Double, Double, Double) {
+        (Double((rgb >> 16) & 0xFF) / 255, Double((rgb >> 8) & 0xFF) / 255, Double(rgb & 0xFF) / 255)
     }
 }

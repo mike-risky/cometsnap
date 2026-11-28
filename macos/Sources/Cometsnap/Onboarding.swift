@@ -216,7 +216,6 @@ final class SettingsWindow: NSWindow {
     private var listening: HotkeyAction?
     private var keyMonitor: Any?
     private var themeButtons: [NSButton] = []
-    private var styleButtons: [NSButton] = []
     private let stylePreview = NSImageView()
     private let styleCopyBox = NSButton(checkboxWithTitle: L.t("Style on copy"), target: nil, action: nil)
     private let styleExportBox = NSButton(checkboxWithTitle: L.t("Style on export"), target: nil, action: nil)
@@ -292,18 +291,14 @@ final class SettingsWindow: NSWindow {
         themeBox.alignment = .leading
         themeBox.spacing = 6
 
-        // Share-ready style: one radio per style, a live preview and the three switches.
-        styleButtons = SnapStyles.all.map { st in
-            let b = NSButton(radioButtonWithTitle: Self.styleName(st), target: self, action: #selector(styleChanged(_:)))
-            b.font = Theme.ui(12)
-            return b
-        }
-        let styleRow = NSStackView(views: styleButtons)
-        styleRow.spacing = 10
+        // Share-ready style: a small preview, the Style studio button and the three switches.
         stylePreview.imageScaling = .scaleProportionallyUpOrDown
         stylePreview.translatesAutoresizingMaskIntoConstraints = false
         stylePreview.widthAnchor.constraint(equalToConstant: 300).isActive = true
         stylePreview.heightAnchor.constraint(equalToConstant: 190).isActive = true
+        let studioButton = NSButton(title: "✨ " + L.t("Open the Style studio"), target: self, action: #selector(openStyleStudio))
+        studioButton.bezelStyle = .rounded
+        studioButton.keyEquivalent = ""
 
         let title = NSTextField(labelWithAttributedString: Theme.wordmark(28))
         func row(_ label: String, _ v: NSView) -> NSView {
@@ -366,8 +361,8 @@ final class SettingsWindow: NSWindow {
         var views: [NSView] = [title, login, takeOver, card, comet, sound, audio, celebrations, seasonal]
         views += [row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), themeBox]
         views += [heading(L.t("Share-ready style")),
-                  hint(L.t("Rounded corners, a soft shadow and a backdrop, ready for social posts and docs. The backdrop and glow follow your capture colors.")),
-                  styleRow, stylePreview,
+                  hint(L.t("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio.")),
+                  stylePreview, studioButton,
                   styleCopyBox, hint(L.t("The clipboard gets the styled capture. Off: the raw capture.")),
                   styleExportBox, hint(L.t("Saved files (and what you drag out of the tray) are styled. Off: the raw capture.")),
                   stylePerShotBox, hint(L.t("A ✨ Style button on the Copied card styles just that capture."))]
@@ -428,8 +423,7 @@ final class SettingsWindow: NSWindow {
         language.selectItem(at: (L.languages.firstIndex { $0.code == s.language }).map { $0 + 1 } ?? 0)
         for (i, t) in CaptureThemes.all.enumerated() { themeButtons[i].state = t.id == s.captureTheme ? .on : .off }
         preview.theme = CaptureThemes.get(s.captureTheme)
-        for (i, st) in SnapStyles.all.enumerated() { styleButtons[i].state = st.id == s.snapStyle ? .on : .off }
-        stylePreview.image = SnapStyler.preview(style: SnapStyles.get(s.snapStyle), accent: CaptureLook.theme.accent)
+        stylePreview.image = SnapStyler.preview(style: s.snapStyle)
         styleCopyBox.state = s.styleOnCopy ? .on : .off
         styleExportBox.state = s.styleOnExport ? .on : .off
         stylePerShotBox.state = s.stylePerShot ? .on : .off
@@ -560,23 +554,8 @@ final class SettingsWindow: NSWindow {
         reload()
     }
 
-    @objc private func styleChanged(_ sender: NSButton) {
-        guard let i = styleButtons.firstIndex(of: sender) else { return }
-        let id = SnapStyles.all[i].id
-        app.update { $0.snapStyle = id }
-        reload()
-    }
-
-    /// English names of the styles, written out so the translation check sees them.
-    static func styleName(_ st: SnapStyle) -> String {
-        switch st.id {
-        case "clean": return L.t("Clean")
-        case "showcase": return L.t("Showcase")
-        case "frosted": return L.t("Frosted")
-        case "comet": return L.t("Comet")
-        case "laser": return L.t("Laser")
-        default: return st.name
-        }
+    @objc private func openStyleStudio() {
+        app.showStyleStudio()
     }
 
     private static func dot(_ color: NSColor) -> NSImage {
