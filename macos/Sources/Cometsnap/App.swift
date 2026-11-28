@@ -138,7 +138,36 @@ final class AppController: NSObject, NSApplicationDelegate {
         card.onOpen = { [weak self] url in self?.openTrimmer(url) }
         card.onText = { [weak self] image, scale in self?.copyText(image, scale: scale, from: nil) }
         card.onShowText = { [weak self] text in self?.showText(text) }
+        card.onStyle = { [weak self] url, raw, scale in self?.styleOneShot(url: url, raw: raw, scale: scale) }
         return card
+    }
+
+    /// The ✨ button of the Copied card: styles this one capture, copies it and saves it beside
+    /// the original ("name-styled.png"), which stays untouched.
+    func styleOneShot(url: URL?, raw: CGImage, scale: CGFloat) {
+        let settings = self.settings
+        let style = SnapStyles.get(settings.snapStyle)
+        let accent = CaptureLook.theme.accent
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let styled = SnapStyler.apply(raw, style: style, accent: accent) else { return }
+            var target: URL?
+            var failure: Error?
+            if let url {
+                if settings.styleOnExport {
+                    target = url // the saved file is styled already
+                } else {
+                    let t = SnapStyles.styledURL(url)
+                    do { try PNG.writeImage(styled, to: t); target = t } catch { failure = error }
+                }
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                Clipboard.copy(styled, scale: scale)
+                if target != nil && !settings.styleOnExport { self.capturesChanged() }
+                self.editCard.showStyled(raw: raw, styled: styled, url: target, copied: true)
+                if let failure { self.report(failure) }
+            }
+        }
     }
 
     /// A new language applies right away: the panel, the card and Settings are rebuilt.

@@ -29,6 +29,14 @@ public struct AppSettings: Codable, Equatable {
     public var language = ""
     /// Look of the capture screen: a CaptureThemes id ("blue" is the classic look).
     public var captureTheme = CaptureThemes.defaultID
+    /// Share-ready look (rounded corners, shadow, backdrop): a SnapStyles id.
+    public var snapStyle = SnapStyles.defaultID
+    /// Put the styled capture on the clipboard. Off: the raw capture.
+    public var styleOnCopy = false
+    /// Save the styled capture (the file you drag out of the panel). Off: the raw capture.
+    public var styleOnExport = false
+    /// A ✨ Style button on the Copied card styles just that capture.
+    public var stylePerShot = true
     /// Save each capture in the captures folder (the clipboard copy is separate).
     public var saveEveryCapture = true
     /// Name of each saved capture, with {date}, {time}… tokens; "/" makes subfolders (see FileNamePattern).
@@ -50,7 +58,8 @@ public struct AppSettings: Codable, Equatable {
         case capturesFolder, loupeCorner, playSound, cometAnimation, showEditCard, copyToClipboard,
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
              celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme,
-             saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys
+             saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys,
+             snapStyle, styleOnCopy, styleOnExport, stylePerShot
     }
 
     public init(from decoder: Decoder) throws {
@@ -83,6 +92,10 @@ public struct AppSettings: Codable, Equatable {
         askWhereToSave = (try? c.decodeIfPresent(Bool.self, forKey: .askWhereToSave)) ?? d.askWhereToSave
         openEditorAfterCapture = (try? c.decodeIfPresent(Bool.self, forKey: .openEditorAfterCapture)) ?? d.openEditorAfterCapture
         nameCounter = max(0, (try? c.decodeIfPresent(Int.self, forKey: .nameCounter)) ?? 0)
+        snapStyle = SnapStyles.get(try? c.decodeIfPresent(String.self, forKey: .snapStyle)).id
+        styleOnCopy = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnCopy)) ?? d.styleOnCopy
+        styleOnExport = (try? c.decodeIfPresent(Bool.self, forKey: .styleOnExport)) ?? d.styleOnExport
+        stylePerShot = (try? c.decodeIfPresent(Bool.self, forKey: .stylePerShot)) ?? d.stylePerShot
         hotkeys = ((try? c.decodeIfPresent([String: HotkeySpec].self, forKey: .hotkeys)) ?? nil) ?? [:]
     }
 

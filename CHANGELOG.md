@@ -7,6 +7,16 @@ Downloads are on the [Releases page](https://github.com/mike-risky/cometsnap/rel
 Changes merged after the last release show up under "Latest build" first: they are already in the
 `nightly`, `macos-nightly` and `linux-nightly` builds and become part of the next numbered release.
 
+## Latest build (coming in the next release)
+
+### New
+- **Share-ready style.** Rounded corners, a soft shadow and a backdrop, the way screenshots look in social
+  posts. Pick a style in Settings, with a live preview: Clean, Showcase (a gradient in your capture color),
+  Frosted (the capture blurred behind itself), Comet (deep space with a glow) or Laser (a glowing outline).
+  Three switches, mix them as you like: **Style on copy** (clipboard), **Style on export** (saved files and
+  what you drag out of the tray), and **Style per shot**, a ✨ button on the Copied card that styles just that
+  capture. Copy and export stay raw by default, so capture is as instant as ever. Windows, macOS and Linux.
+
 ## v1.3.0 — 28 November 2026
 
 ### New

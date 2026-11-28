@@ -298,6 +298,7 @@ enum PNG {
     static func writeImage(_ image: CGImage, to url: URL) throws {
         let ext = url.pathExtension.lowercased()
         guard ext == "jpg" || ext == "jpeg" else { return try write(image, to: url) }
+        let image = SnapStyler.flattened(image)
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { throw CocoaError(.fileWriteUnknown) }

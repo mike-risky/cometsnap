@@ -118,13 +118,26 @@ final class CaptureController {
     }
 
     /// Copy first (instant), then save on a background queue.
-    func deliver(_ image: CGImage, scale: CGFloat, from rect: CGRect) {
+    func deliver(_ raw: CGImage, scale: CGFloat, from rect: CGRect) {
         let settings = app.settings
-        if settings.copyToClipboard { Clipboard.copy(image, scale: scale) }
+        // Share-ready style: the copy and the saved file can each be raw or styled.
+        var styledCache: CGImage?
+        func styled() -> CGImage {
+            if let s = styledCache { return s }
+            let s = SnapStyler.apply(raw, settings: settings) ?? raw
+            styledCache = s
+            return s
+        }
+        let copyImage = settings.styleOnCopy ? styled() : raw
+        let image = settings.styleOnExport ? styled() : raw
+        if settings.copyToClipboard { Clipboard.copy(copyImage, scale: scale) }
         if settings.playSound { Sound.snap() }
         if settings.cometAnimation { CometFlight.fly(from: rect, to: app.statusItem.buttonFrame, image: image) }
         let card = settings.showEditCard ? app.editCard : nil
-        card?.show(image: image, scale: scale, copied: settings.copyToClipboard)
+        let saving = settings.askWhereToSave || settings.saveEveryCapture
+        // ✨ has nothing to add when both the copy and the file are styled already.
+        let canStyle = settings.stylePerShot && !(settings.styleOnCopy && settings.styleOnExport)
+        card?.show(image: saving ? image : copyImage, scale: scale, copied: settings.copyToClipboard, raw: raw, canStyle: canStyle)
         if settings.askWhereToSave {
             DispatchQueue.main.async { [weak self] in self?.askAndSave(image, scale: scale, card: card) }
             return
@@ -201,8 +214,13 @@ final class EditCard: NSPanel {
     var onText: ((CGImage, CGFloat) -> Void)?
     /// A click on the card of a text capture: show the text.
     var onShowText: ((String) -> Void)?
+    /// The ✨ button: style this capture (saved file if known, raw capture, scale).
+    var onStyle: ((URL?, CGImage, CGFloat) -> Void)?
     private var recognized: String?
     private let textButton: SpaceButton
+    private let styleButton: SpaceButton
+    private var raw: CGImage?
+    private var canStyle = false
 
     private let thumb = NSImageView()
     private let titleLabel = NSTextField(labelWithString: L.t("COPIED!"))
@@ -218,7 +236,8 @@ final class EditCard: NSPanel {
     init() {
         editButton = SpaceButton(title: L.t("Edit"), symbol: "pencil", fill: Theme.terracotta, tip: L.t("Open in the editor"))
         textButton = SpaceButton(title: "", symbol: "text.viewfinder", fill: Theme.surface, tip: L.t("Copy the text in this capture"))
-        super.init(contentRect: CGRect(x: 0, y: 0, width: 340, height: 84), styleMask: [.borderless, .nonactivatingPanel],
+        styleButton = SpaceButton(title: "", symbol: "sparkles", fill: Theme.surface, tip: L.t("Style this capture: rounded corners, shadow, backdrop"))
+        super.init(contentRect: CGRect(x: 0, y: 0, width: 380, height: 84), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
         level = .statusBar
@@ -264,11 +283,18 @@ final class EditCard: NSPanel {
             self.hideTimer?.invalidate()
             self.onText?(image, self.scale)
         }
+        styleButton.onClick = { [weak self] in
+            guard let self, let raw = self.raw, !self.fileOnly, self.recognized == nil else { return }
+            self.hideTimer?.invalidate()
+            self.styleButton.isHidden = true
+            self.titleLabel.stringValue = L.t("STYLING…")
+            self.onStyle?(self.url, raw, self.scale)
+        }
         let close = SpaceButton(title: "", symbol: "xmark", tip: L.t("Dismiss"))
         close.layer?.borderWidth = 0
         close.onClick = { [weak self] in self?.fadeOut() }
 
-        for v in [thumb, titleLabel, detail, textButton, editButton, close] as [NSView] {
+        for v in [thumb, titleLabel, detail, styleButton, textButton, editButton, close] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
         }
@@ -281,8 +307,12 @@ final class EditCard: NSPanel {
             titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
             detail.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             detail.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
-            detail.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: textButton.leadingAnchor, constant: -8),
+            detail.trailingAnchor.constraint(lessThanOrEqualTo: styleButton.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: styleButton.leadingAnchor, constant: -8),
+            styleButton.trailingAnchor.constraint(equalTo: textButton.leadingAnchor, constant: -6),
+            styleButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
+            styleButton.widthAnchor.constraint(equalToConstant: 34),
+            styleButton.heightAnchor.constraint(equalToConstant: 34),
             textButton.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
             textButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             textButton.widthAnchor.constraint(equalToConstant: 34),
@@ -301,13 +331,16 @@ final class EditCard: NSPanel {
 
     override var canBecomeKey: Bool { false }
 
-    func show(image: CGImage, scale: CGFloat, copied: Bool) {
+    func show(image: CGImage, scale: CGFloat, copied: Bool, raw: CGImage? = nil, canStyle: Bool = false) {
         self.image = image
         self.scale = scale
         self.url = nil
+        self.raw = raw ?? image
+        self.canStyle = canStyle
         fileOnly = false
         recognized = nil
         textButton.isHidden = false
+        styleButton.isHidden = !canStyle
         editButton.isHidden = false
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = copied ? L.t("COPIED!") : L.t("SNAPPED!")
@@ -325,6 +358,7 @@ final class EditCard: NSPanel {
         fileOnly = true
         recognized = nil
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = false
         thumb.image = thumbnail.map { NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height)) }
             ?? NSImage(systemSymbolName: "film", accessibilityDescription: nil)
@@ -344,6 +378,7 @@ final class EditCard: NSPanel {
         fileOnly = false
         recognized = ""
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = true
         thumb.image = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
         titleLabel.stringValue = L.t("READING…")
@@ -357,6 +392,7 @@ final class EditCard: NSPanel {
     func showText(_ text: String, lines: Int) {
         recognized = text
         textButton.isHidden = true
+        styleButton.isHidden = true
         editButton.isHidden = text.isEmpty
         editButton.update(title: L.t("Show"), symbol: "eye")
         editButton.toolTip = L.t("See the text and copy just a part")
@@ -365,6 +401,17 @@ final class EditCard: NSPanel {
         titleLabel.stringValue = text.isEmpty ? L.t("NO TEXT FOUND") : L.t("TEXT COPIED!")
         detail.stringValue = text.isEmpty ? L.t("Try a bigger area") : lines == 1 ? firstLine : L.f("{0} lines · {1}", lines, firstLine)
         if !isVisible { present() } else { restartTimer() }
+    }
+
+    /// The ✨ button finished: the card now holds the styled capture (already on the clipboard).
+    func showStyled(raw: CGImage, styled: CGImage, url: URL?, copied: Bool) {
+        guard raw === self.raw, isVisible, recognized == nil, !fileOnly else { return }
+        image = styled
+        self.url = url
+        thumb.image = NSImage(cgImage: styled, size: NSSize(width: styled.width, height: styled.height))
+        titleLabel.stringValue = copied ? L.t("STYLED & COPIED!") : L.t("STYLED!")
+        detail.stringValue = "\(styled.width) × \(styled.height)" + (url.map { " · " + $0.lastPathComponent } ?? "")
+        restartTimer()
     }
 
     func setSaved(_ url: URL, for image: CGImage) {
