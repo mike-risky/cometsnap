@@ -250,7 +250,7 @@ final class UpdateCard: NSPanel {
         ])
 
         updateButton.target = self
-        updateButton.action = #selector(update)
+        updateButton.action = #selector(updateTapped)
         updateButton.bezelStyle = .rounded
         updateButton.keyEquivalent = "\r"
         updateButton.bezelColor = Theme.terracotta
@@ -332,7 +332,7 @@ final class UpdateCard: NSPanel {
         setFrame(CGRect(x: screen.maxX - size.width - 12, y: screen.minY + 12, width: size.width, height: size.height), display: true)
     }
 
-    @objc private func update() { if !busy { onUpdate?() } }
+    @objc private func updateTapped() { if !busy { onUpdate?() } }
     @objc private func later() { if !busy { onLater?() } }
     @objc private func skip() { if !busy { onSkip?() } }
     @objc private func everythingNew() { onEverything?() }
