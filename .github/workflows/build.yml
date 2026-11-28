@@ -63,30 +63,13 @@ jobs:
           dotnet publish src/Cometsnap.App/Cometsnap.App.csproj @common -o out/${{ matrix.arch }}
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # For Setup: only Cometsnap itself. Setup installs the .NET Desktop Runtime when it is missing.
+          # Start from a clean obj: reusing the portable build's ReadyToRun code (compiled together with
+          # its bundled runtime) makes the shared-runtime exe crash at startup (1.3.0, issue #42).
+          Remove-Item -Recurse -Force src/Cometsnap.App/obj/Release, src/Cometsnap.App/bin/Release -ErrorAction SilentlyContinue
           dotnet publish src/Cometsnap.App/Cometsnap.App.csproj @common -p:CometsnapFlavor=Installed -o out/${{ matrix.arch }}/installed
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "Portable:  {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/Cometsnap.exe).Length / 1MB)
           "For Setup: {0:N1} MB" -f ((Get-Item out/${{ matrix.arch }}/installed/Cometsnap.exe).Length / 1MB)
-      - name: Launch check of build variants (x64, diagnostic)
-        if: matrix.arch == 'x64'
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $variants = [ordered]@{
-            "fd-single-nor2r"  = @("-p:CometsnapFlavor=Installed", "-p:PublishReadyToRun=false")
-            "fd-folder"        = @("-p:CometsnapFlavor=Installed", "-p:PublishSingleFile=false")
-            "fd-folder-nor2r"  = @("-p:CometsnapFlavor=Installed", "-p:PublishSingleFile=false", "-p:PublishReadyToRun=false")
-            "fd-single-native" = @("-p:CometsnapFlavor=Installed", "-p:IncludeNativeLibrariesForSelfExtract=true")
-            "fd-single-nodbg"  = @("-p:CometsnapFlavor=Installed", "-p:DebugType=none")
-          }
-          foreach ($v in $variants.Keys) {
-            dotnet publish src/Cometsnap.App/Cometsnap.App.csproj -c Release -r win-x64 @($variants[$v]) -o "scratch/v/$v" | Out-Null
-            Get-Process Cometsnap -ErrorAction SilentlyContinue | Stop-Process -Force
-            $p = Start-Process "scratch/v/$v/Cometsnap.exe" -PassThru
-            Start-Sleep 12
-            if ($p.HasExited) { "VARIANT $v : CRASHED ($($p.ExitCode))" } else { "VARIANT $v : RUNS"; $p | Stop-Process -Force }
-            "  files: " + ((Get-ChildItem "scratch/v/$v" -File | Select-Object -ExpandProperty Name) -join ", ")
-          }
       - name: Launch check (x64)
         if: matrix.arch == 'x64'
         shell: pwsh
