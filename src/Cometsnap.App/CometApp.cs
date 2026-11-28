@@ -60,6 +60,29 @@ public sealed class CometApp : Application
     public string CapturesFolder =>
         string.IsNullOrWhiteSpace(Settings.CapturesFolder) ? Paths.DefaultCapturesDirectory : Settings.CapturesFolder;
 
+    /// <summary>Folder picked in the last "Ask where to save" dialog (this session only).</summary>
+    public string? LastSaveFolder { get; set; }
+
+    /// <summary>The {counter} value the next saved capture will get.</summary>
+    public int PeekNameCounter() => Math.Max(0, Settings.NameCounter) + 1;
+
+    /// <summary>Uses up a {counter} value (only when the name pattern has one) and returns it.</summary>
+    public int TakeNameCounter()
+    {
+        var next = PeekNameCounter();
+        if (FileNamePattern.UsesCounter(Settings.FileNamePattern))
+        {
+            Settings.NameCounter = next;
+            TrySaveSettings();
+        }
+        return next;
+    }
+
+    /// <summary>A free path for a new capture, under the user's name pattern and format.</summary>
+    public string NextCapturePath(DateTime when) =>
+        SnapNaming.NextFreePath(CapturesFolder, when, Settings.FileNamePattern,
+            SnapNaming.ExtensionFor(Settings.ImageFormat), TakeNameCounter());
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -482,7 +505,7 @@ public sealed class CometApp : Application
             try
             {
                 if (Directory.Exists(folder))
-                    foreach (var f in Directory.EnumerateFiles(folder, "*.png", SearchOption.AllDirectories))
+                    foreach (var f in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(MediaKinds.IsImage))
                         times.Add(File.GetLastWriteTime(f));
             }
             catch (Exception ex)

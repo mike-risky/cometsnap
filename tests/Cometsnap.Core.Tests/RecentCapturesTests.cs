@@ -32,6 +32,16 @@ public class RecentCapturesTests : IDisposable
     }
 
     [Fact]
+    public void Finds_captures_in_nested_folders_and_jpegs()
+    {
+        var nested = Make(Path.Combine("2026", "11"), "shot.jpg", 2);
+        var root = Make("", "loose.png", 5);
+        var recent = new RecentCaptures(5);
+        recent.Load(_root);
+        Assert.Equal(new[] { nested, root }, recent.Snapshot());
+    }
+
+    [Fact]
     public void Add_puts_new_capture_on_top_without_duplicates()
     {
         var recent = new RecentCaptures(3);

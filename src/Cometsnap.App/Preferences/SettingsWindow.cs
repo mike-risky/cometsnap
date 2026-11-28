@@ -10,6 +10,7 @@ using Cometsnap.Core.Input;
 using Cometsnap.Core.Localization;
 using Cometsnap.Core.Native;
 using Cometsnap.Core.Settings;
+using Cometsnap.Core.Storage;
 
 namespace Cometsnap.App.Preferences;
 
@@ -49,7 +50,7 @@ public sealed class SettingsWindow : Window
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewKeyUp += OnPreviewKeyUp;
         Deactivated += (_, _) => StopListening(apply: false);
-        Closed += (_, _) => StopListening(apply: false);
+        Closed += (_, _) => { StopListening(apply: false); _app.TrySaveSettings(); };
         Build();
     }
 
@@ -100,15 +101,27 @@ public sealed class SettingsWindow : Window
         });
         stack.Children.Add(ThemePicker());
         stack.Children.Add(Switch(L.T("Instant capture (no toolbar)"), L.T("The capture is taken the moment you release the mouse."), S.InstantCapture, v => S.InstantCapture = v));
-        stack.Children.Add(Switch(L.T("Copy to the clipboard"), L.T("Ready to paste anywhere right after the capture."), S.CopyToClipboardOnCapture, v => S.CopyToClipboardOnCapture = v));
-        stack.Children.Add(Switch(L.T("Save every capture"), L.T("Each capture is also saved as a PNG in your captures folder."), S.AutoSave, v => S.AutoSave = v));
         stack.Children.Add(Switch(L.T("Show the Edit card after a capture"), L.T("A small card in the corner to edit or drag the capture."), S.ShowEditCard, v => S.ShowEditCard = v));
         stack.Children.Add(Switch(L.T("Comet animation"), L.T("The comet flies your capture into the tray."), S.ShowCometAnimation, v => S.ShowCometAnimation = v));
         stack.Children.Add(Switch(L.T("Detect windows under the mouse"), L.T("Click a window to capture just that window."), S.WindowDetection, v => S.WindowDetection = v));
 
-        // ---- captures folder
-        Section(stack, L.T("Captures folder"));
+        // ---- where captures go
+        Section(stack, L.T("Where captures go"));
+        stack.Children.Add(Switch(L.T("Copy to the clipboard"), L.T("Ready to paste anywhere right after the capture."), S.CopyToClipboardOnCapture, v => S.CopyToClipboardOnCapture = v));
+        stack.Children.Add(Switch(L.T("Save every capture"), L.T("Each capture is also saved in your captures folder."), S.AutoSave, v => S.AutoSave = v));
+        stack.Children.Add(Switch(L.T("Ask where to save each time"), L.T("A Save dialog after each capture. The clipboard copy happens first."), S.AskWhereToSave, v => S.AskWhereToSave = v));
+        stack.Children.Add(Switch(L.T("Open in the editor right away"), L.T("Every capture opens in the editor, ready for arrows and text."), S.OpenEditorAfterCapture, v => S.OpenEditorAfterCapture = v));
+        stack.Children.Add(Label(L.T("Captures folder")));
         stack.Children.Add(FolderRow());
+        stack.Children.Add(Label(L.T("File name")));
+        stack.Children.Add(NameRow());
+        stack.Children.Add(Label(L.T("File format")));
+        stack.Children.Add(new TextBlock
+        {
+            Text = L.T("PNG keeps every pixel sharp. JPG files are smaller."),
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, -4, 0, 10),
+        });
+        stack.Children.Add(Chips(new[] { (0, "PNG"), (1, "JPG") }, SnapNaming.ExtensionFor(S.ImageFormat) == ".jpg" ? 1 : 0, v => S.ImageFormat = v == 1 ? "jpg" : "png"));
 
         // ---- hotkeys
         Section(stack, L.T("Keyboard shortcuts"));
@@ -364,6 +377,63 @@ public sealed class SettingsWindow : Window
                 Build();
             }));
         panel.Children.Add(buttons);
+        return panel;
+    }
+
+    // ------------------------------------------------------------------ file name
+
+    /// <summary>The name pattern: a text box, tags to click in, and a live example.</summary>
+    private UIElement NameRow()
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
+        var box = new TextBox
+        {
+            Text = string.IsNullOrWhiteSpace(S.FileNamePattern) ? FileNamePattern.Default : S.FileNamePattern,
+            Background = SpaceTheme.WithAlpha(SpaceTheme.Void, 0xC0), Foreground = SpaceTheme.StarWhiteBrush, CaretBrush = SpaceTheme.StarWhiteBrush,
+            BorderBrush = SpaceTheme.NavyLightBrush, BorderThickness = new Thickness(1), Padding = new Thickness(10, 8, 10, 8),
+            FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 13,
+        };
+        panel.Children.Add(new Border { CornerRadius = new CornerRadius(8), ClipToBounds = true, Child = box });
+
+        var example = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
+        void Refresh()
+        {
+            var name = FileNamePattern.Expand(box.Text, DateTime.Now, _app.PeekNameCounter()) + SnapNaming.ExtensionFor(S.ImageFormat);
+            example.Text = L.F("Example: {0}", name);
+        }
+        box.TextChanged += (_, _) =>
+        {
+            var text = box.Text.Trim();
+            S.FileNamePattern = FileNamePattern.IsUsable(text) ? text : FileNamePattern.Default;
+            Refresh();
+        };
+        box.LostKeyboardFocus += (_, _) => _app.TrySaveSettings();
+        Refresh();
+        panel.Children.Add(example);
+
+        panel.Children.Add(new TextBlock
+        {
+            Text = L.T("Click a tag to add it. A / makes a subfolder."),
+            Foreground = SpaceTheme.DustBrush, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8),
+        });
+        var tags = new WrapPanel();
+        foreach (var token in FileNamePattern.Tokens)
+        {
+            var t = token;
+            tags.Children.Add(Chip(t, false, () =>
+            {
+                var at = box.CaretIndex;
+                box.Text = box.Text.Insert(at, t);
+                box.CaretIndex = at + t.Length;
+                box.Focus();
+            }));
+        }
+        panel.Children.Add(tags);
+        panel.Children.Add(Link(L.T("Back to default"), () =>
+        {
+            box.Text = FileNamePattern.Default;
+            _app.TrySaveSettings();
+        }));
         return panel;
     }
 

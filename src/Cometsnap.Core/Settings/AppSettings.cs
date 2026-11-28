@@ -43,6 +43,24 @@ public sealed class AppSettings
     public string CapturesFolder { get; set; } = "";
 
     /// <summary>
+    /// Name of each saved capture, with tokens ({date}, {time}, {year}, {month}, {day}, {hour},
+    /// {minute}, {second}, {counter}); "/" makes subfolders. See <see cref="Storage.FileNamePattern"/>.
+    /// </summary>
+    public string FileNamePattern { get; set; } = Storage.FileNamePattern.Default;
+
+    /// <summary>Format of saved captures: "png" (sharp, lossless) or "jpg" (smaller files).</summary>
+    public string ImageFormat { get; set; } = "png";
+
+    /// <summary>After each capture, ask where to save it (the clipboard copy still happens first).</summary>
+    public bool AskWhereToSave { get; set; }
+
+    /// <summary>Open every capture in the editor right away.</summary>
+    public bool OpenEditorAfterCapture { get; set; }
+
+    /// <summary>Last number used for {counter} in <see cref="FileNamePattern"/>.</summary>
+    public int NameCounter { get; set; }
+
+    /// <summary>
     /// Capture the moment the mouse is released (click a window or drag a box). When off,
     /// the selection stays open with the quick bar for annotating on the frozen screen.
     /// </summary>

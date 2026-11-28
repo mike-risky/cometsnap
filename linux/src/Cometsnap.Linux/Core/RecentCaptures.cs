@@ -1,5 +1,7 @@
 using System.IO;
 
+using Cometsnap.Core.Storage;
+
 namespace Cometsnap.Linux.Core;
 
 /// <summary>
@@ -21,6 +23,31 @@ public sealed class RecentCaptures
         lock (_gate) return _paths.ToArray();
     }
 
+    /// <summary>
+    /// The folder itself, then its subfolders (and theirs, down to <paramref name="depth"/> levels),
+    /// newest name first: "2026-11" before "2026-10", "2026/11" before "2026/10". Hidden ones are skipped.
+    /// </summary>
+    private static IEnumerable<string> NewestFoldersFirst(string folder, int depth)
+    {
+        yield return folder;
+        if (depth <= 0) yield break;
+        string[] subs;
+        try
+        {
+            subs = Directory.EnumerateDirectories(folder)
+                .Where(d => !Path.GetFileName(d).StartsWith('.'))
+                .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (Exception)
+        {
+            yield break;
+        }
+        foreach (var sub in subs)
+            foreach (var f in NewestFoldersFirst(sub, depth - 1))
+                yield return f;
+    }
+
     /// <summary>Scans month folders from newest to oldest until enough captures and recordings are found.</summary>
     public void Load(string root)
     {
@@ -29,11 +56,7 @@ public sealed class RecentCaptures
         {
             if (Directory.Exists(root))
             {
-                var folders = Directory.EnumerateDirectories(root)
-                    .Where(d => !Path.GetFileName(d).StartsWith('.'))
-                    .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
-                    .Prepend(root);
-                foreach (var folder in folders)
+                foreach (var folder in NewestFoldersFirst(root, FileNamePattern.MaxFolders))
                 {
                     var files = Directory.EnumerateFiles(folder)
                         .Where(MediaKinds.IsListed)

@@ -4,7 +4,8 @@ using System.Globalization;
 namespace Cometsnap.Core.Storage;
 
 /// <summary>
-/// Naming scheme for captures: <c>&lt;root&gt;\2026-11\snap_2026-11-26_08-56-12.png</c>.
+/// Naming scheme for captures: <c>&lt;root&gt;\2026-11\snap_2026-11-26_08-56-12.png</c> by default,
+/// or whatever the user's <see cref="FileNamePattern"/> says.
 /// </summary>
 public static class SnapNaming
 {
@@ -21,16 +22,28 @@ public static class SnapNaming
     /// Returns a full path that does not exist yet. Several captures in the same
     /// second get a numeric suffix: snap_..._08-56-12_2.png, _3, ...
     /// </summary>
-    public static string NextFreePath(string root, DateTime when, Func<string, bool>? exists = null)
+    public static string NextFreePath(string root, DateTime when, Func<string, bool>? exists = null) =>
+        NextFreePath(root, when, FileNamePattern.Default, Extension, 1, exists);
+
+    /// <summary>Same, with the user's name pattern and image format (".png" or ".jpg").</summary>
+    public static string NextFreePath(string root, DateTime when, string? pattern, string extension, int counter = 1, Func<string, bool>? exists = null)
     {
         exists ??= File.Exists;
-        var folder = MonthFolder(root, when);
-        var baseName = BaseName(when);
-        var candidate = Path.Combine(folder, baseName + Extension);
+        var relative = FileNamePattern.Expand(pattern, when, counter);
+        var stem = Path.Combine(root, relative);
+        var candidate = stem + extension;
         for (var i = 2; exists(candidate); i++)
-            candidate = Path.Combine(folder, $"{baseName}_{i}{Extension}");
+            candidate = $"{stem}_{i}{extension}";
         return candidate;
     }
+
+    /// <summary>The file name (no folders, no extension) the pattern gives, for Save as dialogs.</summary>
+    public static string SuggestedName(string? pattern, DateTime when, int counter = 1) =>
+        Path.GetFileName(FileNamePattern.Expand(pattern, when, counter));
+
+    /// <summary>".jpg" for "jpg"/"jpeg", otherwise ".png".</summary>
+    public static string ExtensionFor(string? format) =>
+        string.Equals(format, "jpg", StringComparison.OrdinalIgnoreCase) || string.Equals(format, "jpeg", StringComparison.OrdinalIgnoreCase) ? ".jpg" : Extension;
 
     public static string SidecarFor(string imagePath) =>
         Path.ChangeExtension(imagePath, null) + SidecarSuffix;

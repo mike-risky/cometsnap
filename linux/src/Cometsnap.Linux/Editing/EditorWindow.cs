@@ -674,7 +674,7 @@ public sealed class EditorWindow : Window
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = T("Save a copy"),
-            SuggestedFileName = (_path is null ? SnapNaming.BaseName(DateTime.Now) : System.IO.Path.GetFileNameWithoutExtension(_path) + "-edited") + ".png",
+            SuggestedFileName = (_path is null ? SnapNaming.SuggestedName(_app.Settings.FileNamePattern, DateTime.Now, _app.PeekNameCounter()) : System.IO.Path.GetFileNameWithoutExtension(_path) + "-edited") + ".png",
             DefaultExtension = "png",
             FileTypeChoices = new[] { new FilePickerFileType(T("PNG image")) { Patterns = new[] { "*.png" } } },
         });
@@ -705,7 +705,7 @@ public sealed class EditorWindow : Window
     {
         try
         {
-            var path = _path ?? SnapNaming.NextFreePath(_app.CapturesFolder, DateTime.Now);
+            var path = _path ?? _app.NextCapturePath(DateTime.Now);
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
             if (_doc.IsEmpty)
             {
@@ -717,7 +717,7 @@ public sealed class EditorWindow : Window
                 var original = EditSidecar.OriginalFor(path);
                 if (!File.Exists(original)) CaptureStore.WriteAtomic(original, CaptureStore.EncodePng(_base));
             }
-            CaptureStore.WriteAtomic(path, png);
+            CaptureStore.WriteAtomic(path, CaptureStore.ForPath(png, path));
             if (!_doc.IsEmpty) File.WriteAllText(EditSidecar.AnnotationsFor(path), _doc.ToJson());
             _path = path;
             _dirty = false;
