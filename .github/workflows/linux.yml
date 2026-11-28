@@ -91,7 +91,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release delete linux-nightly --yes --cleanup-tag || true
-          { echo "Automatic Linux build of the latest commit on main (${GITHUB_SHA::7})."; echo; cat notes.txt; } > body.txt
+          { echo "Automatic Linux build of the latest commit on main (${GITHUB_SHA::7}). What's new: https://github.com/mike-risky/cometsnap/blob/main/CHANGELOG.md"; echo; cat notes.txt; } > body.txt
           gh release create linux-nightly rel/* --prerelease --latest=false --target "${{ github.sha }}" \
             --title "Latest Linux build (main)" --notes-file body.txt
       - name: Update the Linux test pre-release of this pull request
