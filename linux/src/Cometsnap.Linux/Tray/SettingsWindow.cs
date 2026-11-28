@@ -131,6 +131,33 @@ public sealed class SettingsWindow : Window
             if (_app.Settings.ReplacedDesktopTool) _app.GiveBackPrintScreen();
             else _app.ShowReplaceOffer(force: true);
         }));
+
+        panel.Children.Add(Section(T("Updates")));
+        var updates = _app.Updates;
+        var auto = new CheckBox { IsChecked = updates.Prefs.CheckAutomatically, Content = new TextBlock { Text = T("Check for updates once a day"), FontSize = 14, TextWrapping = TextWrapping.Wrap } };
+        auto.IsCheckedChanged += (_, _) => updates.SetAutomatic(auto.IsChecked == true);
+        panel.Children.Add(auto);
+        panel.Children.Add(new TextBlock { Text = T("Cometsnap asks GitHub if a new version is out. Nothing installs without your click."), FontSize = 11, Foreground = SpaceTheme.DustBrush, Margin = new Thickness(28, 0, 0, 4), TextWrapping = TextWrapping.Wrap });
+        var updateStatus = new TextBlock { FontSize = 12, Foreground = SpaceTheme.DustBrush, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 300 };
+        var checking = false;
+        var updateRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        updateRow.Children.Add(Ui.ActionButton(T("Check now"), null, T("Check now"), async () =>
+        {
+            if (checking) return;
+            checking = true;
+            updateStatus.Text = T("Checking…");
+            var result = await updates.CheckAsync(manual: true);
+            updateStatus.Text = result switch
+            {
+                Services.UpdateService.Result.UpToDate => F("You have the latest version ({0}).", Services.UpdateService.Current),
+                Services.UpdateService.Result.Unreachable => T("Could not reach GitHub. Try again later."),
+                _ => "",
+            };
+            checking = false;
+        }));
+        updateRow.Children.Add(updateStatus);
+        panel.Children.Add(updateRow);
+
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 10, 0, 0) };
         buttons.Children.Add(Ui.ActionButton(T("Edit settings file"), null, T("All settings, including shortcuts, as JSON"), () => Tools.Open(_app.Paths.SettingsFile)));
         panel.Children.Add(buttons);

@@ -38,6 +38,9 @@
   <ItemGroup>
     <Compile Include="..\..\..\src\Cometsnap.Core\Localization\L.cs" Link="Core\Localization\L.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Localization\Strings.cs" Link="Core\Localization\Strings.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Localization\UpdateStrings.cs" Link="Core\Localization\UpdateStrings.cs" />
+    <!-- Update checks (GitHub Releases, what's new, checksums): the same code as on Windows. -->
+    <Compile Include="..\..\..\src\Cometsnap.Core\Updates\Updates.cs" Link="Core\Shared\Updates.cs" />
     <!-- Scrolling capture and OCR text cleanup: the same code as on Windows. -->
     <Compile Include="..\..\..\src\Cometsnap.Core\Capture\ScrollStitcher.cs" Link="Core\Shared\ScrollStitcher.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Text\OcrText.cs" Link="Core\Shared\OcrText.cs" />

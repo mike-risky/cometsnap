@@ -3,9 +3,12 @@ name: macos
 on:
   push:
     branches: [main]
-    paths: ['macos/**', 'assets/**', '.github/workflows/macos.yml']
+    # A release tag (v1.4.0) also builds the Mac app and attaches it to that release, so the
+    # in-app updater finds it there. Path filters do not apply to tags.
+    tags: ['v*']
+    paths: ['macos/**', 'assets/**', 'updates/**', '.github/workflows/macos.yml']
   pull_request:
-    paths: ['macos/**', 'assets/**', '.github/workflows/macos.yml']
+    paths: ['macos/**', 'assets/**', 'updates/**', '.github/workflows/macos.yml']
   workflow_dispatch:
 
 permissions:
@@ -82,10 +85,39 @@ jobs:
             { echo "NOTARY_KEY_PATH=$RUNNER_TEMP/notary.p8"; echo "NOTARY_KEY_ID=$NOTARY_KEY_ID"; echo "NOTARY_ISSUER=$NOTARY_ISSUER"; } >> "$GITHUB_ENV"
           fi
 
+      # A tag gives its own number. Other builds carry the latest release's number, so the
+      # in-app updater offers them the next release (0.1.0 only when GitHub can't be asked).
+      - name: Pick the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null | sed 's/^v//')" || true
+          fi
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || VERSION="0.1.0"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Version: $VERSION"
+
       - name: Bundle .app, .dmg and .zip
         run: |
-          VERSION="0.1.0"
           scripts/make-app.sh "$VERSION" "${{ github.run_number }}"
+          (cd build && shasum -a 256 Cometsnap-macOS.dmg Cometsnap-macOS.zip > SHA256SUMS-macOS.txt && cat SHA256SUMS-macOS.txt)
+
+      - name: Attach to the tagged release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # The Windows workflow (or github.com) creates the release: wait for it, up to an hour (signing can take a while).
+          for i in $(seq 1 120); do
+            gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break
+            echo "Waiting for release $GITHUB_REF_NAME..."; sleep 30
+          done
+          gh release upload "$GITHUB_REF_NAME" build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip build/SHA256SUMS-macOS.txt --clobber
 
       - name: Update the macOS "latest build" pre-release (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -94,7 +126,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release delete macos-nightly --yes --cleanup-tag || true
-          gh release create macos-nightly build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip \
+          gh release create macos-nightly build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip build/SHA256SUMS-macOS.txt \
             --prerelease --latest=false --target "${{ github.sha }}" \
             --title "Latest macOS build (main)" --notes-file FIRST-LAUNCH.txt
 
@@ -112,6 +144,6 @@ jobs:
             echo
             cat FIRST-LAUNCH.txt
           } > notes.txt
-          gh release create "macos-test-pr$PR" build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip \
+          gh release create "macos-test-pr$PR" build/Cometsnap-macOS.dmg build/Cometsnap-macOS.zip build/SHA256SUMS-macOS.txt \
             --prerelease --latest=false --target "$HEAD_SHA" \
             --title "macOS test build: PR #$PR" --notes-file notes.txt

@@ -23,12 +23,27 @@ Changes merged after the last release show up under "Latest build" first: they a
   itself is copied and saved exactly as before, and nothing opens on its own. Want only the code? Ctrl+Alt+Q
   (⌘⇧1 on macOS, or the tray menu) scans an area and copies the code right away, barcodes too (EAN, UPC, Code 128,
   Data Matrix and more). Everything is read offline. Turn the spotting off in Settings. Windows, macOS and Linux.
+- **Updates come to you, on every platform.** Once a day Cometsnap quietly asks GitHub whether a new version
+  is out. If there is one, a small card says "Cometsnap 1.4 is here" with what the new version brings, in your
+  language, plus **Update now**, **Later** and **Skip this version**. Nothing installs without your click.
+  - **Windows (installed):** one click downloads the small installer, checks it, installs it and restarts Cometsnap.
+    Your settings stay. The portable exe gets a download link instead.
+  - **macOS:** Cometsnap downloads the new .dmg and opens it: drag Cometsnap into Applications and choose Replace.
+  - **Linux:** the AppImage updates itself and restarts. A .deb install gets the download link.
+  - Settings has a new **Updates** section: switch the daily check off, or press **Check now**.
+- Release pages now also carry the macOS and Linux downloads next to the Windows ones.
 
 ### Improved
 - **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains
   Cometsnap in four short lines (press, let go and it's copied and saved, click the Copied card to edit, find
   your snaps in the tray) plus the handy shortcuts: video, GIF, copy text and the color picker. It shows the
   keys you actually have, on Windows, macOS and Linux, in all 8 languages.
+
+## v1.3.1 — 28 November 2026
+
+### Fixed
+- **Windows: Cometsnap 1.3.0 installed with Setup closed right after starting.** It starts again, and every
+  build is now launched once in CI before it ships.
 
 ## v1.3.0 — 28 November 2026
 

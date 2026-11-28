@@ -169,6 +169,13 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(Label(L.T("Frame rate")));
         stack.Children.Add(Chips(new[] { (15, "15 fps"), (30, "30 fps"), (60, "60 fps") }, S.RecordFramesPerSecond, v => S.RecordFramesPerSecond = v));
 
+        // ---- updates
+        Section(stack, L.T("Updates"));
+        stack.Children.Add(Switch(L.T("Check for updates once a day"),
+            L.T("Cometsnap asks GitHub if a new version is out. Nothing installs without your click."),
+            _app.Updates.Prefs.CheckAutomatically, v => _app.Updates.SetAutomatic(v)));
+        stack.Children.Add(UpdateRow());
+
         // ---- footer
         var footer = new DockPanel { Margin = new Thickness(0, 26, 0, 0), LastChildFill = false };
         var version = new TextBlock { Text = $"Cometsnap {CometApp.Version}", Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
@@ -182,6 +189,32 @@ public sealed class SettingsWindow : Window
         _scroll = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = SpaceTheme.NebulaBrush };
         Content = _scroll;
         _scroll.ScrollToVerticalOffset(offset);
+    }
+
+    // ------------------------------------------------------------------ updates
+
+    /// <summary>"Check now", and what it found.</summary>
+    private UIElement UpdateRow()
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+        var status = new TextBlock { Foreground = SpaceTheme.DustBrush, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 340 };
+        var busy = false;
+        row.Children.Add(Pill(L.T("Check now"), false, async () =>
+        {
+            if (busy) return;
+            busy = true;
+            status.Text = L.T("Checking…");
+            var result = await _app.Updates.CheckAsync(manual: true);
+            status.Text = result switch
+            {
+                Cometsnap.App.Updates.UpdateService.Result.UpToDate => L.F("You have the latest version ({0}).", CometApp.Version),
+                Cometsnap.App.Updates.UpdateService.Result.Unreachable => L.T("Could not reach GitHub. Try again later."),
+                _ => "",
+            };
+            busy = false;
+        }));
+        row.Children.Add(status);
+        return row;
     }
 
     // ------------------------------------------------------------------ language

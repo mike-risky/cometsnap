@@ -373,6 +373,7 @@ final class SettingsWindow: NSWindow {
         views += [heading(L.t("Keyboard shortcuts")), hint(L.t("Click a shortcut, then press the new keys. Esc cancels."))]
         views += hotkeyRows
         views.append(keys)
+        views += updateViews(heading: heading, hint: hint)
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -583,6 +584,39 @@ final class SettingsWindow: NSWindow {
     }
 
     @objc private func openFolder() { app.openCapturesFolder() }
+
+    // MARK: updates
+
+    private let updatesBox = NSButton(checkboxWithTitle: L.t("Check for updates once a day"), target: nil, action: nil)
+    private let updateStatus = NSTextField(labelWithString: "")
+
+    private func updateViews(heading: (String) -> NSTextField, hint: (String) -> NSTextField) -> [NSView] {
+        updatesBox.target = self
+        updatesBox.action = #selector(updatesChanged)
+        updatesBox.state = app.updater?.prefs.checkAutomatically == false ? .off : .on
+        let check = NSButton(title: L.t("Check now"), target: self, action: #selector(checkNow))
+        check.bezelStyle = .rounded
+        updateStatus.font = Theme.ui(11)
+        updateStatus.textColor = Theme.muted
+        let row = NSStackView(views: [check, updateStatus])
+        row.spacing = 8
+        return [heading(L.t("Updates")), updatesBox,
+                hint(L.t("Cometsnap asks GitHub if a new version is out. Nothing installs without your click.")), row]
+    }
+
+    @objc private func updatesChanged() { app.updater?.setAutomatic(updatesBox.state == .on) }
+
+    @objc private func checkNow() {
+        guard let updater = app.updater else { return }
+        updateStatus.stringValue = L.t("Checking…")
+        updater.check(manual: true) { [weak self] result in
+            switch result {
+            case .upToDate: self?.updateStatus.stringValue = L.f("You have the latest version ({0}).", Updater.current.description)
+            case .unreachable: self?.updateStatus.stringValue = L.t("Could not reach GitHub. Try again later.")
+            case .offered: self?.updateStatus.stringValue = ""
+            }
+        }
+    }
 }
 
 extension SettingsWindow: NSTextFieldDelegate {

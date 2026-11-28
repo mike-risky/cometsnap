@@ -40,6 +40,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     private var trimmers: [TrimWindow] = []
     private var settingsWindow: SettingsWindow?
     private var welcome: WelcomeWindow?
+    /// The daily update check and the "Cometsnap X is here" card.
+    private(set) var updater: Updater!
 
     var capturesDirectory: URL { paths.capturesDirectory(settings) }
 
@@ -99,6 +101,9 @@ final class AppController: NSObject, NSApplicationDelegate {
         if !settings.snapCountSeeded { seedSnapCount() }
         // A new season can start while Cometsnap runs.
         Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in self?.statusItem.refreshIcon() }
+
+        updater = Updater(app: self)
+        updater.start()
 
         if !settings.firstRunDone { showWelcome() }
     }

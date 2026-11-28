@@ -17,6 +17,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- The update-check tests are shared with the Windows tests. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\tests\Cometsnap.Core.Tests\UpdateTests.cs" Link="Shared\UpdateTests.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cometsnap.Linux\Cometsnap.Linux.csproj" />
   </ItemGroup>

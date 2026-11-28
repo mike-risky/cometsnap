@@ -1,0 +1,37 @@
+{
+  "//": "Short lines for the in-app 'Cometsnap X is here' card, in all 8 languages, newest first. 'latest' is what the next release adds: rename it to the version number (e.g. \"1.4.0\") when you tag the release, together with CHANGELOG.md, and start a new empty 'latest'. At most 2 or 3 short lines per version.",
+  "latest": {
+    "en": [
+      "Updates come to you: a small card like this one says what's new, and nothing installs without your click.",
+      "A quick mission briefing on first launch explains Cometsnap in four lines."
+    ],
+    "fr": [
+      "Les mises à jour viennent à vous : une petite carte comme celle-ci dit ce qui est nouveau, et rien ne s’installe sans votre clic.",
+      "Un court briefing de mission au premier lancement explique Cometsnap en quatre lignes."
+    ],
+    "de": [
+      "Updates kommen zu Ihnen: Eine kleine Karte wie diese sagt, was neu ist, und ohne Ihren Klick wird nichts installiert.",
+      "Ein kurzes Missions-Briefing beim ersten Start erklärt Cometsnap in vier Zeilen."
+    ],
+    "it": [
+      "Gli aggiornamenti arrivano da te: una piccola scheda come questa dice cosa c’è di nuovo, e niente si installa senza il tuo clic.",
+      "Un breve briefing di missione al primo avvio spiega Cometsnap in quattro righe."
+    ],
+    "es": [
+      "Las actualizaciones vienen a ti: una tarjetita como esta cuenta las novedades, y nada se instala sin tu clic.",
+      "Un breve briefing de misión en el primer inicio explica Cometsnap en cuatro líneas."
+    ],
+    "pt": [
+      "As atualizações vêm até você: um cartãozinho como este conta as novidades, e nada é instalado sem o seu clique.",
+      "Um breve briefing de missão na primeira abertura explica o Cometsnap em quatro linhas."
+    ],
+    "zh": [
+      "更新会主动来找你：像这样的小卡片告诉你有什么新内容，不经你点击，什么都不会安装。",
+      "首次启动时的简短任务简报，用四行字讲清 Cometsnap。"
+    ],
+    "hi": [
+      "अपडेट खुद आपके पास आते हैं: ऐसा ही एक छोटा कार्ड बताता है कि नया क्या है, और आपके क्लिक के बिना कुछ भी इंस्टॉल नहीं होता।",
+      "पहली बार खोलने पर एक छोटी मिशन ब्रीफ़िंग चार लाइनों में Cometsnap समझाती है।"
+    ]
+  }
+}

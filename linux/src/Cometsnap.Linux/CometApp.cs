@@ -37,6 +37,8 @@ public sealed class CometApp : Application
     public RecordingController Recorder { get; private set; } = null!;
     public FlyoutWindow Flyout { get; private set; } = null!;
     public HotkeyService Hotkeys { get; private set; } = null!;
+    /// <summary>The daily update check and the "Cometsnap X is here" card.</summary>
+    public UpdateService Updates { get; private set; } = null!;
     private TrayController? _tray;
     private EditCard? _card;
     private ToastWindow? _toast;
@@ -107,6 +109,8 @@ public sealed class CometApp : Application
         ApplySeason();
         _seasonTimer = new DispatcherTimer(TimeSpan.FromHours(1), DispatcherPriority.Background, (_, _) => ApplySeason());
         _seasonTimer.Start();
+        Updates = new UpdateService(this);
+        Updates.Start();
         if (!Settings.SnapCountSeeded) SeedSnapCount();
 
         Hotkeys = new HotkeyService(Settings, RunCommand);
@@ -171,6 +175,7 @@ public sealed class CometApp : Application
             case "trim" when parts.Length > 1: OpenTrimmer(parts[1]); break;
             case "quit": Quit(); break;
             case "background": break;
+            case "updated": Toast(F("Cometsnap {0} is installed", UpdateService.Current), 5000); break;
             default: Log.Info($"Unknown command '{command}'"); break;
         }
     }
