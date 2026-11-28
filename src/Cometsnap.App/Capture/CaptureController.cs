@@ -164,6 +164,9 @@ public sealed class CaptureController
     /// <summary>"Copy text": drag over some text (or click a window) and its text goes on the clipboard.</summary>
     public void StartTextCapture() => PickArea((image, rect) => _ = _app.CopyTextAsync(image, rect));
 
+    /// <summary>Select an area with a QR code or barcode: what it holds goes to the clipboard.</summary>
+    public void StartQrCapture() => PickArea((image, rect) => _ = _app.ScanCodeAsync(image, rect));
+
     /// <summary>Copies, saves and announces an image made elsewhere (a scrolling capture), like a normal capture.</summary>
     public void DeliverImage(BitmapSource image, PixelRect from) => Deliver(image, from);
 

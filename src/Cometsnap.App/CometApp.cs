@@ -252,6 +252,7 @@ public sealed class CometApp : Application
         Register(Settings.RecordGifHotkey, () => Recorder.ToggleRegion(RecordingFormat.Gif));
         Register(Settings.ScrollingHotkey, Scrolling.Start);
         Register(Settings.TextHotkey, Capture.StartTextCapture);
+        Register(Settings.QrHotkey, Capture.StartQrCapture);
         Register(Settings.ColorHotkey, Capture.StartColorPicker);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
@@ -496,6 +497,55 @@ public sealed class CometApp : Application
         }
     }
 
+    // ------------------------------------------------------------------ scan a QR code
+
+    /// <summary>
+    /// Looks for a QR code (or barcode) in the selected area, offline, and copies what it holds.
+    /// A web link is shown with an "Open link" button but never opened on its own.
+    /// </summary>
+    public async Task ScanCodeAsync(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect? from)
+    {
+        if (_reading) return;
+        _reading = true;
+        try
+        {
+            var sw = Stopwatch.StartNew();
+            if (Settings.ShowEditCard) _card?.ShowScanning(image, SystemParameters.WorkArea);
+            var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(image, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+            var pixels = new byte[stride * h];
+            bgra.CopyPixels(pixels, stride, 0);
+            var codes = await Task.Run(() => Cometsnap.Core.Scanning.CodeScanner.Scan(pixels, w, h, stride));
+            Log.Info($"QR scan: {codes.Count} code(s) in {sw.ElapsedMilliseconds} ms");
+            var first = codes.FirstOrDefault();
+            string? text = codes.Count == 0 ? null : string.Join("\n", codes.Select(c => c.Text));
+            if (text is not null && !ClipboardService.SetText(text)) Log.Error("Could not copy the code to the clipboard");
+            var link = Cometsnap.Core.Scanning.CodeScanner.LinkOf(first?.Text);
+            if (Settings.ShowEditCard && _card is not null) _card.ShowCode(image, text, first?.Format, link, SystemParameters.WorkArea);
+            else if (text is not null) Notify(L.T("QR code copied"), Preview(text));
+            else Notify(L.T("No QR code found"), L.T("Select just the code, a bit bigger"));
+            if (text is not null && from is { } rect) LaunchComet(new Point(rect.CenterX, rect.CenterY));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("QR scan failed", ex);
+            _card?.Hide();
+            Notify(L.T("Could not scan the code"), ex.Message);
+        }
+        finally
+        {
+            _reading = false;
+        }
+    }
+
+    /// <summary>Opens a scanned web link in the default browser, only after the user clicked it.</summary>
+    public void OpenLink(string link)
+    {
+        if (Cometsnap.Core.Scanning.CodeScanner.LinkOf(link) is not { } safe) return;
+        try { Process.Start(new ProcessStartInfo(safe) { UseShellExecute = true }); }
+        catch (Exception ex) { Log.Error("Could not open the link", ex); }
+    }
+
     private static string Preview(string text)
     {
         var first = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
@@ -611,6 +661,7 @@ public sealed class CometApp : Application
         card.TextRequested += image => _ = CopyTextAsync(image, null);
         card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
         card.ShowTextRequested += ShowRecognizedText;
+        card.OpenLinkRequested += OpenLink;
         return card;
     }
 

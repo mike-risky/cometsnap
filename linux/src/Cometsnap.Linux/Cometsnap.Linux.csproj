@@ -23,6 +23,8 @@
     <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+    <!-- QR codes and barcodes (Scan QR code): small, managed, offline. -->
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,6 +46,7 @@
     <Compile Include="..\..\..\src\Cometsnap.Core\Settings\CaptureThemes.cs" Link="Core\Shared\CaptureThemes.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Styling\SnapStyles.cs" Link="Core\Shared\SnapStyles.cs" />
     <Compile Include="..\..\..\src\Cometsnap.Core\Styling\StyleRenderer.cs" Link="Core\Shared\StyleRenderer.cs" />
+    <Compile Include="..\..\..\src\Cometsnap.Core\Scanning\CodeScanner.cs" Link="Core\Shared\CodeScanner.cs" />
   </ItemGroup>
 
   <ItemGroup>

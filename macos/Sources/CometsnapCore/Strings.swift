@@ -360,6 +360,19 @@ enum Strings {
         "Hue": "Teinte",
         "Saturation": "Saturation",
         "Brightness": "Luminosité",
+        "Scan a QR code": "Scanner un code QR",
+        "Open link": "Ouvrir le lien",
+        "SCANNING…": "SCAN EN COURS…",
+        "Looking for a QR code": "Recherche d'un code QR",
+        "NO QR CODE FOUND": "AUCUN CODE QR TROUVÉ",
+        "No QR code found": "Aucun code QR trouvé",
+        "Select just the code, a bit bigger": "Sélectionnez juste le code, un peu plus grand",
+        "QR CODE COPIED!": "CODE QR COPIÉ !",
+        "CODE COPIED!": "CODE COPIÉ !",
+        "QR code copied": "Code QR copié",
+        "Code copied": "Code copié",
+        "Could not scan the code": "Impossible de scanner le code",
+        "Drag over the QR code, or click a window · Esc cancel": "Glissez sur le code QR, ou cliquez sur une fenêtre · Échap annule",
     ]
 
     static let german: [String: String] = [
@@ -707,6 +720,19 @@ enum Strings {
         "Hue": "Farbton",
         "Saturation": "Sättigung",
         "Brightness": "Helligkeit",
+        "Scan a QR code": "QR-Code scannen",
+        "Open link": "Link öffnen",
+        "SCANNING…": "WIRD GESCANNT…",
+        "Looking for a QR code": "Suche nach einem QR-Code",
+        "NO QR CODE FOUND": "KEIN QR-CODE GEFUNDEN",
+        "No QR code found": "Kein QR-Code gefunden",
+        "Select just the code, a bit bigger": "Nur den Code auswählen, etwas größer",
+        "QR CODE COPIED!": "QR-CODE KOPIERT!",
+        "CODE COPIED!": "CODE KOPIERT!",
+        "QR code copied": "QR-Code kopiert",
+        "Code copied": "Code kopiert",
+        "Could not scan the code": "Der Code konnte nicht gescannt werden",
+        "Drag over the QR code, or click a window · Esc cancel": "Über den QR-Code ziehen oder ein Fenster anklicken · Esc bricht ab",
     ]
 
     static let italian: [String: String] = [
@@ -1054,6 +1080,19 @@ enum Strings {
         "Hue": "Tonalità",
         "Saturation": "Saturazione",
         "Brightness": "Luminosità",
+        "Scan a QR code": "Scansiona un codice QR",
+        "Open link": "Apri il link",
+        "SCANNING…": "SCANSIONE…",
+        "Looking for a QR code": "Cerco un codice QR",
+        "NO QR CODE FOUND": "NESSUN CODICE QR TROVATO",
+        "No QR code found": "Nessun codice QR trovato",
+        "Select just the code, a bit bigger": "Seleziona solo il codice, un po' più grande",
+        "QR CODE COPIED!": "CODICE QR COPIATO!",
+        "CODE COPIED!": "CODICE COPIATO!",
+        "QR code copied": "Codice QR copiato",
+        "Code copied": "Codice copiato",
+        "Could not scan the code": "Impossibile scansionare il codice",
+        "Drag over the QR code, or click a window · Esc cancel": "Trascina sul codice QR o clicca una finestra · Esc annulla",
     ]
 
     static let spanish: [String: String] = [
@@ -1401,6 +1440,19 @@ enum Strings {
         "Hue": "Tono",
         "Saturation": "Saturación",
         "Brightness": "Brillo",
+        "Scan a QR code": "Escanear un código QR",
+        "Open link": "Abrir el enlace",
+        "SCANNING…": "ESCANEANDO…",
+        "Looking for a QR code": "Buscando un código QR",
+        "NO QR CODE FOUND": "NO SE ENCONTRÓ NINGÚN CÓDIGO QR",
+        "No QR code found": "No se encontró ningún código QR",
+        "Select just the code, a bit bigger": "Selecciona solo el código, un poco más grande",
+        "QR CODE COPIED!": "¡CÓDIGO QR COPIADO!",
+        "CODE COPIED!": "¡CÓDIGO COPIADO!",
+        "QR code copied": "Código QR copiado",
+        "Code copied": "Código copiado",
+        "Could not scan the code": "No se pudo escanear el código",
+        "Drag over the QR code, or click a window · Esc cancel": "Arrastra sobre el código QR o haz clic en una ventana · Esc cancela",
     ]
 
     static let portuguese: [String: String] = [
@@ -1748,6 +1800,19 @@ enum Strings {
         "Hue": "Matiz",
         "Saturation": "Saturação",
         "Brightness": "Brilho",
+        "Scan a QR code": "Ler um código QR",
+        "Open link": "Abrir o link",
+        "SCANNING…": "LENDO…",
+        "Looking for a QR code": "Procurando um código QR",
+        "NO QR CODE FOUND": "NENHUM CÓDIGO QR ENCONTRADO",
+        "No QR code found": "Nenhum código QR encontrado",
+        "Select just the code, a bit bigger": "Selecione só o código, um pouco maior",
+        "QR CODE COPIED!": "CÓDIGO QR COPIADO!",
+        "CODE COPIED!": "CÓDIGO COPIADO!",
+        "QR code copied": "Código QR copiado",
+        "Code copied": "Código copiado",
+        "Could not scan the code": "Não foi possível ler o código",
+        "Drag over the QR code, or click a window · Esc cancel": "Arraste sobre o código QR ou clique numa janela · Esc cancela",
     ]
 
     static let chinese: [String: String] = [
@@ -2095,6 +2160,19 @@ enum Strings {
         "Hue": "色相",
         "Saturation": "饱和度",
         "Brightness": "亮度",
+        "Scan a QR code": "扫描二维码",
+        "Open link": "打开链接",
+        "SCANNING…": "扫描中…",
+        "Looking for a QR code": "正在查找二维码",
+        "NO QR CODE FOUND": "未找到二维码",
+        "No QR code found": "未找到二维码",
+        "Select just the code, a bit bigger": "只框选二维码，稍大一点",
+        "QR CODE COPIED!": "二维码已复制！",
+        "CODE COPIED!": "条码已复制！",
+        "QR code copied": "二维码内容已复制",
+        "Code copied": "条码内容已复制",
+        "Could not scan the code": "无法扫描该码",
+        "Drag over the QR code, or click a window · Esc cancel": "拖动框选二维码，或点击一个窗口 · Esc 取消",
     ]
 
     static let hindi: [String: String] = [
@@ -2442,5 +2520,18 @@ enum Strings {
         "Hue": "ह्यू",
         "Saturation": "संतृप्ति",
         "Brightness": "चमक",
+        "Scan a QR code": "QR कोड स्कैन करें",
+        "Open link": "लिंक खोलें",
+        "SCANNING…": "स्कैन हो रहा है…",
+        "Looking for a QR code": "QR कोड ढूँढ रहे हैं",
+        "NO QR CODE FOUND": "कोई QR कोड नहीं मिला",
+        "No QR code found": "कोई QR कोड नहीं मिला",
+        "Select just the code, a bit bigger": "सिर्फ़ कोड चुनें, थोड़ा बड़ा",
+        "QR CODE COPIED!": "QR कोड कॉपी हुआ!",
+        "CODE COPIED!": "कोड कॉपी हुआ!",
+        "QR code copied": "QR कोड कॉपी हुआ",
+        "Code copied": "कोड कॉपी हुआ",
+        "Could not scan the code": "कोड स्कैन नहीं हो सका",
+        "Drag over the QR code, or click a window · Esc cancel": "QR कोड पर ड्रैग करें, या कोई विंडो क्लिक करें · Esc रद्द करे",
     ]
 }

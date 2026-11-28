@@ -19,6 +19,7 @@ struct HotkeyDisplay {
     var text = "⌘⇧9"
     var scrolling = "⌘⇧0"
     var color = "⌘⇧6"
+    var qr = "⌘⇧1"
 }
 
 /// Owns everything: settings, the menu bar item, the flyout, capture, recording and editors.
@@ -47,7 +48,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         return HotkeyDisplay(capture: settings.takeOverSystemShortcut && !changed ? "⌘⇧4" : settings.hotkey(.capture).display,
                              video: settings.hotkey(.video).display, gif: settings.hotkey(.gif).display,
                              text: settings.hotkey(.text).display, scrolling: settings.hotkey(.scrolling).display,
-                             color: settings.hotkey(.color).display)
+                             color: settings.hotkey(.color).display, qr: settings.hotkey(.qr).display)
     }
 
     /// While Settings listens for new keys, the app's own shortcuts must not catch them.
@@ -137,6 +138,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         card.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
         card.onOpen = { [weak self] url in self?.openTrimmer(url) }
         card.onText = { [weak self] image, scale in self?.copyText(image, scale: scale, from: nil) }
+        card.onOpenLink = { link in if let safe = CodeLinks.linkOf(link), let url = URL(string: safe) { NSWorkspace.shared.open(url) } }
         card.onShowText = { [weak self] text in self?.showText(text) }
         card.onStyle = { [weak self] url, raw, scale in self?.styleOneShot(url: url, raw: raw, scale: scale) }
         return card
@@ -216,6 +218,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         hk.register(settings.hotkey(.text), action: { [weak self] in self?.capture.startTextCapture() })
         hk.register(settings.hotkey(.scrolling), action: { [weak self] in self?.scrolling.start() })
         hk.register(settings.hotkey(.color), action: { [weak self] in self?.capture.startColorPicker() })
+        hk.register(settings.hotkey(.qr), action: { [weak self] in self?.capture.startQrCapture() })
     }
 
     // MARK: copy text (OCR)
@@ -234,6 +237,37 @@ final class AppController: NSObject, NSApplicationDelegate {
                 if outcome.found { Clipboard.copyText(outcome.text) }
                 if let card { card.showText(outcome.text, lines: outcome.lines) }
                 if outcome.found, let rect, self.settings.cometAnimation {
+                    CometFlight.fly(from: rect, to: self.statusItem.buttonFrame, image: image)
+                }
+            } catch {
+                card?.orderOut(nil)
+                self.report(error)
+            }
+        }
+    }
+
+    // MARK: scan a QR code
+
+    /// Finds a QR code (or barcode) in an image with Vision, offline, and copies what it holds.
+    /// A web link gets an "Open link" button on the card; it is never opened on its own.
+    func scanCode(_ image: CGImage, scale: CGFloat, from rect: CGRect?) {
+        guard !reading else { return }
+        reading = true
+        let card = settings.showEditCard ? editCard : nil
+        card?.showScanning(image: image, scale: scale)
+        Task { @MainActor in
+            defer { self.reading = false }
+            do {
+                let codes = try await CodeReader.read(image)
+                Log.info("qr: \(codes.count) code(s)")
+                let text = codes.isEmpty ? nil : codes.map(\.text).joined(separator: "\n")
+                if let text { Clipboard.copyText(text) }
+                if let card {
+                    card.showCode(text, format: codes.first?.format, link: CodeLinks.linkOf(codes.first?.text))
+                } else if let text {
+                    Log.info("qr copied: \(text.prefix(40))")
+                }
+                if text != nil, let rect, self.settings.cometAnimation {
                     CometFlight.fly(from: rect, to: self.statusItem.buttonFrame, image: image)
                 }
             } catch {

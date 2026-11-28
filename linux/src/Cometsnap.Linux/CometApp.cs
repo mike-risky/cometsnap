@@ -30,6 +30,7 @@ public sealed class CometApp : Application
     public CaptureStore Store { get; private set; } = null!;
     public ClipboardService Clipboard { get; private set; } = null!;
     public TextCapture CopyText { get; private set; } = null!;
+    public CodeScan ScanCode { get; private set; } = null!;
     public ScrollingCapture Scrolling { get; private set; } = null!;
     public SoundService Sound { get; private set; } = null!;
     public CaptureController Capture { get; private set; } = null!;
@@ -97,6 +98,7 @@ public sealed class CometApp : Application
         Flyout = new FlyoutWindow(this);
         Clipboard = new ClipboardService(() => Flyout);
         CopyText = new TextCapture(this);
+        ScanCode = new CodeScan(this);
         Scrolling = new ScrollingCapture(this);
         Task.Run(() => Recent.Load(CapturesFolder));
 
@@ -155,6 +157,7 @@ public sealed class CometApp : Application
             case "fullscreen": Capture.CaptureFullscreen(); break;
             case "scroll": Scrolling.Start(); break;
             case "text": CopyText.Start(); break;
+            case "qr": ScanCode.Start(); break;
             case "color": Capture.StartColorPicker(); break;
             case "delayed": Capture.StartDelayed(parts.Length > 1 && int.TryParse(parts[1], out var s) ? s : 3); break;
             case "record": Recorder.ToggleRegion(RecordingFormat.Mp4); break;
@@ -563,14 +566,14 @@ public sealed class CometApp : Application
     public double ScalingAt(PixelRect r) =>
         Screens?.ScreenFromPoint(new PixelPoint(r.CenterX, r.CenterY))?.Scaling ?? 1;
 
-    public void Toast(string text, int ms)
+    public void Toast(string text, int ms, string? actionLabel = null, Action? action = null)
     {
         Dispatcher.UIThread.Post(() =>
         {
             _toast ??= new ToastWindow();
             var p = X11.PointerPosition() ?? (0, 0);
             var (work, scale) = WorkAreaAt(p.X, p.Y);
-            _toast.ShowMessage(text, ms, work, scale);
+            _toast.ShowMessage(text, ms, work, scale, actionLabel, action);
         });
     }
 

@@ -132,7 +132,7 @@ public struct HotkeySpec: Codable, Equatable {
 
 /// The actions whose shortcut can be changed in Settings.
 public enum HotkeyAction: String, CaseIterable {
-    case capture, video, gif, text, scrolling, color
+    case capture, video, gif, text, scrolling, color, qr
 }
 
 /// Standard folders.

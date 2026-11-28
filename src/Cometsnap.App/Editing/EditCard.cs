@@ -31,6 +31,8 @@ public sealed class EditCard : Window
     private readonly Border _editButton;
     private readonly Border _cardBorder;
     private readonly Border _textButton;
+    private readonly Border _linkButton;
+    private string? _link;                // a scanned QR code that is a web link
     private readonly Border _styleButton;
     private BitmapSource? _raw;           // the capture before any style, for the ✨ button
     private bool _canStyle;
@@ -56,6 +58,9 @@ public sealed class EditCard : Window
 
     /// <summary>Raised with the recognized text when the card of a text capture is clicked.</summary>
     public event Action<string>? ShowTextRequested;
+
+    /// <summary>The user asked to open the web link of a scanned QR code (never opened on its own).</summary>
+    public event Action<string>? OpenLinkRequested;
 
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
     private const string TextIcon = "M3,3.5 H13 M8,3.5 V13.5 M6,13.5 H10";
@@ -147,6 +152,26 @@ public sealed class EditCard : Window
             StyleRequested?.Invoke(_path, raw);
         };
 
+        // Open link: only for a scanned QR code that is a web link, and only on a click.
+        _linkButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 6, 11, 6),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            Visibility = Visibility.Collapsed,
+            Child = new TextBlock { Text = "🔗 " + L.T("Open link"), Foreground = SpaceTheme.StarWhiteBrush, FontWeight = FontWeights.SemiBold, FontSize = 13 },
+        };
+        _linkButton.MouseEnter += (_, _) => _linkButton.Background = CaptureLook.AccentBrush;
+        _linkButton.MouseLeave += (_, _) => _linkButton.Background = SpaceTheme.NavyBrush;
+        _linkButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _link is not { } link) return;
+            _timer.Stop();
+            Hide();
+            OpenLinkRequested?.Invoke(link);
+        };
+
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -159,6 +184,7 @@ public sealed class EditCard : Window
         row.Children.Add(text);
         row.Children.Add(_styleButton);
         row.Children.Add(_textButton);
+        row.Children.Add(_linkButton);
         row.Children.Add(edit);
         row.Children.Add(close);
 
@@ -268,6 +294,8 @@ public sealed class EditCard : Window
         _title.Foreground = CaptureLook.TagBrush;
         _recording = recording;
         _text = text;
+        _link = null;
+        _linkButton.Visibility = Visibility.Collapsed;
         var video = recording is not null;
         var reading = text is not null;
         _textButton.Visibility = video || reading ? Visibility.Collapsed : Visibility.Visible;
@@ -303,6 +331,43 @@ public sealed class EditCard : Window
         _title.Text = text.Length > 0 ? L.T("TEXT COPIED!") : L.T("NO TEXT FOUND");
         _detail.Text = text.Length == 0 ? L.T("Try a bigger area")
             : lines == 1 ? FirstLine(text) : L.F("{0} lines · {1}", lines, FirstLine(text));
+        Present(workAreaDip, fadeLater: true);
+    }
+
+    /// <summary>The capture is being searched for a QR code or barcode.</summary>
+    public void ShowScanning(BitmapSource image, Rect workAreaDip)
+    {
+        ShowReading(image, workAreaDip);
+        _title.Text = L.T("SCANNING…");
+        _detail.Text = L.T("Looking for a QR code");
+    }
+
+    /// <summary>
+    /// Shows what the QR code (or barcode) holds, already on the clipboard. A web link gets an
+    /// "Open link" button; nothing is ever opened without that click.
+    /// </summary>
+    public void ShowCode(BitmapSource image, string? text, string? format, string? link, Rect workAreaDip)
+    {
+        SetMode(recording: null, text: text ?? "");
+        _image = image;
+        _path = null;
+        _thumb.Source = image;
+        if (text is null)
+        {
+            _title.Text = L.T("NO QR CODE FOUND");
+            _detail.Text = L.T("Select just the code, a bit bigger");
+        }
+        else
+        {
+            _title.Text = format == "QR code" ? L.T("QR CODE COPIED!") : L.T("CODE COPIED!");
+            _detail.Text = FirstLine(text);
+            _link = link;
+            if (link is not null)
+            {
+                _linkButton.Visibility = Visibility.Visible;
+                _linkButton.ToolTip = link;
+            }
+        }
         Present(workAreaDip, fadeLater: true);
     }
 
