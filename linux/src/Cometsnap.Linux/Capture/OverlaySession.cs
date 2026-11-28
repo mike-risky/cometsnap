@@ -15,6 +15,8 @@ public enum OverlayPurpose
     Scroll,
     /// <summary>Color picker: a click copies the color under the cursor.</summary>
     Color,
+    /// <summary>Pick the QR code (or barcode) to read.</summary>
+    Qr,
 }
 
 /// <summary>

@@ -39,6 +39,9 @@ public sealed class AppSettings
     /// <summary>Copy text (OCR with Tesseract).</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
 
+    /// <summary>Scan a QR code (or barcode): drag over it, what it says goes on the clipboard.</summary>
+    public string QrHotkey { get; set; } = "Ctrl+Alt+Q";
+
     /// <summary>Start recording a region (pick it like a capture). Pressed again while recording: stop.</summary>
     public string RecordHotkey { get; set; } = "Shift+PrintScreen";
 

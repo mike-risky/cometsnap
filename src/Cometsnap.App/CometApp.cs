@@ -252,6 +252,7 @@ public sealed class CometApp : Application
         Register(Settings.ScrollingHotkey, Scrolling.Start);
         Register(Settings.TextHotkey, Capture.StartTextCapture);
         Register(Settings.ColorHotkey, Capture.StartColorPicker);
+        Register(Settings.QrHotkey, Capture.StartQrScan);
 
         RegionHotkeyText = main ? Settings.CaptureHotkey : fallback ? Settings.CaptureHotkeyFallback : null;
         _menu?.Rebuild();
@@ -390,6 +391,8 @@ public sealed class CometApp : Application
         if (Settings.PlaySounds) _sounds?.Snap();
         if (Settings.ShowEditCard) _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture);
         LaunchComet(new Point(from.CenterX, from.CenterY), image);
+        // A QR code in the capture? The card offers to read it (quick check, off the UI thread).
+        if (Settings.ShowEditCard) Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, () => _ = OfferCodesAsync(image));
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle, CountSnap);
     }
@@ -451,6 +454,48 @@ public sealed class CometApp : Application
         var window = new TextResultWindow(text);
         window.Show();
         window.Activate();
+    }
+
+    // ------------------------------------------------------------------ QR codes
+
+    private bool _scanning;
+
+    /// <summary>"Scan a QR code": reads the codes in the picked area; the first one goes on the clipboard.</summary>
+    public async Task ScanCodesAsync(System.Windows.Media.Imaging.BitmapSource image, Cometsnap.Core.Geometry.PixelRect? from)
+    {
+        if (_scanning) return;
+        _scanning = true;
+        try
+        {
+            var codes = await QrService.ScanAsync(image, quick: false);
+            if (codes.Count == 0)
+            {
+                Notify(L.T("No QR code found"), L.T("Drag a box around the code, a little bigger than the code itself."));
+                return;
+            }
+            ShowCodes(codes);
+            if (from is { } rect) LaunchComet(new Point(rect.CenterX, rect.CenterY));
+        }
+        finally
+        {
+            _scanning = false;
+        }
+    }
+
+    /// <summary>Copies the first code (a Wi-Fi code gives its password) and shows what the codes say.</summary>
+    public void ShowCodes(IReadOnlyList<Cometsnap.Core.Text.ScannedCode> codes)
+    {
+        if (codes.Count == 0) return;
+        if (!ClipboardService.SetText(codes[0].ClipboardText)) Log.Error("Could not copy the QR code to the clipboard");
+        var window = new QrResultWindow(codes);
+        window.Show();
+        window.Activate();
+    }
+
+    private async Task OfferCodesAsync(System.Windows.Media.Imaging.BitmapSource image)
+    {
+        var codes = await QrService.ScanAsync(image, quick: true);
+        if (codes.Count > 0) _card?.OfferCodes(image, codes);
     }
 
     // ------------------------------------------------------------------ playful touches
@@ -553,6 +598,7 @@ public sealed class CometApp : Application
         card.TrimRequested += OpenTrimmer;
         card.TextRequested += image => _ = CopyTextAsync(image, null);
         card.ShowTextRequested += ShowRecognizedText;
+        card.CodesRequested += ShowCodes;
         return card;
     }
 

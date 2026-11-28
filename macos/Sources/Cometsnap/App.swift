@@ -19,6 +19,7 @@ struct HotkeyDisplay {
     var text = "⌘⇧9"
     var scrolling = "⌘⇧0"
     var color = "⌘⇧6"
+    var qr = "⌘⇧1"
 }
 
 /// Owns everything: settings, the menu bar item, the flyout, capture, recording and editors.
@@ -33,6 +34,8 @@ final class AppController: NSObject, NSApplicationDelegate {
     private(set) var recorder: Recorder!
     private(set) var scrolling: ScrollingCapture!
     private var textWindows: [TextWindow] = []
+    private var qrWindows: [QrWindow] = []
+    private var scanning = false
     private var reading = false
     private(set) var editCard: EditCard!
     private var editors: [EditorWindow] = []
@@ -47,7 +50,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         return HotkeyDisplay(capture: settings.takeOverSystemShortcut && !changed ? "⌘⇧4" : settings.hotkey(.capture).display,
                              video: settings.hotkey(.video).display, gif: settings.hotkey(.gif).display,
                              text: settings.hotkey(.text).display, scrolling: settings.hotkey(.scrolling).display,
-                             color: settings.hotkey(.color).display)
+                             color: settings.hotkey(.color).display, qr: settings.hotkey(.qr).display)
     }
 
     /// While Settings listens for new keys, the app's own shortcuts must not catch them.
@@ -188,6 +191,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         hk.register(settings.hotkey(.text), action: { [weak self] in self?.capture.startTextCapture() })
         hk.register(settings.hotkey(.scrolling), action: { [weak self] in self?.scrolling.start() })
         hk.register(settings.hotkey(.color), action: { [weak self] in self?.capture.startColorPicker() })
+        hk.register(settings.hotkey(.qr), action: { [weak self] in self?.capture.startQrScan() })
     }
 
     // MARK: copy text (OCR)
@@ -220,6 +224,43 @@ final class AppController: NSObject, NSApplicationDelegate {
         textWindows.append(w)
         NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
             DispatchQueue.main.async { self?.textWindows.removeAll { $0 === w } }
+        }
+        NSApp.activate()
+        w.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: QR codes
+
+    /// Reads the QR codes (and barcodes) in an image; the first one goes on the clipboard.
+    func scanCodes(_ image: CGImage, from rect: CGRect?) {
+        guard !scanning else { return }
+        scanning = true
+        Task { @MainActor in
+            defer { self.scanning = false }
+            let codes = await QrReader.scan(image)
+            Log.info("qr: \(codes.count) code(s)")
+            guard let first = codes.first else {
+                NSApp.activate()
+                let a = NSAlert()
+                a.icon = Theme.logo
+                a.messageText = L.t("No QR code found")
+                a.informativeText = L.t("Drag a box around the code, a little bigger than the code itself.")
+                a.runModal()
+                return
+            }
+            Clipboard.copyText(first.clipboardText)
+            self.showCodes(codes)
+            if let rect, self.settings.cometAnimation {
+                CometFlight.fly(from: rect, to: self.statusItem.buttonFrame, image: image)
+            }
+        }
+    }
+
+    func showCodes(_ codes: [ScannedCode]) {
+        let w = QrWindow(codes: codes)
+        qrWindows.append(w)
+        NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+            DispatchQueue.main.async { self?.qrWindows.removeAll { $0 === w } }
         }
         NSApp.activate()
         w.makeKeyAndOrderFront(nil)

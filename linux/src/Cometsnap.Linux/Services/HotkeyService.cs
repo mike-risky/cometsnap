@@ -58,6 +58,7 @@ public sealed class HotkeyService : IDisposable
             Add("record-gif", T("Record a GIF (press again to stop)"), _settings.RecordGifHotkey);
             Add("text", T("Copy text from the screen"), _settings.TextHotkey);
             Add("color", T("Pick a color"), _settings.ColorHotkey);
+            Add("qr", T("Scan a QR code"), _settings.QrHotkey);
             var ok = await portal.BindGlobalShortcutsAsync(shortcuts, id => Avalonia.Threading.Dispatcher.UIThread.Post(() => _onCommand(id)));
             Log.Info($"Hotkeys: GlobalShortcuts portal {(ok ? "bound" : "not available")}");
             PrintScreenTaken = !ok;
@@ -93,6 +94,7 @@ public sealed class HotkeyService : IDisposable
         Grab("scroll", _settings.ScrollingHotkey);
         Grab("text", _settings.TextHotkey);
         Grab("color", _settings.ColorHotkey);
+        Grab("qr", _settings.QrHotkey);
         _x11.Start();
     }
 

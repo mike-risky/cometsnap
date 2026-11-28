@@ -126,7 +126,7 @@ public sealed class CaptureController
             EnsureOverlays(monitors);
             var session = new OverlaySession(screen, windows, monitors, _app.Settings, purpose)
             {
-                CanScroll = purpose != OverlayPurpose.Record && ScrollingCapture.Supported && !_app.Scrolling.IsRunning,
+                CanScroll = purpose != OverlayPurpose.Record && purpose != OverlayPurpose.Qr && ScrollingCapture.Supported && !_app.Scrolling.IsRunning,
             };
             var done = new TaskCompletionSource<PixelRect?>();
             session.Finished += r => done.TrySetResult(r);

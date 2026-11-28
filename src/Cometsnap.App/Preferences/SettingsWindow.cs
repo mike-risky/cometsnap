@@ -141,6 +141,7 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(HotkeyRow(L.T("Active window"), () => S.ActiveWindowHotkey, v => S.ActiveWindowHotkey = v, new AppSettings().ActiveWindowHotkey));
         stack.Children.Add(HotkeyRow(L.T("Scrolling capture"), () => S.ScrollingHotkey, v => S.ScrollingHotkey = v, new AppSettings().ScrollingHotkey));
         stack.Children.Add(HotkeyRow(L.T("Copy text from the screen"), () => S.TextHotkey, v => S.TextHotkey = v, new AppSettings().TextHotkey));
+        stack.Children.Add(HotkeyRow(L.T("Scan a QR code"), () => S.QrHotkey, v => S.QrHotkey = v, new AppSettings().QrHotkey));
         stack.Children.Add(HotkeyRow(L.T("Pick a color (copies #RRGGBB)"), () => S.ColorHotkey, v => S.ColorHotkey = v, new AppSettings().ColorHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a video (MP4)"), () => S.RecordHotkey, v => S.RecordHotkey = v, new AppSettings().RecordHotkey));
         stack.Children.Add(HotkeyRow(L.T("Record a GIF"), () => S.RecordGifHotkey, v => S.RecordGifHotkey = v, new AppSettings().RecordGifHotkey));

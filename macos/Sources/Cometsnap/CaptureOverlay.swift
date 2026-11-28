@@ -25,7 +25,7 @@ struct OverlayResult {
 /// the cursor (click grabs it), drag selects any area with edges snapping to windows, and a
 /// loupe in a corner shows the real pixels and dodges the cursor.
 final class CaptureOverlay {
-    enum Purpose { case screenshot, recording, text, scrolling, color }
+    enum Purpose { case screenshot, recording, text, scrolling, color, qr }
 
     let purpose: Purpose
     let loupeCorner: LoupeCorner
@@ -353,6 +353,7 @@ final class OverlayView: NSView {
         switch overlay.purpose {
         case .recording: hint.text = L.t("Pick what to record: click a window or drag an area · F whole screen · Esc cancel")
         case .text: hint.text = L.t("Drag over the text to copy, or click a window · Esc cancel")
+        case .qr: hint.text = L.t("Drag over the QR code, or click a window · Esc cancel")
         case .scrolling: hint.text = L.t("Drag over the part that scrolls, then keep the button held and scroll · Esc cancel")
         case .color: hint.text = L.t("Click to copy the color  ·  Shift+click: RGB  ·  Esc cancels")
         case .screenshot: hint.text = L.t("Click a window or drag an area · F whole screen · W window detection · Esc cancel")

@@ -9,6 +9,14 @@ Changes merged after the last release show up under "Latest build" first: they a
 
 ## Latest build
 
+### New
+- **Scan a QR code** (Ctrl+Alt+Q on Windows and Linux, ⌘⇧1 on macOS, or the tray menu): drag over a QR code
+  or a barcode and what it says lands on the clipboard. A small window shows it, with **Open link** for web
+  addresses (links never open by themselves, and you see the site's name first) and the network name and password
+  for Wi-Fi codes, where the password is what gets copied. Reads QR codes, Data Matrix, Aztec, PDF417 and the usual
+  barcodes (EAN, UPC, Code 128...), also light codes on dark pages and codes you boxed a bit too tightly. All offline.
+  On Windows, when a capture holds a QR code, the Copied card shows a **QR** button too.
+
 ### Improved
 - **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains
   Cometsnap in four short lines (press, let go and it's copied and saved, click the Copied card to edit, find

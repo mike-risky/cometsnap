@@ -39,6 +39,9 @@ public sealed class AppSettings
     /// <summary>Copy text (OCR): drag over text on the screen and the text goes on the clipboard.</summary>
     public string TextHotkey { get; set; } = "Ctrl+Alt+T";
 
+    /// <summary>Scan a QR code (or barcode): drag over it, what it says goes on the clipboard.</summary>
+    public string QrHotkey { get; set; } = "Ctrl+Alt+Q";
+
     /// <summary>Folder for captures. Empty = default (Pictures\Cometsnap or beside the exe in portable mode).</summary>
     public string CapturesFolder { get; set; } = "";
 

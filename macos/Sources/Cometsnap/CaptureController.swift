@@ -39,6 +39,14 @@ final class CaptureController {
         }
     }
 
+    /// Scan a QR code: drag over a code (or click a window) and what it says goes on the clipboard.
+    func startQrScan() {
+        openOverlay(purpose: .qr) { [weak self] result in
+            guard let self, let result, let image = result.image else { return }
+            self.app.scanCodes(image, from: result.rect)
+        }
+    }
+
     /// Color picker: the loupe opens on the frozen screen, a click copies the color as #RRGGBB.
     func startColorPicker() {
         openOverlay(purpose: .color, onColor: { color, text in

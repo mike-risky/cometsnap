@@ -76,6 +76,8 @@ the comet and meteor showers need a compositing desktop, which almost every desk
 It speaks English, Spanish, Portuguese, French, German, Italian, Simplified Chinese and Hindi, following your desktop's language (change it in *Settings*).
 **Copy text** (Ctrl+Alt+T, or the tray menu): drag over any text and it lands on the clipboard. It uses Tesseract,
 offline: `sudo apt install tesseract-ocr` (plus e.g. `tesseract-ocr-fra` for other languages).
+**Scan a QR code** (Ctrl+Alt+Q, or the tray menu): drag over a QR code or barcode and what it says lands on the
+clipboard, with an **Open link** button for web addresses. Read offline, nothing to install.
 **Scrolling capture**: in any capture, drag over the part that scrolls and, still holding the button, scroll; let go
 to finish (Ctrl+Alt+Print Screen opens the capture with this reminder). It needs an X11 session for now.
 Recordings open in a small trimmer (the **Trim** button on the Copied card, or double-click one in the tray panel):
@@ -125,6 +127,10 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 - **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
   button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
   Click the card to see the text and copy just a part
+- **Scan a QR code** (Ctrl+Alt+Q, or the tray menu): drag over a QR code (or a barcode: EAN, UPC, Code 128,
+  Data Matrix, PDF417, Aztec...) and what it says lands on the clipboard. A small window shows it, with **Open link**
+  for web addresses (links never open by themselves) and the network and password for Wi-Fi codes (the password is
+  what gets copied). When a capture holds a QR code, the Copied card shows a **QR** button. Read offline
 - **Color picker** (Win+Shift+C, or the tray menu): the loupe opens, click any pixel and its color lands on the
   clipboard as `#RRGGBB` (Shift+click for `rgb(...)`). In any capture, **C** copies the color under the cursor too
 - **Capture colors**: pick the look of the capture screen in Settings (Comet blue, Sun yellow, Terracotta, Flame
@@ -141,6 +147,7 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 | Anywhere | **Ctrl+Shift+Print Screen** | Record a region / window to an animated GIF |
 | Anywhere | **Ctrl+Alt+Print Screen** | Scrolling capture (hold the button and scroll, let go to finish) |
 | Anywhere | **Ctrl+Alt+T** | Copy the text in an area (OCR) |
+| Anywhere | **Ctrl+Alt+Q** | Scan a QR code or barcode in an area |
 | Anywhere | **Win+Shift+C** | Color picker: click a pixel to copy its `#RRGGBB` |
 | Overlay | click | Capture the highlighted window |
 | Overlay | drag | Capture a free region (hold **Alt** to disable edge snapping, hold **Space** to move it) |

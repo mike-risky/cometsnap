@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- QR code / barcode reading (Apache-2.0, managed, ~0.5 MB, no other dependencies). -->
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Cometsnap.Core.Tests" />
   </ItemGroup>
 

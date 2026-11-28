@@ -31,6 +31,8 @@ public sealed class EditCard : Window
     private readonly Border _editButton;
     private readonly Border _cardBorder;
     private readonly Border _textButton;
+    private readonly Border _qrButton;
+    private IReadOnlyList<Cometsnap.Core.Text.ScannedCode>? _codes; // QR codes found in the capture
     private string? _recording;           // set while the card shows a recording
     private string? _text;                // set while the card shows recognized text
     private readonly DispatcherTimer _timer;
@@ -51,9 +53,13 @@ public sealed class EditCard : Window
     /// <summary>Raised with the recognized text when the card of a text capture is clicked.</summary>
     public event Action<string>? ShowTextRequested;
 
+    /// <summary>Raised with the QR codes found in the capture when its QR button is clicked.</summary>
+    public event Action<IReadOnlyList<Cometsnap.Core.Text.ScannedCode>>? CodesRequested;
+
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
     private const string TextIcon = "M3,3.5 H13 M8,3.5 V13.5 M6,13.5 H10";
     private const string EyeIcon = "M1.5,8 C4,3.5 12,3.5 14.5,8 C12,12.5 4,12.5 1.5,8 Z M8,8 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0";
+    private const string QrIcon = "M2.5,2.5 H6.5 V6.5 H2.5 Z M9.5,2.5 H13.5 V6.5 H9.5 Z M2.5,9.5 H6.5 V13.5 H2.5 Z M9.5,9.5 H11 M13.5,9.5 V11 M9.5,13.5 H13.5 M11.5,11.5 V13.5";
     private const string ScissorsIcon = "M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4";
 
     public EditCard()
@@ -120,6 +126,30 @@ public sealed class EditCard : Window
             TextRequested?.Invoke(image);
         };
 
+        // Shown only when the capture holds a QR code: reads it (link, Wi-Fi, text).
+        _qrButton = new Border
+        {
+            Background = SpaceTheme.NavyBrush, CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7, 9, 7),
+            Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand,
+            ToolTip = L.T("Read the QR code in this capture"), Visibility = Visibility.Collapsed,
+            Child = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse(QrIcon), Stroke = SpaceTheme.StarWhiteBrush, StrokeThickness = 1.6,
+                StrokeLineJoin = PenLineJoin.Round, Width = 16, Height = 16,
+            },
+        };
+        _qrButton.MouseEnter += (_, _) => _qrButton.Background = CaptureLook.AccentBrush;
+        _qrButton.MouseLeave += (_, _) => _qrButton.Background = SpaceTheme.NavyBrush;
+        _qrButton.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            _pressAt = null;
+            if (_dragged || _codes is not { Count: > 0 } codes) return;
+            _timer.Stop();
+            Hide();
+            CodesRequested?.Invoke(codes);
+        };
+
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -130,6 +160,7 @@ public sealed class EditCard : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
+        row.Children.Add(_qrButton);
         row.Children.Add(_textButton);
         row.Children.Add(edit);
         row.Children.Add(close);
@@ -235,6 +266,8 @@ public sealed class EditCard : Window
     private void SetMode(string? recording, string? text)
     {
         _title.Foreground = CaptureLook.TagBrush;
+        _codes = null;
+        _qrButton.Visibility = Visibility.Collapsed;
         _recording = recording;
         _text = text;
         var video = recording is not null;
@@ -297,6 +330,20 @@ public sealed class EditCard : Window
         if (_recording is not null || _text is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
         _path = path;
         _detail.Text = $"{image.PixelWidth} × {image.PixelHeight} · {Path.GetFileName(path)}";
+    }
+
+    /// <summary>The quick check found QR codes in the capture on the card: show the QR button.</summary>
+    public void OfferCodes(BitmapSource image, IReadOnlyList<Cometsnap.Core.Text.ScannedCode> codes)
+    {
+        if (_recording is not null || _text is not null || !ReferenceEquals(image, _image) || !IsVisible || codes.Count == 0) return;
+        _codes = codes;
+        _qrButton.Visibility = Visibility.Visible;
+        _qrButton.ToolTip = codes[0].Link is { } link
+            ? L.F("Read the QR code in this capture ({0})", Cometsnap.Core.Text.QrCodes.LinkHost(link) ?? link)
+            : L.T("Read the QR code in this capture");
+        UpdateLayout();
+        // Keep the card in its corner as it grows.
+        Left = SystemParameters.WorkArea.Right - ActualWidth - 4;
     }
 
     private void OnEdit()

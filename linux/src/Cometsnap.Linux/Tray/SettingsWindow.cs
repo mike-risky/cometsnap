@@ -96,6 +96,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(HotkeyRow(T("Scrolling capture"), () => s.ScrollingHotkey, v => s.ScrollingHotkey = v, defaults.ScrollingHotkey));
         panel.Children.Add(HotkeyRow(T("Copy text from the screen"), () => s.TextHotkey, v => s.TextHotkey = v, defaults.TextHotkey));
         panel.Children.Add(HotkeyRow(T("Pick a color"), () => s.ColorHotkey, v => s.ColorHotkey = v, defaults.ColorHotkey));
+        panel.Children.Add(HotkeyRow(T("Scan a QR code"), () => s.QrHotkey, v => s.QrHotkey = v, defaults.QrHotkey));
         panel.Children.Add(HotkeyRow(T("Record a video (press again to stop)"), () => s.RecordHotkey, v => s.RecordHotkey = v, defaults.RecordHotkey));
         panel.Children.Add(HotkeyRow(T("Record a GIF (press again to stop)"), () => s.RecordGifHotkey, v => s.RecordGifHotkey = v, defaults.RecordGifHotkey));
 
