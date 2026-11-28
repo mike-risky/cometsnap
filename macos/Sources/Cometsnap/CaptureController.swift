@@ -146,7 +146,15 @@ final class CaptureController {
         let saving = settings.askWhereToSave || settings.saveEveryCapture
         // ✨ has nothing to add when both the copy and the file are styled already.
         let canStyle = settings.stylePerShot && !(settings.styleOnCopy && settings.styleOnExport)
-        card?.show(image: saving ? image : copyImage, scale: scale, copied: settings.copyToClipboard, raw: raw, canStyle: canStyle)
+        let shown = saving ? image : copyImage
+        card?.show(image: shown, scale: scale, copied: settings.copyToClipboard, raw: raw, canStyle: canStyle)
+        if let card, settings.detectQrCodes {
+            // After the copy: a QR code in the capture is offered on the card, never forced on the clipboard.
+            Task { @MainActor in
+                guard let code = try? await CodeReader.read(raw).first(where: { $0.format == "QR code" }) else { return }
+                card.offerCode(code.text, link: CodeLinks.linkOf(code.text), for: shown)
+            }
+        }
         if settings.askWhereToSave {
             DispatchQueue.main.async { [weak self] in self?.askAndSave(image, scale: scale, card: card) }
             return
@@ -230,6 +238,11 @@ final class EditCard: NSPanel {
     private var recognized: String?
     private var link: String?
     private let linkButton: SpaceButton
+    /// "Copy QR": a QR code spotted in a normal capture; its content is copied only on a click.
+    var onCopyCode: ((String) -> Void)?
+    private var offered: String?
+    private let qrButton: SpaceButton
+    private static let baseWidth: CGFloat = 380
     private let textButton: SpaceButton
     private let styleButton: SpaceButton
     private var raw: CGImage?
@@ -251,6 +264,7 @@ final class EditCard: NSPanel {
         textButton = SpaceButton(title: "", symbol: "text.viewfinder", fill: Theme.surface, tip: L.t("Copy the text in this capture"))
         styleButton = SpaceButton(title: "", symbol: "sparkles", fill: Theme.surface, tip: L.t("Style this capture: rounded corners, shadow, backdrop"))
         linkButton = SpaceButton(title: "", symbol: "link", fill: Theme.surface, tip: L.t("Open link"))
+        qrButton = SpaceButton(title: "", symbol: "qrcode", fill: Theme.surface, tip: L.t("Copy what the QR code holds"))
         super.init(contentRect: CGRect(x: 0, y: 0, width: 380, height: 84), styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
@@ -311,11 +325,29 @@ final class EditCard: NSPanel {
             self.orderOut(nil)
             self.onOpenLink?(link)
         }
+        qrButton.isHidden = true
+        qrButton.onClick = { [weak self] in
+            guard let self, let code = self.offered else { return }
+            self.onCopyCode?(code)
+            self.titleLabel.stringValue = L.t("QR CODE COPIED!")
+            self.detail.stringValue = code.split(separator: "\n").first.map { String($0) } ?? ""
+            self.qrButton.isHidden = true
+            self.restartTimer()
+        }
         let close = SpaceButton(title: "", symbol: "xmark", tip: L.t("Dismiss"))
         close.layer?.borderWidth = 0
         close.onClick = { [weak self] in self?.fadeOut() }
 
-        for v in [thumb, titleLabel, detail, styleButton, textButton, linkButton, editButton, close] as [NSView] {
+        // The small round buttons sit in a row; hidden ones take no room.
+        let buttons = NSStackView(views: [qrButton, linkButton, styleButton, textButton])
+        buttons.orientation = .horizontal
+        buttons.spacing = 6
+        for b in [qrButton, linkButton, styleButton, textButton] {
+            b.translatesAutoresizingMaskIntoConstraints = false
+            b.widthAnchor.constraint(equalToConstant: 34).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        }
+        for v in [thumb, titleLabel, detail, buttons, editButton, close] as [NSView] {
             v.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(v)
         }
@@ -328,21 +360,10 @@ final class EditCard: NSPanel {
             titleLabel.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
             detail.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             detail.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
-            detail.trailingAnchor.constraint(lessThanOrEqualTo: styleButton.leadingAnchor, constant: -8),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: styleButton.leadingAnchor, constant: -8),
-            styleButton.trailingAnchor.constraint(equalTo: textButton.leadingAnchor, constant: -6),
-            styleButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-            styleButton.widthAnchor.constraint(equalToConstant: 34),
-            styleButton.heightAnchor.constraint(equalToConstant: 34),
-            textButton.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
-            textButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-            textButton.widthAnchor.constraint(equalToConstant: 34),
-            textButton.heightAnchor.constraint(equalToConstant: 34),
-            // Same spot as the T button, which a scanned code never shows.
-            linkButton.centerXAnchor.constraint(equalTo: textButton.centerXAnchor),
-            linkButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-            linkButton.widthAnchor.constraint(equalToConstant: 34),
-            linkButton.heightAnchor.constraint(equalToConstant: 34),
+            detail.trailingAnchor.constraint(lessThanOrEqualTo: buttons.leadingAnchor, constant: -8),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: buttons.leadingAnchor, constant: -8),
+            buttons.trailingAnchor.constraint(equalTo: editButton.leadingAnchor, constant: -6),
+            buttons.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             editButton.trailingAnchor.constraint(equalTo: close.leadingAnchor, constant: -4),
             editButton.centerYAnchor.constraint(equalTo: root.centerYAnchor),
             editButton.widthAnchor.constraint(equalToConstant: 74),
@@ -367,6 +388,8 @@ final class EditCard: NSPanel {
         recognized = nil
         link = nil
         linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = false
         styleButton.isHidden = !canStyle
         editButton.isHidden = false
@@ -387,6 +410,8 @@ final class EditCard: NSPanel {
         recognized = nil
         link = nil
         linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = true
         styleButton.isHidden = true
         editButton.isHidden = false
@@ -409,6 +434,8 @@ final class EditCard: NSPanel {
         recognized = ""
         link = nil
         linkButton.isHidden = true
+        offered = nil
+        qrButton.isHidden = true
         textButton.isHidden = true
         styleButton.isHidden = true
         editButton.isHidden = true
@@ -433,6 +460,27 @@ final class EditCard: NSPanel {
         titleLabel.stringValue = text.isEmpty ? L.t("NO TEXT FOUND") : L.t("TEXT COPIED!")
         detail.stringValue = text.isEmpty ? L.t("Try a bigger area") : lines == 1 ? firstLine : L.f("{0} lines · {1}", lines, firstLine)
         if !isVisible { present() } else { restartTimer() }
+    }
+
+    /// A QR code was spotted in the capture this card shows: offers Copy QR (and the link button
+    /// for a web link). The screenshot stays on the clipboard until Copy QR is clicked.
+    func offerCode(_ text: String, link: String?, for image: CGImage) {
+        guard image === self.image, isVisible, recognized == nil, !fileOnly else { return }
+        offered = text
+        qrButton.isHidden = false
+        qrButton.toolTip = L.t("Copy what the QR code holds") + "\n" + String(text.prefix(120))
+        self.link = link
+        linkButton.isHidden = link == nil
+        linkButton.toolTip = link
+        detail.stringValue = "▦ " + (text.split(separator: "\n").first.map { String($0) } ?? "")
+        // Room for the new buttons: the card grows to the left.
+        let extra: CGFloat = link == nil ? 40 : 80
+        var f = frame
+        let right = f.maxX
+        f.size.width = Self.baseWidth + extra
+        f.origin.x = right - f.size.width
+        setFrame(f, display: true, animate: true)
+        restartTimer()
     }
 
     /// The capture is being searched for a QR code or barcode.
@@ -472,14 +520,14 @@ final class EditCard: NSPanel {
     func setSaved(_ url: URL, for image: CGImage) {
         guard image === self.image, isVisible, recognized == nil else { return }
         self.url = url
-        detail.stringValue = "\(image.width) × \(image.height) · \(url.lastPathComponent)"
+        if offered == nil { detail.stringValue = "\(image.width) × \(image.height) · \(url.lastPathComponent)" }
     }
 
     private func present() {
         titleLabel.textColor = CaptureLook.tag
         let screen = NSScreen.underMouse
         let vf = screen.visibleFrame
-        let f = CGRect(x: vf.maxX - frame.width - 14, y: vf.minY + 14, width: frame.width, height: frame.height)
+        let f = CGRect(x: vf.maxX - Self.baseWidth - 14, y: vf.minY + 14, width: Self.baseWidth, height: frame.height)
         setFrame(f.offsetBy(dx: 0, dy: -10), display: false)
         alphaValue = 0
         orderFrontRegardless()

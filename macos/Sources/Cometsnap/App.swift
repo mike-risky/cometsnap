@@ -138,6 +138,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         card.onEdit = { [weak self] url, image, scale in self?.openEditor(url: url, image: image, scale: scale) }
         card.onOpen = { [weak self] url in self?.openTrimmer(url) }
         card.onText = { [weak self] image, scale in self?.copyText(image, scale: scale, from: nil) }
+        card.onCopyCode = { text in Clipboard.copyText(text) }
         card.onOpenLink = { link in if let safe = CodeLinks.linkOf(link), let url = URL(string: safe) { NSWorkspace.shared.open(url) } }
         card.onShowText = { [weak self] text in self?.showText(text) }
         card.onStyle = { [weak self] url, raw, scale in self?.styleOneShot(url: url, raw: raw, scale: scale) }

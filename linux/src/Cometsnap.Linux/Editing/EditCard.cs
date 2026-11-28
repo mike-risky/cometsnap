@@ -24,6 +24,10 @@ public sealed class EditCard : Window
     private readonly Border _editButton;
     private readonly Border _trimButton;
     private readonly Border _styleButton;
+    private readonly Border _qrButton;
+    private readonly Border _linkButton;
+    private string? _offered;             // a QR code spotted in the capture, not copied yet
+    private string? _link;
     private Bitmap? _raw;                 // the capture before any style, for the ✨ button
     private bool _canStyle;
     private Bitmap? _image;
@@ -40,6 +44,12 @@ public sealed class EditCard : Window
 
     /// <summary>Raised with the saved path (if known) and the raw capture when ✨ Style is clicked.</summary>
     public event Action<string?, Bitmap>? StyleRequested;
+
+    /// <summary>Copy QR was clicked: put the spotted QR code's content on the clipboard.</summary>
+    public event Action<string>? CopyCodeRequested;
+
+    /// <summary>Open link was clicked (links never open on their own).</summary>
+    public event Action<string>? OpenLinkRequested;
 
     private const string PenIcon = "M10.5,2.5 L13.5,5.5 L5.5,13.5 H2.5 V10.5 Z M8.5,4.5 L11.5,7.5";
     public const string ScissorsIcon = "M5,4.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M5,11.5 m-2,0 a2,2 0 1 0 4,0 a2,2 0 1 0 -4,0 M6.6,5.6 L14,12 M6.6,10.4 L14,4";
@@ -91,6 +101,31 @@ public sealed class EditCard : Window
         _styleButton.VerticalAlignment = VerticalAlignment.Center;
         _styleButton.Margin = new Thickness(0, 0, 6, 0);
         _styleButton.IsVisible = false;
+        // A QR code spotted in the capture: Copy QR puts its content on the clipboard instead
+        // of the screenshot; Open link only for web links, only on a click.
+        _qrButton = Ui.ActionButton("▦ " + T("Copy QR"), null, T("Copy what the QR code holds"), () =>
+        {
+            if (_offered is not { } code) return;
+            CopyCodeRequested?.Invoke(code);
+            _title.Text = T("QR CODE COPIED!");
+            _detail.Text = FirstLine(code);
+            _qrButton!.IsVisible = false;
+            _timer.Stop();
+            if (!IsPointerOver) _timer.Start();
+        });
+        _qrButton.VerticalAlignment = VerticalAlignment.Center;
+        _qrButton.Margin = new Thickness(0, 0, 6, 0);
+        _qrButton.IsVisible = false;
+        _linkButton = Ui.ActionButton("🔗 " + T("Open link"), null, T("Open link"), () =>
+        {
+            if (_link is not { } link) return;
+            _timer.Stop();
+            Hide();
+            OpenLinkRequested?.Invoke(link);
+        });
+        _linkButton.VerticalAlignment = VerticalAlignment.Center;
+        _linkButton.Margin = new Thickness(0, 0, 6, 0);
+        _linkButton.IsVisible = false;
         var close = new TextBlock
         {
             Text = "✕", Foreground = SpaceTheme.DustBrush, FontSize = 12, Margin = new Thickness(10, 0, 0, 0),
@@ -103,6 +138,8 @@ public sealed class EditCard : Window
         row.Children.Add(thumbFrame);
         row.Children.Add(text);
         row.Children.Add(_styleButton);
+        row.Children.Add(_qrButton);
+        row.Children.Add(_linkButton);
         row.Children.Add(edit);
         row.Children.Add(_trimButton);
         row.Children.Add(close);
@@ -199,6 +236,10 @@ public sealed class EditCard : Window
     private void SetMode(string? recording)
     {
         _recording = recording;
+        _offered = null;
+        _link = null;
+        _qrButton.IsVisible = false;
+        _linkButton.IsVisible = false;
         var video = recording is not null;
         _editButton.IsVisible = !video;
         _trimButton.IsVisible = video;
@@ -206,8 +247,13 @@ public sealed class EditCard : Window
         ToolTip.SetTip(_card, video ? T("Click to trim · Drag into any app") : T("Click to edit · Drag into any app"));
     }
 
+    private PixelRect _workArea;
+    private double _scaling = 1;
+
     private void Place(PixelRect workArea, double scaling)
     {
+        _workArea = workArea;
+        _scaling = scaling;
         Opacity = 1;
         if (!IsVisible) Show();
         Ui.Entrance(_card, lift: 14, ms: 180);
@@ -230,8 +276,35 @@ public sealed class EditCard : Window
     {
         if (_recording is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
         _path = path;
-        _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · {System.IO.Path.GetFileName(path)}";
+        if (_offered is null) _detail.Text = $"{image.PixelSize.Width} × {image.PixelSize.Height} · {System.IO.Path.GetFileName(path)}";
     }
+
+    /// <summary>
+    /// A QR code was spotted in the capture this card shows: offers Copy QR (and Open link for a
+    /// web link). The screenshot stays on the clipboard until Copy QR is clicked.
+    /// </summary>
+    public void OfferCode(Bitmap image, string text, string? link)
+    {
+        if (_recording is not null || !ReferenceEquals(image, _image) || !IsVisible) return;
+        _offered = text;
+        _qrButton.IsVisible = true;
+        ToolTip.SetTip(_qrButton, T("Copy what the QR code holds") + "\n" + (text.Length > 120 ? text[..120] + "…" : text));
+        _link = link;
+        _linkButton.IsVisible = link is not null;
+        if (link is not null) ToolTip.SetTip(_linkButton, link);
+        _detail.Text = "▦ " + FirstLine(text);
+        // The card grew: keep it inside the work area, right edge where it was.
+        _card.Measure(Size.Infinity);
+        var size = _card.DesiredSize + new Size(24, 24);
+        Position = new PixelPoint(
+            _workArea.Right - (int)(size.Width * _scaling) - 4,
+            _workArea.Bottom - (int)(size.Height * _scaling) - 4);
+        _timer.Stop();
+        if (!IsPointerOver) _timer.Start();
+    }
+
+    private static string FirstLine(string text) =>
+        text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
 
     public void SetDetail(string text) => _detail.Text = text;
 

@@ -54,6 +54,8 @@ public sealed class AppSettings
 
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
+    /// <summary>After each capture, look for a QR code and offer its content.</summary>
+    public bool DetectQrCodes { get; set; } = true;
 
     /// <summary>Share-ready look built in the Style studio (corners, border, shadow, glow, backdrop; shared with Windows).</summary>
     [JsonConverter(typeof(Cometsnap.Core.Styling.SnapStyleJsonConverter))]

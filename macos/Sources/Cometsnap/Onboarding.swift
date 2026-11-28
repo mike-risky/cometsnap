@@ -196,6 +196,7 @@ final class SettingsWindow: NSWindow {
     private let takeOver = NSButton(checkboxWithTitle: L.t("Use ⌘⇧3, ⌘⇧4 and ⌘⇧5 for Cometsnap (turns off the macOS screenshot shortcuts)"), target: nil, action: nil)
     private let copyBox = NSButton(checkboxWithTitle: L.t("Copy every capture to the clipboard"), target: nil, action: nil)
     private let card = NSButton(checkboxWithTitle: L.t("Show the small Edit card after a capture"), target: nil, action: nil)
+    private let spotQr = NSButton(checkboxWithTitle: L.t("Spot QR codes in captures"), target: nil, action: nil)
     private let comet = NSButton(checkboxWithTitle: L.t("Comet animation into the menu bar"), target: nil, action: nil)
     private let sound = NSButton(checkboxWithTitle: L.t("Play a sound"), target: nil, action: nil)
     private let audio = NSButton(checkboxWithTitle: L.t("Record the Mac's sound in videos"), target: nil, action: nil)
@@ -234,7 +235,7 @@ final class SettingsWindow: NSWindow {
     }
 
     private func build() {
-        for b in [login, takeOver, copyBox, card, comet, sound, audio, celebrations, seasonal, saveBox, askBox, editorBox,
+        for b in [login, takeOver, copyBox, card, spotQr, comet, sound, audio, celebrations, seasonal, saveBox, askBox, editorBox,
                   styleCopyBox, styleExportBox, stylePerShotBox] {
             b.target = self
             b.action = #selector(changed)
@@ -358,7 +359,7 @@ final class SettingsWindow: NSWindow {
             hotkeyRows.append(r)
         }
 
-        var views: [NSView] = [title, login, takeOver, card, comet, sound, audio, celebrations, seasonal]
+        var views: [NSView] = [title, login, takeOver, card, spotQr, comet, sound, audio, celebrations, seasonal]
         views += [row(L.t("Language"), language), row(L.t("Loupe corner"), loupe), row(L.t("GIF smoothness"), gifFps), themeBox]
         views += [heading(L.t("Share-ready style")),
                   hint(L.t("Rounded corners, drop shadow, border, laser or neon glow and a backdrop, ready for social posts and docs. Build your own look in the Style studio.")),
@@ -412,6 +413,7 @@ final class SettingsWindow: NSWindow {
         takeOver.state = s.takeOverSystemShortcut ? .on : .off
         copyBox.state = s.copyToClipboard ? .on : .off
         card.state = s.showEditCard ? .on : .off
+        spotQr.state = s.detectQrCodes ? .on : .off
         comet.state = s.cometAnimation ? .on : .off
         sound.state = s.playSound ? .on : .off
         audio.state = s.recordSystemAudio ? .on : .off
@@ -519,6 +521,7 @@ final class SettingsWindow: NSWindow {
             s.takeOverSystemShortcut = takeOver.state == .on
             s.copyToClipboard = copyBox.state == .on
             s.showEditCard = card.state == .on
+            s.detectQrCodes = spotQr.state == .on
             s.cometAnimation = comet.state == .on
             s.playSound = sound.state == .on
             s.recordSystemAudio = audio.state == .on

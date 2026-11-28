@@ -34,6 +34,19 @@ public class CodeScannerTests
     }
 
     [Fact]
+    public void Spots_a_qr_code_in_a_full_screenshot_quickly()
+    {
+        var (px, w, h) = Draw("https://example.org/menu", BarcodeFormat.QR_CODE, 220, 220, 2560, 1440, 1900, 900);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var code = CodeScanner.FindQr(px, w, h, w * 4);
+        Console.WriteLine($"FindQr 2560x1440: {sw.ElapsedMilliseconds} ms");
+        Assert.Equal("https://example.org/menu", code?.Text);
+        var (bar, bw, bh) = Draw("Cometsnap-2026", BarcodeFormat.CODE_128, 300, 80, 400, 140, 50, 30);
+        Assert.Null(CodeScanner.FindQr(bar, bw, bh, bw * 4)); // barcodes are only for Scan a QR code
+        Assert.Null(CodeScanner.FindQr(new byte[800 * 600 * 4], 800, 600, 3200));
+    }
+
+    [Fact]
     public void Reads_a_code_boxed_right_up_to_its_edges()
     {
         // No quiet zone at all: the scanner adds one before decoding.

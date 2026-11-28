@@ -9,6 +9,8 @@ public struct AppSettings: Codable, Equatable {
     public var playSound = false
     public var cometAnimation = true
     public var showEditCard = true
+    /// After each capture, look for a QR code and offer its content on the Copied card.
+    public var detectQrCodes = true
     public var copyToClipboard = true
     public var takeOverSystemShortcut = false
     public var firstRunDone = false
@@ -59,7 +61,7 @@ public struct AppSettings: Codable, Equatable {
              takeOverSystemShortcut, firstRunDone, recordSystemAudio, gifFramesPerSecond, videoFramesPerSecond,
              celebrations, seasonalLooks, constellationSteps, snapCount, snapMonth, snapMonthCount, snapCountSeeded, language, captureTheme,
              saveEveryCapture, fileNamePattern, imageFormat, askWhereToSave, openEditorAfterCapture, nameCounter, hotkeys,
-             snapStyle, styleOnCopy, styleOnExport, stylePerShot
+             snapStyle, styleOnCopy, styleOnExport, stylePerShot, detectQrCodes
     }
 
     public init(from decoder: Decoder) throws {
@@ -70,6 +72,7 @@ public struct AppSettings: Codable, Equatable {
         playSound = (try? c.decodeIfPresent(Bool.self, forKey: .playSound)) ?? d.playSound
         cometAnimation = (try? c.decodeIfPresent(Bool.self, forKey: .cometAnimation)) ?? d.cometAnimation
         showEditCard = (try? c.decodeIfPresent(Bool.self, forKey: .showEditCard)) ?? d.showEditCard
+        detectQrCodes = (try? c.decodeIfPresent(Bool.self, forKey: .detectQrCodes)) ?? d.detectQrCodes
         copyToClipboard = (try? c.decodeIfPresent(Bool.self, forKey: .copyToClipboard)) ?? d.copyToClipboard
         takeOverSystemShortcut = (try? c.decodeIfPresent(Bool.self, forKey: .takeOverSystemShortcut)) ?? d.takeOverSystemShortcut
         firstRunDone = (try? c.decodeIfPresent(Bool.self, forKey: .firstRunDone)) ?? d.firstRunDone

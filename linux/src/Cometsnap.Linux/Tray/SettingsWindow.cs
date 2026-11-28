@@ -56,6 +56,7 @@ public sealed class SettingsWindow : Window
         panel.Children.Add(Toggle(T("Detect windows under the mouse"), s.WindowDetection, v => s.WindowDetection = v,
             WindowFinder.IsAvailable ? null : T("Wayland does not let apps see other windows: click captures the screen, drag picks an area.")));
         panel.Children.Add(Toggle(T("Show the Edit card after a capture"), s.ShowEditCard, v => s.ShowEditCard = v));
+        panel.Children.Add(Toggle(T("Spot QR codes in captures"), s.DetectQrCodes, v => s.DetectQrCodes = v));
         panel.Children.Add(Toggle(T("Soft click sound"), s.PlaySounds, v => s.PlaySounds = v));
         panel.Children.Add(Toggle(T("Comet animation"), s.ShowCometAnimation, v => s.ShowCometAnimation = v,
             T("The capture rides a comet towards the tray. Needs a compositor (most desktops have one).")));

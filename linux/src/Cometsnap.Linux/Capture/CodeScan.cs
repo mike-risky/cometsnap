@@ -59,13 +59,26 @@ public sealed class CodeScan
         finally { _busy = false; }
     }
 
-    private static unsafe IReadOnlyList<ScannedCode> Scan(Bitmap image)
+    /// <summary>The QR code in a normal capture, if any (QR only, quick). Safe on any thread.</summary>
+    public static ScannedCode? FindQr(Bitmap image)
+    {
+        var (pixels, w, h) = Pixels(image);
+        return CodeScanner.FindQr(pixels, w, h, w * 4);
+    }
+
+    private static IReadOnlyList<ScannedCode> Scan(Bitmap image)
+    {
+        var (pixels, w, h) = Pixels(image);
+        return CodeScanner.Scan(pixels, w, h, w * 4);
+    }
+
+    private static unsafe (byte[] Pixels, int W, int H) Pixels(Bitmap image)
     {
         var w = image.PixelSize.Width;
         var h = image.PixelSize.Height;
         var pixels = new byte[w * h * 4];
         fixed (byte* p = pixels)
             image.CopyPixels(new Avalonia.PixelRect(0, 0, w, h), (IntPtr)p, pixels.Length, w * 4);
-        return CodeScanner.Scan(pixels, w, h, w * 4);
+        return (pixels, w, h);
     }
 }

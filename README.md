@@ -126,8 +126,9 @@ see [`macos/`](macos/README.md) and [`linux/`](linux/) for their details.
 - **Copy text (OCR)** (Ctrl+Alt+T): drag over any text on screen and the text lands on the clipboard. Also the **T**
   button on the Copied card and **Copy text** in the editor. Uses the OCR built into Windows, offline: nothing is uploaded.
   Click the card to see the text and copy just a part
-- **Scan a QR code** (Ctrl+Alt+Q, or the tray menu): drag over a QR code (or a barcode) and what it holds lands on
-  the clipboard, read offline. A web link gets an **Open link** button on the Copied card; nothing opens on its own.
+- **QR codes**: when a capture has a QR code in it, the Copied card offers **Copy QR** and, for web links, **Open link**
+  (the screenshot stays on the clipboard; turn it off in Settings). **Scan a QR code** (Ctrl+Alt+Q, or the tray menu):
+  drag over a QR code (or a barcode) and what it holds lands on the clipboard right away, read offline. A web link gets an **Open link** button on the Copied card; nothing opens on its own.
   On macOS it is ⌘⇧1 and uses Apple's Vision; every shortcut can be changed in Settings
 - **Color picker** (Win+Shift+C, or the tray menu): the loupe opens, click any pixel and its color lands on the
   clipboard as `#RRGGBB` (Shift+click for `rgb(...)`). In any capture, **C** copies the color under the cursor too

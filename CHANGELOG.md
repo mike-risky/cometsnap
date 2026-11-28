@@ -18,10 +18,11 @@ Changes merged after the last release show up under "Latest build" first: they a
   Comet or Polaroid. Three switches decide where it applies: **Style on copy** (clipboard), **Style on export**
   (saved files and what you drag out of the tray) and **Style per shot**, a ✨ button on the Copied card that
   styles just that capture. Copy and export stay raw by default, so capture is as instant as ever. Windows, macOS and Linux.
-- **Scan a QR code.** Press Ctrl+Alt+Q (⌘⇧1 on macOS, or pick it in the tray menu), drag over a QR code and what
-  it holds is on your clipboard. Barcodes work too (EAN, UPC, Code 128, Data Matrix and more). It reads offline,
-  nothing is uploaded. When the code is a web link, the Copied card shows an **Open link** button; links never open
-  on their own. The shortcut can be changed in Settings. Windows, macOS and Linux.
+- **QR codes, spotted for you.** Just capture as usual: when there's a QR code in the screenshot, the Copied card
+  shows **Copy QR** (puts what the code holds on the clipboard) and, for web links, **Open link**. The screenshot
+  itself is copied and saved exactly as before, and nothing opens on its own. Want only the code? Ctrl+Alt+Q
+  (⌘⇧1 on macOS, or the tray menu) scans an area and copies the code right away, barcodes too (EAN, UPC, Code 128,
+  Data Matrix and more). Everything is read offline. Turn the spotting off in Settings. Windows, macOS and Linux.
 
 ### Improved
 - **A quick mission briefing on first launch.** The "Replace your old screen capture" window now also explains

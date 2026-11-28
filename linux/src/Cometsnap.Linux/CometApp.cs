@@ -194,7 +194,12 @@ public sealed class CometApp : Application
         var copyImage = Settings.StyleOnCopy ? Styled() : raw;
         var image = Settings.StyleOnExport ? Styled() : raw;
         var saving = Settings.AutoSave || Settings.AskWhereToSave;
-        if (Settings.ShowEditCard) ShowCard(saving ? image : copyImage, rect, copy, raw);
+        if (Settings.ShowEditCard)
+        {
+            var shown = saving ? image : copyImage;
+            ShowCard(shown, rect, copy, raw);
+            if (Settings.DetectQrCodes) SpotQr(shown, raw);
+        }
         LaunchComet(rect, image);
         // Counting (and any celebration) waits until the capture is fully done.
         Dispatcher.UIThread.Post(CountSnap, DispatcherPriority.ApplicationIdle);
@@ -333,6 +338,23 @@ public sealed class CometApp : Application
         _ = StartHotkeysAsync();
     }
 
+    /// <summary>
+    /// After a capture (copied and saved as usual): looks for a QR code in the background. When
+    /// there is one, the Copied card offers its content; the screenshot stays on the clipboard.
+    /// </summary>
+    private void SpotQr(Bitmap shown, Bitmap raw) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            await Task.Delay(60); // the card, the comet and the save go first
+            var code = CodeScan.FindQr(raw);
+            if (code is null) return;
+            var link = Cometsnap.Core.Scanning.CodeScanner.LinkOf(code.Text);
+            Dispatcher.UIThread.Post(() => _card?.OfferCode(shown, code.Text, link));
+        }
+        catch (Exception ex) { Log.Error("Looking for a QR code failed", ex); }
+    });
+
     private void ShowCard(Bitmap image, PixelRect rect, bool copied, Bitmap? raw = null)
     {
         var (work, scale) = WorkAreaAt(rect.CenterX, rect.CenterY);
@@ -386,6 +408,8 @@ public sealed class CometApp : Application
         };
         _card.TrimRequested += OpenTrimmer;
         _card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
+        _card.CopyCodeRequested += text => _ = Clipboard.SetTextAsync(text);
+        _card.OpenLinkRequested += link => { if (Cometsnap.Core.Scanning.CodeScanner.LinkOf(link) is { } safe) Tools.Open(safe); };
         return _card;
     }
 

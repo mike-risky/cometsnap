@@ -32,12 +32,22 @@ public static class CodeScanner
         return found;
     }
 
-    private static List<ScannedCode> Decode(byte[] luminance, int w, int h)
+    /// <summary>
+    /// The QR code in a normal capture, if there is one: QR codes only, so it stays quick on a big
+    /// screenshot. Runs off the UI thread after the capture is already copied and saved.
+    /// </summary>
+    public static ScannedCode? FindQr(byte[] bgra, int width, int height, int stride)
+    {
+        if (width < 21 || height < 21) return null;
+        return Decode(Luminance(bgra, width, height, stride, 1), width, height, [BarcodeFormat.QR_CODE]).FirstOrDefault();
+    }
+
+    private static List<ScannedCode> Decode(byte[] luminance, int w, int h, IList<BarcodeFormat>? formats = null)
     {
         var reader = new BarcodeReaderGeneric
         {
             AutoRotate = true,
-            Options = new DecodingOptions { TryHarder = true, TryInverted = true, PossibleFormats = Formats, CharacterSet = "UTF-8" },
+            Options = new DecodingOptions { TryHarder = true, TryInverted = true, PossibleFormats = formats ?? Formats, CharacterSet = "UTF-8" },
         };
         // A white quiet zone around the picked area: a tightly boxed code still reads.
         // (Light-on-dark codes get a dark one too, as TryInverted flips the whole image.)

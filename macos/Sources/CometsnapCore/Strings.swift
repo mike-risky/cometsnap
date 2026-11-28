@@ -373,6 +373,11 @@ enum Strings {
         "Code copied": "Code copié",
         "Could not scan the code": "Impossible de scanner le code",
         "Drag over the QR code, or click a window · Esc cancel": "Glissez sur le code QR, ou cliquez sur une fenêtre · Échap annule",
+        "Copy QR": "Copier le QR",
+        "Copied": "Copié",
+        "Copy what the QR code holds": "Copier le contenu du code QR",
+        "Spot QR codes in captures": "Repérer les codes QR dans les captures",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "La carte Copié propose de copier le contenu d'un code QR ou d'ouvrir son lien. La capture reste dans le presse-papiers.",
     ]
 
     static let german: [String: String] = [
@@ -733,6 +738,11 @@ enum Strings {
         "Code copied": "Code kopiert",
         "Could not scan the code": "Der Code konnte nicht gescannt werden",
         "Drag over the QR code, or click a window · Esc cancel": "Über den QR-Code ziehen oder ein Fenster anklicken · Esc bricht ab",
+        "Copy QR": "QR kopieren",
+        "Copied": "Kopiert",
+        "Copy what the QR code holds": "Inhalt des QR-Codes kopieren",
+        "Spot QR codes in captures": "QR-Codes in Aufnahmen erkennen",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "Die Kopiert-Karte bietet an, den Inhalt eines QR-Codes zu kopieren oder seinen Link zu öffnen. Der Screenshot bleibt in der Zwischenablage.",
     ]
 
     static let italian: [String: String] = [
@@ -1093,6 +1103,11 @@ enum Strings {
         "Code copied": "Codice copiato",
         "Could not scan the code": "Impossibile scansionare il codice",
         "Drag over the QR code, or click a window · Esc cancel": "Trascina sul codice QR o clicca una finestra · Esc annulla",
+        "Copy QR": "Copia QR",
+        "Copied": "Copiato",
+        "Copy what the QR code holds": "Copia il contenuto del codice QR",
+        "Spot QR codes in captures": "Riconosci i codici QR nelle catture",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "La scheda Copiato propone di copiare il contenuto di un codice QR o di aprirne il link. Lo screenshot resta negli appunti.",
     ]
 
     static let spanish: [String: String] = [
@@ -1453,6 +1468,11 @@ enum Strings {
         "Code copied": "Código copiado",
         "Could not scan the code": "No se pudo escanear el código",
         "Drag over the QR code, or click a window · Esc cancel": "Arrastra sobre el código QR o haz clic en una ventana · Esc cancela",
+        "Copy QR": "Copiar QR",
+        "Copied": "Copiado",
+        "Copy what the QR code holds": "Copiar el contenido del código QR",
+        "Spot QR codes in captures": "Detectar códigos QR en las capturas",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "La tarjeta Copiado ofrece copiar el contenido de un código QR o abrir su enlace. La captura sigue en el portapapeles.",
     ]
 
     static let portuguese: [String: String] = [
@@ -1813,6 +1833,11 @@ enum Strings {
         "Code copied": "Código copiado",
         "Could not scan the code": "Não foi possível ler o código",
         "Drag over the QR code, or click a window · Esc cancel": "Arraste sobre o código QR ou clique numa janela · Esc cancela",
+        "Copy QR": "Copiar QR",
+        "Copied": "Copiado",
+        "Copy what the QR code holds": "Copiar o conteúdo do código QR",
+        "Spot QR codes in captures": "Detectar códigos QR nas capturas",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "O cartão Copiado oferece copiar o conteúdo de um código QR ou abrir o link. A captura continua na área de transferência.",
     ]
 
     static let chinese: [String: String] = [
@@ -2173,6 +2198,11 @@ enum Strings {
         "Code copied": "条码内容已复制",
         "Could not scan the code": "无法扫描该码",
         "Drag over the QR code, or click a window · Esc cancel": "拖动框选二维码，或点击一个窗口 · Esc 取消",
+        "Copy QR": "复制二维码",
+        "Copied": "已复制",
+        "Copy what the QR code holds": "复制二维码中的内容",
+        "Spot QR codes in captures": "识别截图中的二维码",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "“已复制”卡片会提供复制二维码内容或打开其链接的按钮。截图仍保留在剪贴板中。",
     ]
 
     static let hindi: [String: String] = [
@@ -2533,5 +2563,10 @@ enum Strings {
         "Code copied": "कोड कॉपी हुआ",
         "Could not scan the code": "कोड स्कैन नहीं हो सका",
         "Drag over the QR code, or click a window · Esc cancel": "QR कोड पर ड्रैग करें, या कोई विंडो क्लिक करें · Esc रद्द करे",
+        "Copy QR": "QR कॉपी करें",
+        "Copied": "कॉपी हुआ",
+        "Copy what the QR code holds": "QR कोड की सामग्री कॉपी करें",
+        "Spot QR codes in captures": "कैप्चर में QR कोड पहचानें",
+        "The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard.": "Copied कार्ड QR कोड की सामग्री कॉपी करने या उसका लिंक खोलने का विकल्प देता है। स्क्रीनशॉट क्लिपबोर्ड पर ही रहता है।",
     ]
 }

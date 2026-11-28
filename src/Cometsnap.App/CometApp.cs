@@ -411,6 +411,7 @@ public sealed class CometApp : Application
             // ✨ has nothing to add when both the copy and the file are styled already.
             var canStyle = Settings.StylePerShot && !(Settings.StyleOnCopy && Settings.StyleOnExport);
             _card?.ShowFor(image, SystemParameters.WorkArea, Settings.CopyToClipboardOnCapture, Capture.LastRawCapture, canStyle);
+            if (Settings.DetectQrCodes) _ = SpotQrAsync(image, Capture.LastRawCapture ?? image);
         }
         LaunchComet(new Point(from.CenterX, from.CenterY), image);
         // Counting (and any celebration) waits until the capture is fully done.
@@ -538,6 +539,32 @@ public sealed class CometApp : Application
         }
     }
 
+    /// <summary>
+    /// After a normal capture (already copied and saved): looks for a QR code in the background.
+    /// When there is one, the Copied card offers its content; the screenshot stays on the clipboard.
+    /// </summary>
+    private async Task SpotQrAsync(System.Windows.Media.Imaging.BitmapSource shown, System.Windows.Media.Imaging.BitmapSource raw)
+    {
+        try
+        {
+            // Let the card, the comet and the save go first: capture stays instant.
+            await System.Windows.Threading.Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+            var sw = Stopwatch.StartNew();
+            var bgra = new System.Windows.Media.Imaging.FormatConvertedBitmap(raw, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+            int w = bgra.PixelWidth, h = bgra.PixelHeight, stride = w * 4;
+            var pixels = new byte[stride * h];
+            bgra.CopyPixels(pixels, stride, 0);
+            var code = await Task.Run(() => Cometsnap.Core.Scanning.CodeScanner.FindQr(pixels, w, h, stride));
+            if (code is null) return;
+            Log.Info($"QR spotted in a capture in {sw.ElapsedMilliseconds} ms");
+            _card?.OfferCode(shown, code.Text, Cometsnap.Core.Scanning.CodeScanner.LinkOf(code.Text));
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Looking for a QR code failed", ex);
+        }
+    }
+
     /// <summary>Opens a scanned web link in the default browser, only after the user clicked it.</summary>
     public void OpenLink(string link)
     {
@@ -662,6 +689,7 @@ public sealed class CometApp : Application
         card.StyleRequested += (path, raw) => _ = StyleOneShotAsync(path, raw);
         card.ShowTextRequested += ShowRecognizedText;
         card.OpenLinkRequested += OpenLink;
+        card.CopyCodeRequested += text => { if (!ClipboardService.SetText(text)) Log.Error("Could not copy the QR code"); };
         return card;
     }
 

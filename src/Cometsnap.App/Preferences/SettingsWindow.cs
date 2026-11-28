@@ -103,6 +103,7 @@ public sealed class SettingsWindow : Window
         stack.Children.Add(ThemePicker());
         stack.Children.Add(Switch(L.T("Instant capture (no toolbar)"), L.T("The capture is taken the moment you release the mouse."), S.InstantCapture, v => S.InstantCapture = v));
         stack.Children.Add(Switch(L.T("Show the Edit card after a capture"), L.T("A small card in the corner to edit or drag the capture."), S.ShowEditCard, v => S.ShowEditCard = v));
+        stack.Children.Add(Switch(L.T("Spot QR codes in captures"), L.T("The Copied card offers to copy a QR code's content or open its link. The screenshot stays on the clipboard."), S.DetectQrCodes, v => S.DetectQrCodes = v));
         stack.Children.Add(Switch(L.T("Comet animation"), L.T("The comet flies your capture into the tray."), S.ShowCometAnimation, v => S.ShowCometAnimation = v));
         stack.Children.Add(Switch(L.T("Detect windows under the mouse"), L.T("Click a window to capture just that window."), S.WindowDetection, v => S.WindowDetection = v));
 

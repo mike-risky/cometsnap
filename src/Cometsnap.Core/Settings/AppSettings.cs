@@ -69,6 +69,8 @@ public sealed class AppSettings
 
     /// <summary>After a capture, show a small card in the corner with an "Edit" button.</summary>
     public bool ShowEditCard { get; set; } = true;
+    /// <summary>After each capture, look for a QR code and offer its content on the Copied card.</summary>
+    public bool DetectQrCodes { get; set; } = true;
 
     /// <summary>Look of the capture screen: a <see cref="CaptureThemes"/> id ("blue" is the classic look).</summary>
     public string CaptureTheme { get; set; } = CaptureThemes.DefaultId;
